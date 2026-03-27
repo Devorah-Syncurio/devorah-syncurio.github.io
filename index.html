@@ -17,7 +17,7 @@
             <span style="color:#F07830;">S</span><span style="color:#1C2B3A;">yncurio</span>
           </div>
           <div style="font-size:12px;color:#8a99a8;letter-spacing:2px;margin-bottom:32px;">invoice tracker</div>
-          <input id="pwd-input" type="password" placeholder="Enter password" autocomplete="off"
+          <input id="pwd-input" type="password" placeholder="Enter password" autocomplete="new-password"
             style="width:100%;box-sizing:border-box;padding:12px 16px;border:1.5px solid #dde2ea;border-radius:8px;font-size:15px;color:#1C2B3A;outline:none;margin-bottom:12px;"
             onkeydown="if(event.key==='Enter')document.getElementById('pwd-btn').click()"
           />
@@ -32,7 +32,7 @@
           >Sign In</button>
         </div>`;
       document.body.appendChild(overlay);
-      setTimeout(function(){ document.getElementById('pwd-input') && document.getElementById('pwd-input').focus(); }, 50);
+      setTimeout(function(){ var el=document.getElementById('pwd-input'); if(el){el.value='';el.focus();} }, 100);
     });
   }
 })();
@@ -276,10 +276,10 @@ tbody tr:hover{background:var(--bg)}
         <button class="mbtn" onclick="shiftMonth(1)">&#8594;</button>
       </div>
       <div class="sgrid">
-        <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-count">—</div></div>
-        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
-        <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
-        <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
+        <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-count">—</div></div>
+        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
+        <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
+        <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
       <div class="dgrid">
         <div style="display:flex;flex-direction:column;height:100%">
@@ -807,7 +807,7 @@ function showCommPin(){
       </div>
       <div style="font-size:11px;color:#8a99a8;letter-spacing:2px;margin-bottom:8px;">invoice tracker</div>
       <div style="font-size:13px;color:#1C2B3A;font-weight:600;margin-bottom:20px;">Commission Access</div>
-      <input id="comm-pin-input" type="password" placeholder="Enter commission code" autocomplete="off"
+      <input id="comm-pin-input" type="password" placeholder="Enter commission code" autocomplete="new-password"
         style="width:100%;box-sizing:border-box;padding:12px 16px;border:1.5px solid #dde2ea;border-radius:8px;font-size:15px;color:#1C2B3A;outline:none;margin-bottom:12px;"
         onkeydown="if(event.key==='Enter')document.getElementById('comm-pin-btn').click()"
       />
@@ -822,7 +822,7 @@ function showCommPin(){
       >Unlock</button>
     </div>`;
   document.body.appendChild(ov);
-  setTimeout(()=>document.getElementById('comm-pin-input')&&document.getElementById('comm-pin-input').focus(),50);
+  setTimeout(()=>{var el=document.getElementById('comm-pin-input');if(el){el.value='';el.focus();}},100);
 }
 
 function clearCommFilters(){
@@ -1509,13 +1509,21 @@ function renderDash(){
   const nextTotal=nextFc.length?nextFc[0].recurTotal:0;
   const nextCount=nextFc.length?nextFc[0].items.length:0;
 
-  document.getElementById('ds-total').textContent=fmtPound(total);
+  const totalEx=invs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+  const nextTotalEx=nextFc.length?nextFc[0].recurSub:0;
+  const recurTotal=recurInvs.reduce((s,i)=>s+i.total,0);
+  const recurEx=recurInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+  document.getElementById('ds-total').textContent=fmtPound(total)+' inc. VAT';
+  document.getElementById('ds-total-ex').textContent=fmtPound(totalEx)+' ex. VAT';
   document.getElementById('ds-count').textContent=invs.length+' invoice'+(invs.length!==1?'s':'');
-  document.getElementById('ds-next').textContent=fmtPound(nextTotal);
+  document.getElementById('ds-next').textContent=fmtPound(nextTotal)+' inc. VAT';
+  document.getElementById('ds-next-ex').textContent=fmtPound(nextTotalEx)+' ex. VAT';
   document.getElementById('ds-next-sub').textContent=nextCount+' recurring schedule'+(nextCount!==1?'s':'');
-  document.getElementById('ds-recur').textContent=fmtPound(recurInvs.reduce((s,i)=>s+i.total,0));
+  document.getElementById('ds-recur').textContent=fmtPound(recurTotal)+' inc. VAT';
+  document.getElementById('ds-recur-ex').textContent=fmtPound(recurEx)+' ex. VAT';
   document.getElementById('ds-recur-sub').textContent=recurInvs.length+' recurring invoice'+(recurInvs.length!==1?'s':'');
-  document.getElementById('ds-max').textContent=maxInv?fmtPound(maxInv.total):'—';
+  document.getElementById('ds-max').textContent=maxInv?(fmtPound(maxInv.total)+' inc. VAT'):'—';
+  document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.sub||maxInv.total/(1+(maxInv.vatRate||20)/100))+' ex. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
   // (#4) Monthly trend: 6 past months + current + next month forecast
