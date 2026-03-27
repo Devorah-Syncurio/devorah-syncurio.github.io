@@ -261,6 +261,7 @@ tbody tr:hover{background:var(--bg)}
     <div class="topbar-right">
       <button class="btn btn-ghost" onclick="openExport()">↓ Export to Excel</button>
       <button class="btn btn-ghost" onclick="exportVarianceReport()" title="Export variance comparison between current month actuals and next month forecast">↓ Variance Report</button>
+      <button class="btn btn-ghost" onclick="showInvoiceChangesModal()" title="Compare invoices across two date ranges">↓ Invoice Changes</button>
       <button class="btn btn-ghost" onclick="openCustModal()">+ Customer</button>
       <button class="btn btn-primary" onclick="openInvModal()">+ New Invoice</button>
     </div>
@@ -307,32 +308,6 @@ tbody tr:hover{background:var(--bg)}
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
         </div>
 
-      <!-- Customer Invoice Changes -->
-      <div style="margin-top:20px">
-        <div class="card">
-          <div class="card-hdr" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="toggleCard('inv-changes')">
-            <span class="card-title">Customer invoice changes</span>
-            <div style="display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap" onclick="event.stopPropagation()">
-              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3)">
-                <span style="font-weight:600;color:var(--ink2)">Period A:</span>
-                <input type="date" id="chg-a-from" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
-                <span>→</span>
-                <input type="date" id="chg-a-to" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3)">
-                <span style="font-weight:600;color:var(--ink2)">Period B:</span>
-                <input type="date" id="chg-b-from" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
-                <span>→</span>
-                <input type="date" id="chg-b-to" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
-              </div>
-              <button onclick="event.stopPropagation();initChangePeriods()" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink3);cursor:pointer">Reset</button>
-            </div>
-            <span class="card-total-pill" id="inv-changes-total"></span>
-            <button class="card-toggle" id="inv-changes-arrow" aria-label="Toggle">▼</button>
-          </div>
-          <div class="card-body" id="inv-changes" style="display:none"></div>
-        </div>
-      </div>
     </div>
 
     <!-- INVOICES -->
@@ -1519,221 +1494,10 @@ function openFcExport(){document.getElementById('fcexp-months').value=document.g
 let dashY=new Date().getFullYear(),dashM=new Date().getMonth();
 function shiftMonth(d){dashM+=d;if(dashM>11){dashM=0;dashY++;}if(dashM<0){dashM=11;dashY--;}renderDash();}
 
-function initChangePeriods(){
-  // Default: Period A = prev month, Period B = current month
-  const prevD=new Date(dashY,dashM-1,1);
-  const curD=new Date(dashY,dashM,1);
-  const lastPrev=new Date(dashY,dashM,0);
-  const lastCur=new Date(dashY,dashM+1,0);
-  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  const aFrom=document.getElementById('chg-a-from');
-  const aTo=document.getElementById('chg-a-to');
-  const bFrom=document.getElementById('chg-b-from');
-  const bTo=document.getElementById('chg-b-to');
-  if(aFrom) aFrom.value=fmt(prevD);
-  if(aTo) aTo.value=fmt(lastPrev);
-  if(bFrom) bFrom.value=fmt(curD);
-  if(bTo) bTo.value=fmt(lastCur);
-}
 
-function renderChanges(){
-  const aFrom=document.getElementById('chg-a-from')?.value;
-  const aTo=document.getElementById('chg-a-to')?.value;
-  const bFrom=document.getElementById('chg-b-from')?.value;
-  const bTo=document.getElementById('chg-b-to')?.value;
-  if(!aFrom||!aTo||!bFrom||!bTo){initChangePeriods();return;}
-
-  const inRange=(date,from,to)=>date>=from&&date<=to;
-  const fmtPeriod=(f,t)=>{
-    const fd=new Date(f+'T00:00:00'), td=new Date(t+'T00:00:00');
-    if(f===t) return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    if(fd.getFullYear()===td.getFullYear()&&fd.getMonth()===td.getMonth())
-      return fd.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-    return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+td.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-  };
-  const lblA=fmtPeriod(aFrom,aTo);
-  const lblB=fmtPeriod(bFrom,bTo);
-
-  // Group invoices by customer for each period
-  const pA={}, pB={};
-  DB.invoices.filter(i=>inRange(i.date,aFrom,aTo)).forEach(i=>{
-    if(!pA[i.customerId]) pA[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
-    pA[i.customerId].total+=i.total;
-    pA[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
-    pA[i.customerId].invoices.push(i);
-    (i.lines||[]).forEach(l=>pA[i.customerId].lines.push({...l,_inv:i.id}));
-  });
-  DB.invoices.filter(i=>inRange(i.date,bFrom,bTo)).forEach(i=>{
-    if(!pB[i.customerId]) pB[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
-    pB[i.customerId].total+=i.total;
-    pB[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
-    pB[i.customerId].invoices.push(i);
-    (i.lines||[]).forEach(l=>pB[i.customerId].lines.push({...l,_inv:i.id}));
-  });
-
-  const custIds=[...new Set([...Object.keys(pA),...Object.keys(pB)])];
-  const changes=[];
-  custIds.forEach(cid=>{
-    const c=DB.customers.find(x=>x.id===cid);
-    if(!c) return;
-    const hasA=!!pA[cid], hasB=!!pB[cid];
-    const totA=hasA?pA[cid].total:0, totB=hasB?pB[cid].total:0;
-    const subA=hasA?pA[cid].sub:0, subB=hasB?pB[cid].sub:0;
-    const diff=totB-totA;
-    const pct=totA?((diff/totA)*100):null;
-
-    // Detect line item changes (A → B)
-    const lineChanges=[];
-    if(hasA&&hasB){
-      const mapA={}, mapB={};
-      pA[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapA[k]) mapA[k]={qty:0,price:l.price,unit:l.unit||''}; mapA[k].qty+=Number(l.qty)||0; });
-      pB[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapB[k]) mapB[k]={qty:0,price:l.price,unit:l.unit||''}; mapB[k].qty+=Number(l.qty)||0; });
-      Object.keys(mapB).forEach(k=>{ if(!mapA[k]) lineChanges.push({type:'added',desc:k||'Unnamed',qty:mapB[k].qty,price:mapB[k].price}); });
-      Object.keys(mapA).forEach(k=>{ if(!mapB[k]) lineChanges.push({type:'removed',desc:k||'Unnamed',qty:mapA[k].qty,price:mapA[k].price}); });
-      Object.keys(mapB).forEach(k=>{
-        if(!mapA[k]) return;
-        const qd=mapB[k].qty-mapA[k].qty;
-        const pd=mapB[k].price-mapA[k].price;
-        if(Math.abs(qd)>0.001) lineChanges.push({type:'qty',desc:k||'Unnamed',fromQty:mapA[k].qty,toQty:mapB[k].qty,diff:qd,price:mapB[k].price});
-        if(Math.abs(pd)>0.001) lineChanges.push({type:'price',desc:k||'Unnamed',fromPrice:mapA[k].price,toPrice:mapB[k].price,qty:mapB[k].qty,diff:pd});
-      });
-    }
-
-    if(Math.abs(diff)<0.01&&lineChanges.length===0&&hasA&&hasB) return;
-    const status=!hasA&&hasB?'new':hasA&&!hasB?'gone':diff>0?'up':diff<0?'down':'same';
-    const serviceType=pB[cid]?.invoices[0]?.serviceType||pA[cid]?.invoices[0]?.serviceType||'';
-    changes.push({c,diff,pct,totA,totB,subA,subB,lineChanges,status,serviceType});
-  });
-
-  changes.sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
-
-  const el=document.getElementById('inv-changes');
-  const pill=document.getElementById('inv-changes-total');
-  pill.textContent=changes.length+' change'+(changes.length!==1?'s':'');
-
-  if(!changes.length){
-    el.innerHTML=`<div style="padding:20px;color:var(--ink3);font-size:13px;text-align:center">No changes detected between ${esc(lblA)} and ${esc(lblB)}</div>`;
-    return;
-  }
-
-  const statusIcon={up:'↑',down:'↓',new:'★',gone:'✕',same:'→'};
-  const statusCol={up:'#1a9e5c',down:'#e03e3e',new:'#F07830',gone:'#8a99a8',same:'var(--ink3)'};
-  const statusBg={up:'#e8f5ee',down:'#fdecea',new:'#fff3e8',gone:'#f5f5f5',same:'#f8f9fa'};
-
-  el.innerHTML=`
-  <div style="overflow-x:auto">
-  <table style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead>
-      <tr style="border-bottom:2px solid var(--border);color:var(--ink3);font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">
-        <th style="padding:10px 14px;text-align:left;font-weight:600">Customer</th>
-        <th style="padding:10px 14px;text-align:right;font-weight:600">${esc(lblA)}</th>
-        <th style="padding:10px 14px;text-align:right;font-weight:600">${esc(lblB)}</th>
-        <th style="padding:10px 14px;text-align:right;font-weight:600">Change</th>
-        <th style="padding:10px 14px;text-align:left;font-weight:600">What changed</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${changes.map((ch,ri)=>{
-        const icon=statusIcon[ch.status];
-        const col=statusCol[ch.status];
-        const bg=statusBg[ch.status];
-        const diffStr=ch.diff>0?'+'+fmtGBP(ch.diff):(ch.diff<0?fmtGBP(ch.diff):'—');
-        const pctStr=ch.pct!==null?` (${ch.pct>0?'+':''}${ch.pct.toFixed(1)}%)`:' ';
-
-        // Period A display
-        const aExDisp=ch.totA?fmtGBP(ch.subA)+' ex':'—';
-        const aIncDisp=ch.totA?fmtGBP(ch.totA)+' inc':'';
-        // Period B display
-        const bExDisp=ch.totB?fmtGBP(ch.subB)+' ex':'—';
-        const bIncDisp=ch.totB?fmtGBP(ch.totB)+' inc':'';
-
-        // Customer info
-        const custInfo=`<div style="font-weight:700;color:var(--ink1);font-size:13px">${esc(ch.c.name)}</div>`
-          +(ch.c.company&&ch.c.company!==ch.c.name?`<div style="font-size:11px;color:var(--ink3);margin-top:1px">${esc(ch.c.company)}</div>`:'')
-          +(ch.serviceType?`<div style="font-size:11px;color:var(--ink3);margin-top:1px">${esc(ch.serviceType)}</div>`:'')
-          +(ch.c.email?`<div style="font-size:11px;color:#3560c8;margin-top:1px">${esc(ch.c.email)}</div>`:'');
-
-        // Line item change chips with before/after detail
-        let detailRows='';
-        if(ch.lineChanges.length){
-          detailRows=ch.lineChanges.map(lc=>{
-            if(lc.type==='added') return `
-              <div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:#e8f5ee;border-left:3px solid #1a9e5c;border-radius:0 6px 6px 0">
-                <span style="color:#1a9e5c;font-weight:700;font-size:13px">+</span>
-                <div>
-                  <div style="font-weight:600;color:#1a9e5c;font-size:12px">${esc(lc.desc)}</div>
-                  <div style="font-size:11px;color:#2d7a50">Added — qty ${lc.qty} × £${f2(lc.price)} = <strong>£${f2(lc.qty*lc.price)}</strong></div>
-                </div>
-              </div>`;
-            if(lc.type==='removed') return `
-              <div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:#fdecea;border-left:3px solid #e03e3e;border-radius:0 6px 6px 0">
-                <span style="color:#e03e3e;font-weight:700;font-size:13px">−</span>
-                <div>
-                  <div style="font-weight:600;color:#e03e3e;font-size:12px">${esc(lc.desc)}</div>
-                  <div style="font-size:11px;color:#a02828">Removed — was qty ${lc.qty} × £${f2(lc.price)} = <strong>£${f2(lc.qty*lc.price)}</strong></div>
-                </div>
-              </div>`;
-            if(lc.type==='qty'){
-              const impact=lc.diff*lc.price;
-              return `
-              <div style="margin:3px 0;padding:4px 8px;background:#fff3e8;border-left:3px solid #F07830;border-radius:0 6px 6px 0">
-                <div style="font-weight:600;color:#c05800;font-size:12px">${esc(lc.desc)}</div>
-                <div style="font-size:11px;color:#8B4F2A">
-                  Qty: <span style="background:#fde8d0;padding:1px 5px;border-radius:3px;font-weight:600">${lc.fromQty}</span>
-                  → <span style="background:#fde8d0;padding:1px 5px;border-radius:3px;font-weight:600">${lc.toQty}</span>
-                  &nbsp;(${lc.diff>0?'+':''}${lc.diff} × £${f2(lc.price)} = <strong style="color:${impact>=0?'#1a9e5c':'#e03e3e'}">${impact>=0?'+':''}£${f2(Math.abs(impact))}</strong>)
-                </div>
-              </div>`;
-            }
-            if(lc.type==='price'){
-              const impact=lc.diff*lc.qty;
-              return `
-              <div style="margin:3px 0;padding:4px 8px;background:#eef3ff;border-left:3px solid #3560c8;border-radius:0 6px 6px 0">
-                <div style="font-weight:600;color:#3560c8;font-size:12px">${esc(lc.desc)}</div>
-                <div style="font-size:11px;color:#2a4a9e">
-                  Price: <span style="background:#dce8ff;padding:1px 5px;border-radius:3px;font-weight:600">£${f2(lc.fromPrice)}</span>
-                  → <span style="background:#dce8ff;padding:1px 5px;border-radius:3px;font-weight:600">£${f2(lc.toPrice)}</span>
-                  &nbsp;(${lc.diff>0?'+':'−'}£${f2(Math.abs(lc.diff))} × qty ${lc.qty} = <strong style="color:${impact>=0?'#1a9e5c':'#e03e3e'}">${impact>=0?'+':''}£${f2(Math.abs(impact))}</strong>)
-                </div>
-              </div>`;
-            }
-            return '';
-          }).join('');
-        } else if(ch.status==='new'){
-          detailRows=`<div style="padding:4px 8px;background:#fff3e8;border-left:3px solid #F07830;border-radius:0 6px 6px 0;font-size:12px;color:#c05800;font-weight:600">★ New customer — no prior invoice in Period A</div>`;
-        } else if(ch.status==='gone'){
-          detailRows=`<div style="padding:4px 8px;background:#f5f5f5;border-left:3px solid #8a99a8;border-radius:0 6px 6px 0;font-size:12px;color:#6a7a88;font-weight:600">✕ No invoice in Period B</div>`;
-        } else {
-          detailRows=`<div style="font-size:12px;color:var(--ink3);padding:4px 0">Total changed (no line item detail)</div>`;
-        }
-
-        return `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:12px 14px;vertical-align:top">${custInfo}</td>
-          <td style="padding:12px 14px;text-align:right;vertical-align:top;font-family:var(--mono)">
-            <div style="font-weight:600;color:var(--ink1);font-size:13px">${aExDisp}</div>
-            <div style="font-size:11px;color:var(--ink3)">${aIncDisp}</div>
-          </td>
-          <td style="padding:12px 14px;text-align:right;vertical-align:top;font-family:var(--mono)">
-            <div style="font-weight:700;color:var(--ink1);font-size:13px">${bExDisp}</div>
-            <div style="font-size:11px;color:var(--ink3)">${bIncDisp}</div>
-          </td>
-          <td style="padding:12px 14px;text-align:right;vertical-align:top">
-            <div style="display:inline-flex;align-items:center;gap:4px;background:${bg};color:${col};font-weight:700;font-size:14px;padding:4px 10px;border-radius:8px">${icon} ${diffStr}</div>
-            <div style="font-size:11px;color:${col};margin-top:3px;font-weight:600">${pctStr}</div>
-          </td>
-          <td style="padding:12px 14px;vertical-align:top;min-width:240px">${detailRows}</td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  </div>`;
-}
-
-}
 
 function renderDash(){
   // Initialise period pickers on first load
-  if(!document.getElementById('chg-a-from')?.value) initChangePeriods();
   const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
   document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
   const invs=DB.invoices.filter(i=>mk(i.date)===key);
@@ -1769,7 +1533,6 @@ function renderDash(){
   document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
-  renderChanges();
   // (#4) Monthly trend: 6 past months + current + next month forecast
   const bars=[];
   for(let i=5;i>=0;i--){
@@ -1859,6 +1622,7 @@ function applyCardState(bodyId){
 function toggleCard(bodyId){
   cardStates[bodyId]=!cardStates[bodyId];
   applyCardState(bodyId);
+  // Lazy-render the changes card only when first expanded
 }
 function setCardTotal(bodyId,text){
   const pill=document.getElementById(bodyId+'-total');
@@ -1964,11 +1728,11 @@ function updateExpPreview(){
 function buildInvRows(invList,mode){
   const rows=[];
   if(mode==='summary'){
-    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',inv.lines.map(l=>l.desc).filter(Boolean).join('; '),'£'+f2(inv.subtotal),inv.vatRate+'%','£'+f2(inv.vat),'£'+f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});
-    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Subtotal','VAT Rate','VAT Amount','Total','Recurring','Notes'],...rows];
+    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',inv.lines.map(l=>l.desc).filter(Boolean).join('; '),f2(inv.subtotal),inv.vatRate,f2(inv.vat),f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});
+    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Subtotal ex VAT','VAT Rate %','VAT Amount','Total inc VAT','Recurring','Notes'],...rows];
   }else{
-    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);inv.lines.forEach(l=>{rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',l.desc||'',l.qty,'£'+f2(l.price),'£'+f2(l.qty*l.price),'£'+f2(inv.subtotal),inv.vatRate+'%','£'+f2(inv.vat),'£'+f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});});
-    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Line Description','Beds','Price per Bed','Line Total','Invoice Subtotal','VAT Rate','VAT Amount','Invoice Total','Recurring','Notes'],...rows];
+    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);inv.lines.forEach(l=>{rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',l.desc||'',l.qty,f2(l.price),f2(l.qty*l.price),f2(inv.subtotal),inv.vatRate,f2(inv.vat),f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});});
+    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Line Description','Qty','Unit Price','Line Total','Invoice Subtotal ex VAT','VAT Rate %','VAT Amount','Invoice Total inc VAT','Recurring','Notes'],...rows];
   }
 }
 function doExport(){
@@ -1980,7 +1744,7 @@ function doExport(){
   if(grp==='none'){
     sheets.push({name:'Invoices',rows:buildInvRows(invs,mode)});
   }else if(grp==='all-cust'){
-    const hdr=['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Beds','Price per Bed','Subtotal','VAT Rate','VAT Amount','Total','Recurring','Notes'];
+    const hdr=['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Qty','Unit Price','Subtotal ex VAT','VAT Rate %','VAT Amount','Total inc VAT','Recurring','Notes'];
     const allRows=[hdr];let gSub=0,gVat=0,gTot=0;
     const byCust={};invs.forEach(inv=>{if(!byCust[inv.customerId])byCust[inv.customerId]=[];byCust[inv.customerId].push(inv);});
     Object.entries(byCust).forEach(([cid,cinvs])=>{
@@ -1992,17 +1756,17 @@ function doExport(){
         const subtotal=totalBeds*pricePerBed;
         const vat=subtotal*(inv.vatRate/100);
         const total=subtotal+vat;
-        allRows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',descs,totalBeds,'£'+f2(pricePerBed),'£'+f2(subtotal),inv.vatRate+'%','£'+f2(vat),'£'+f2(total),inv.isRecurring?'Yes':'No',inv.notes||'']);
+        allRows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',descs,totalBeds,f2(pricePerBed),f2(subtotal),inv.vatRate,f2(vat),f2(total),inv.isRecurring?'Yes':'No',inv.notes||'']);
       });
       gSub+=cinvs.reduce((s,i)=>s+i.subtotal,0);gVat+=cinvs.reduce((s,i)=>s+i.vat,0);gTot+=cinvs.reduce((s,i)=>s+i.total,0);
     });
-    const grand=hdr.map(()=>'');grand[0]='GRAND TOTAL';grand[9]='£'+f2(gSub);grand[11]='£'+f2(gVat);grand[12]='£'+f2(gTot);
+    const grand=hdr.map(()=>'');grand[0]='GRAND TOTAL';grand[9]=f2(gSub);grand[11]=f2(gVat);grand[12]=f2(gTot);
     allRows.push(grand);sheets.push({name:'All Invoices',rows:allRows});
   }else if(grp==='per-cust'){
     const byCust={};invs.forEach(inv=>{if(!byCust[inv.customerId])byCust[inv.customerId]=[];byCust[inv.customerId].push(inv);});
     Object.entries(byCust).forEach(([cid,cinvs])=>{const c=DB.customers.find(x=>x.id===cid);const name=(c?.name||'?').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,28)||'Customer';sheets.push({name,rows:buildInvRows(cinvs,mode)});});
-    const sumRows=DB.customers.map(c=>{const ci=invs.filter(i=>i.customerId===c.id);if(!ci.length)return null;return[c.name,c.company||'',ci.length,'£'+f2(ci.reduce((s,i)=>s+i.subtotal,0)),'£'+f2(ci.reduce((s,i)=>s+i.vat,0)),'£'+f2(ci.reduce((s,i)=>s+i.total,0))];}).filter(Boolean);
-    sheets.push({name:'Summary',rows:[['Customer','Company','Invoices','Subtotal','VAT','Total'],...sumRows]});
+    const sumRows=DB.customers.map(c=>{const ci=invs.filter(i=>i.customerId===c.id);if(!ci.length)return null;return[c.name,c.company||'',ci.length,f2(ci.reduce((s,i)=>s+i.subtotal,0)),f2(ci.reduce((s,i)=>s+i.vat,0)),f2(ci.reduce((s,i)=>s+i.total,0))];}).filter(Boolean);
+    sheets.push({name:'Summary',rows:[['Customer','Company','Invoice Count','Subtotal ex VAT','VAT','Total inc VAT'],...sumRows]});
   }else{
     const byM={};invs.forEach(inv=>{const m=mk(inv.date);if(!byM[m])byM[m]=[];byM[m].push(inv);});
     Object.entries(byM).sort().forEach(([m,mi])=>{const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}).replace(' ','_');sheets.push({name:lbl,rows:buildInvRows(mi,mode)});});
@@ -2022,8 +1786,8 @@ function doFcExport(){
   else{const n=parseInt(document.getElementById('fcexp-months').value)||6;data=buildForecast(n);const now=new Date();fromLabel=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');toLabel=new Date(now.getFullYear(),now.getMonth()+n,1).toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');}
   if(!data.length){showToast('No months in range.');return;}
   const sheets=[];
-  if(detail==='summary'){const hdr=['Month','Subtotal (ex VAT)','VAT','Total (inc VAT)'];const rows=data.map(m=>[m.label,'£'+f2(m.recurSub),'£'+f2(m.recurVat),'£'+f2(m.recurTotal)]);rows.push(['TOTAL','£'+f2(data.reduce((s,m)=>s+m.recurSub,0)),'£'+f2(data.reduce((s,m)=>s+m.recurVat,0)),'£'+f2(data.reduce((s,m)=>s+m.recurTotal,0))]);sheets.push({name:'Forecast Summary',rows:[hdr,...rows]});}
-  else{const hdr=['Month','Customer','Schedule','Subtotal (ex VAT)','VAT','Total (inc VAT)'];const rows=[];data.forEach(m=>{m.items.forEach(r=>rows.push([m.label,r.custName,r.name,'£'+f2(r.sub),'£'+f2(r.vat),'£'+f2(r.total)]));rows.push([m.label,'','MONTH TOTAL','£'+f2(m.recurSub),'£'+f2(m.recurVat),'£'+f2(m.recurTotal)]);rows.push(hdr.map(()=>''));});sheets.push({name:'Forecast Detail',rows:[hdr,...rows]});}
+  if(detail==='summary'){const hdr=['Month','Subtotal ex VAT','VAT','Total inc VAT'];const rows=data.map(m=>[m.label,f2(m.recurSub),f2(m.recurVat),f2(m.recurTotal)]);rows.push(['TOTAL',f2(data.reduce((s,m)=>s+m.recurSub,0)),f2(data.reduce((s,m)=>s+m.recurVat,0)),f2(data.reduce((s,m)=>s+m.recurTotal,0))]);sheets.push({name:'Forecast Summary',rows:[hdr,...rows]});}
+  else{const hdr=['Month','Customer','Schedule','Subtotal ex VAT','VAT','Total inc VAT'];const rows=[];data.forEach(m=>{m.items.forEach(r=>rows.push([m.label,r.custName,r.name,f2(r.sub),f2(r.vat),f2(r.total)]));rows.push([m.label,'','MONTH TOTAL',f2(m.recurSub),f2(m.recurVat),f2(m.recurTotal)]);rows.push(hdr.map(()=>''));});sheets.push({name:'Forecast Detail',rows:[hdr,...rows]});}
   dlXlsx(sheets,`forecast_${fromLabel}_to_${toLabel}.xlsx`);closeOverlay('fcexp-modal');showToast('Forecast exported!');
 }
 
@@ -2054,6 +1818,172 @@ function buildZip(files){
   for(const[name,content]of Object.entries(files)){const nb=enc.encode(name),db=enc.encode(content),crc=crc32(db),sz=db.length;const local=cat(new Uint8Array([0x50,0x4B,0x03,0x04]),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(sz),u32(sz),u16(nb.length),u16(0),nb,db);entries.push(local);cd.push(cat(new Uint8Array([0x50,0x4B,0x01,0x02]),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(sz),u32(sz),u16(nb.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off),nb));off+=local.length;}
   const cdBytes=cat(...cd);const eocd=cat(new Uint8Array([0x50,0x4B,0x05,0x06]),u16(0),u16(0),u16(cd.length),u16(cd.length),u32(cdBytes.length),u32(off),u16(0));
   return cat(...entries,cdBytes,eocd);
+}
+
+
+// ── Invoice Changes Export ─────────────────────────────────────────
+function showInvoiceChangesModal(){
+  // Default: Period A = prev month, Period B = current month
+  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const prevStart=new Date(dashY,dashM-1,1);
+  const prevEnd=new Date(dashY,dashM,0);
+  const curStart=new Date(dashY,dashM,1);
+  const curEnd=new Date(dashY,dashM+1,0);
+  document.getElementById('ica-from').value=fmt(prevStart);
+  document.getElementById('ica-to').value=fmt(prevEnd);
+  document.getElementById('icb-from').value=fmt(curStart);
+  document.getElementById('icb-to').value=fmt(curEnd);
+  showOverlay('inv-chg-modal');
+}
+
+function exportInvoiceChanges(){
+  const aFrom=document.getElementById('ica-from').value;
+  const aTo=document.getElementById('ica-to').value;
+  const bFrom=document.getElementById('icb-from').value;
+  const bTo=document.getElementById('icb-to').value;
+  if(!aFrom||!aTo||!bFrom||!bTo){showToast('Please fill in all four dates');return;}
+
+  const inRange=(date,from,to)=>date>=from&&date<=to;
+  const r2=v=>Math.round(v*100)/100;
+
+  const fmtPeriod=(f,t)=>{
+    const fd=new Date(f+'T00:00:00'),td=new Date(t+'T00:00:00');
+    if(f===t) return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(fd.getFullYear()===td.getFullYear()&&fd.getMonth()===td.getMonth())
+      return fd.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+td.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  };
+  const lblA=fmtPeriod(aFrom,aTo);
+  const lblB=fmtPeriod(bFrom,bTo);
+
+  // ── Group invoices by customer ──────────────────────────────────
+  const pA={}, pB={};
+  DB.invoices.filter(i=>inRange(i.date,aFrom,aTo)).forEach(i=>{
+    if(!pA[i.customerId]) pA[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pA[i.customerId].total+=i.total;
+    pA[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pA[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pA[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+  DB.invoices.filter(i=>inRange(i.date,bFrom,bTo)).forEach(i=>{
+    if(!pB[i.customerId]) pB[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pB[i.customerId].total+=i.total;
+    pB[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pB[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pB[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+
+  const custIds=[...new Set([...Object.keys(pA),...Object.keys(pB)])];
+  const changes=[];
+  custIds.forEach(cid=>{
+    const c=DB.customers.find(x=>x.id===cid);
+    if(!c) return;
+    const hasA=!!pA[cid], hasB=!!pB[cid];
+    const totA=hasA?pA[cid].total:0, totB=hasB?pB[cid].total:0;
+    const subA=hasA?pA[cid].sub:0, subB=hasB?pB[cid].sub:0;
+    const diff=totB-totA;
+
+    // Detect line item changes
+    const lineChanges=[];
+    const mapA={}, mapB={};
+    if(hasA) pA[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapA[k]) mapA[k]={qty:0,price:l.price,unit:l.unit||''}; mapA[k].qty+=Number(l.qty)||0; });
+    if(hasB) pB[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapB[k]) mapB[k]={qty:0,price:l.price,unit:l.unit||''}; mapB[k].qty+=Number(l.qty)||0; });
+
+    if(hasA&&hasB){
+      Object.keys(mapB).forEach(k=>{ if(!mapA[k]) lineChanges.push({type:'added',desc:k||'Unnamed',qty:mapB[k].qty,price:mapB[k].price,impact:r2(mapB[k].qty*mapB[k].price)}); });
+      Object.keys(mapA).forEach(k=>{ if(!mapB[k]) lineChanges.push({type:'removed',desc:k||'Unnamed',qty:mapA[k].qty,price:mapA[k].price,impact:-r2(mapA[k].qty*mapA[k].price)}); });
+      Object.keys(mapB).forEach(k=>{
+        if(!mapA[k]) return;
+        const qd=mapB[k].qty-mapA[k].qty;
+        const pd=mapB[k].price-mapA[k].price;
+        if(Math.abs(qd)>0.001) lineChanges.push({type:'qty',desc:k||'Unnamed',fromQty:mapA[k].qty,toQty:mapB[k].qty,price:mapB[k].price,impact:r2(qd*mapB[k].price)});
+        if(Math.abs(pd)>0.001) lineChanges.push({type:'price',desc:k||'Unnamed',qty:mapB[k].qty,fromPrice:mapA[k].price,toPrice:mapB[k].price,impact:r2(pd*mapB[k].qty)});
+      });
+    }
+
+    // Include all customers with any difference or line changes
+    const status=!hasA&&hasB?'NEW':hasA&&!hasB?'REMOVED':diff>0.01?'UP':diff<-0.01?'DOWN':'UNCHANGED';
+    if(status==='UNCHANGED'&&lineChanges.length===0) return;
+    changes.push({c,diff,totA,totB,subA,subB,lineChanges,status,mapA,mapB,hasA,hasB});
+  });
+
+  changes.sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+  // ── Sheet 1: Summary ────────────────────────────────────────────
+  const sumRows=[
+    [`Invoice Changes: ${lblA}  →  ${lblB}`],
+    [],
+    ['Customer','Company','Email','Service Type',
+     `${lblA} — Ex VAT (£)`,`${lblA} — Inc VAT (£)`,
+     `${lblB} — Ex VAT (£)`,`${lblB} — Inc VAT (£)`,
+     'Change (Ex VAT £)','Change %','Status','What Changed']
+  ];
+  let totSubA=0,totSubB=0,totTotA=0,totTotB=0;
+  changes.forEach(({c,diff,totA,totB,subA,subB,lineChanges,status})=>{
+    const pct=subA?r2(((subB-subA)/subA)*100):0;
+    const whatChanged=lineChanges.map(lc=>{
+      if(lc.type==='added') return `+ ${lc.desc}`;
+      if(lc.type==='removed') return `− ${lc.desc}`;
+      if(lc.type==='qty') return `${lc.desc}: qty ${lc.fromQty}→${lc.toQty}`;
+      if(lc.type==='price') return `${lc.desc}: price £${r2(lc.fromPrice)}→£${r2(lc.toPrice)}`;
+      return '';
+    }).join(' | ');
+    sumRows.push([
+      c.name||'', c.company||'', c.email||'', c.serviceType||'',
+      r2(subA), r2(totA), r2(subB), r2(totB),
+      r2(subB-subA), pct||'', status, whatChanged
+    ]);
+    totSubA+=subA; totSubB+=subB; totTotA+=totA; totTotB+=totB;
+  });
+  sumRows.push([]);
+  sumRows.push(['TOTAL','','','',r2(totSubA),r2(totTotA),r2(totSubB),r2(totTotB),r2(totSubB-totSubA),totSubA?r2(((totSubB-totSubA)/totSubA)*100):0,'','']);
+
+  // ── Sheet 2: Detail ─────────────────────────────────────────────
+  const detRows=[
+    [`Invoice Changes Detail: ${lblA}  →  ${lblB}`],
+    [],
+    ['Customer','Company','Email','Line Item','Change Type',
+     `${lblA} Qty`,`${lblA} Unit Price (£)`,`${lblA} Line Total (£)`,
+     `${lblB} Qty`,`${lblB} Unit Price (£)`,`${lblB} Line Total (£)`,
+     'Impact (£)','Notes']
+  ];
+
+  changes.forEach(({c,lineChanges,mapA,mapB,hasA,hasB,totA,totB,subA,subB,status})=>{
+    // All line items for this customer
+    const allKeys=[...new Set([...Object.keys(mapA),...Object.keys(mapB)])];
+    allKeys.forEach(k=>{
+      const a=mapA[k]||{qty:0,price:0};
+      const b=mapB[k]||{qty:0,price:0};
+      const lineDiff=r2((b.qty*b.price)-(a.qty*a.price));
+      let changeType='UNCHANGED';
+      if(!mapA[k]) changeType='ADDED';
+      else if(!mapB[k]) changeType='REMOVED';
+      else if(Math.abs(a.qty-b.qty)>0.001&&Math.abs(a.price-b.price)>0.001) changeType='QTY + PRICE CHANGED';
+      else if(Math.abs(a.qty-b.qty)>0.001) changeType='QTY CHANGED';
+      else if(Math.abs(a.price-b.price)>0.001) changeType='PRICE CHANGED';
+      detRows.push([
+        c.name||'', c.company||'', c.email||'', k, changeType,
+        mapA[k]?r2(a.qty):'—', mapA[k]?r2(a.price):'—', mapA[k]?r2(a.qty*a.price):'—',
+        mapB[k]?r2(b.qty):'—', mapB[k]?r2(b.price):'—', mapB[k]?r2(b.qty*b.price):'—',
+        changeType==='UNCHANGED'?0:lineDiff,
+        changeType==='ADDED'?'New line item this period':changeType==='REMOVED'?'Line item not present this period':''
+      ]);
+    });
+    // Customer subtotal row
+    detRows.push([c.name,'','','— CUSTOMER TOTAL —','',
+      '','',r2(Object.values(mapA).reduce((s,l)=>s+l.qty*l.price,0)),
+      '','',r2(Object.values(mapB).reduce((s,l)=>s+l.qty*l.price,0)),
+      r2(subB-subA),'Ex VAT']);
+    detRows.push([]);
+  });
+
+  const sheets={
+    'Summary': sumRows,
+    'Line Item Detail': detRows
+  };
+  dlXlsx(sheets, `invoice_changes_${aFrom}_${bFrom}.xlsx`);
+  closeOverlay('inv-chg-modal');
+  showToast('Invoice Changes exported!');
 }
 
 // ── Variance Report Export ────────────────────────────────────────────
@@ -2555,5 +2485,41 @@ function exportCommission(){
     .subscribe();
 })();
 </script>
+
+  <!-- Invoice Changes Export Modal -->
+  <div class="overlay" id="inv-chg-modal" style="display:none">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-hdr">
+        <div>
+          <div class="modal-title">Invoice Changes Export</div>
+          <div class="modal-sub">Compare invoices across two periods and export to Excel</div>
+        </div>
+        <button class="xbtn" onclick="closeOverlay('inv-chg-modal')">✕</button>
+      </div>
+      <div style="padding:20px 24px 24px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period A — From</div>
+            <input type="date" id="ica-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period A — To</div>
+            <input type="date" id="ica-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period B — From</div>
+            <input type="date" id="icb-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period B — To</div>
+            <input type="date" id="icb-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">
+          The export will contain two sheets: a <strong>Summary</strong> (one row per customer with totals and change indicators) and a <strong>Detail</strong> sheet (every changed line item highlighted with before/after values).
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="closeOverlay('inv-chg-modal')">Cancel</button>
+          <button class="btn btn-primary" onclick="exportInvoiceChanges()">↓ Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
