@@ -2079,6 +2079,26 @@ function deleteComm(id){
   });
 }
 
+// ── Expand recurring commissions into one row per month ───────────────
+function expandCommToMonths(c){
+  if(c.commissionType!=='recurring'||!c.endDate){
+    return[{...c,_monthLabel:null,_monthDate:c.startDate}];
+  }
+  const rows=[];
+  const start=new Date(c.startDate+'T00:00:00');
+  const end=new Date(c.endDate+'T00:00:00');
+  let yr=start.getFullYear(),mo=start.getMonth();
+  const endYr=end.getFullYear(),endMo=end.getMonth();
+  while(yr<endYr||(yr===endYr&&mo<=endMo)){
+    const d=new Date(yr,mo,1);
+    const monthDate=`${yr}-${String(mo+1).padStart(2,'0')}-01`;
+    const monthLabel=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    rows.push({...c,_monthLabel:monthLabel,_monthDate:monthDate});
+    mo++;if(mo>11){mo=0;yr++;}
+  }
+  return rows;
+}
+
 // ── Render commission view ─────────────────────────────────────────────
 function renderCommission(){
   renderSpList();
@@ -2092,12 +2112,27 @@ function renderCommission(){
   const spId=document.getElementById('comm-sp-filter')?.value||'';
   const fromDate=document.getElementById('comm-from')?.value||'';
   const toDate=document.getElementById('comm-to')?.value||'';
-  let comms=[...DB.commissions];
   // Filter by salesperson
+  let comms=[...DB.commissions];
   if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
-  // Filter by date range (start date within range)
-  if(fromDate)comms=comms.filter(c=>c.startDate>=fromDate);
-  if(toDate)comms=comms.filter(c=>c.startDate<=toDate);
+  // Filter by date range using OVERLAP logic:
+  // Recurring: show if commission period overlaps with filter range
+  // One-off: show if startDate falls within filter range
+  if(fromDate||toDate){
+    comms=comms.filter(c=>{
+      if(c.commissionType==='recurring'){
+        const cEnd=c.endDate||'9999-12-31';
+        const rangeEnd=toDate||'9999-12-31';
+        const rangeStart=fromDate||'0000-01-01';
+        return c.startDate<=rangeEnd && cEnd>=rangeStart;
+      }else{
+        // one-off: startDate within range
+        if(fromDate&&c.startDate<fromDate)return false;
+        if(toDate&&c.startDate>toDate)return false;
+        return true;
+      }
+    });
+  }
   const tb=document.getElementById('comm-tbody');
   const em=document.getElementById('comm-empty');
   const footer=document.getElementById('comm-footer');
@@ -2108,32 +2143,36 @@ function renderCommission(){
     return;
   }
   if(em)em.style.display='none';
-  if(tb)tb.innerHTML=comms.map(c=>{
-    const spNames=c.salespersonEntries.map(e=>`<div style="font-size:12px">${e.spName}: ${e.pct}% → ${fmtGBP(e.amount)}</div>`).join('');
-    const spPcts=c.salespersonEntries.map(e=>e.pct+'%').join(' / ');
-    const typeBadge=c.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
-    const linkedBadge=c.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
+  if(tb)tb.innerHTML=comms.map(r=>{
+    const spNames=r.salespersonEntries.map(e=>`<div style="font-size:12px">${e.spName}: ${e.pct}% → ${fmtGBP(e.amount)}</div>`).join('');
+    const spPcts=r.salespersonEntries.map(e=>e.pct+'%').join(' / ');
+    const typeBadge=r.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
+    const linkedBadge=r.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
+    // For recurring show period label, for one-off just show start date
+    const periodLabel=r.commissionType==='recurring'&&r.endDate
+      ?`<div style="font-size:11px;color:var(--ink3)">${fmtD(r.startDate)} – ${fmtD(r.endDate)}</div>`
+      :``;
     return`<tr>
-      <td><div style="font-weight:500">${c.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${c.customer||'—'}</div></td>
+      <td><div style="font-weight:500">${r.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${r.customer||'—'}</div></td>
       <td>${spNames}</td>
-      <td class="r">${fmtGBP(c.invoiceTotalExVat)}</td>
+      <td class="r">${fmtGBP(r.invoiceTotalExVat)}</td>
       <td class="r" style="font-family:var(--mono);font-size:12px">${spPcts}</td>
-      <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(c.totalCommission)}</td>
+      <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(r.totalCommission)}</td>
       <td>${typeBadge}</td>
-      <td class="muted" style="font-size:12px">${fmtD(c.startDate)}</td>
-      <td class="muted" style="font-size:12px">${c.endDate?fmtD(c.endDate):'—'}</td>
+      <td class="muted" style="font-size:12px"><div>${fmtD(r.startDate)}</div>${periodLabel}</td>
+      <td class="muted" style="font-size:12px">${r.endDate&&r.commissionType!=='recurring'?fmtD(r.endDate):'—'}</td>
       <td><div style="display:flex;gap:4px">
-        <button class="btn btn-ghost btn-xs" onclick="openCommModal('${c.id}')">Edit</button>
-        <button class="btn btn-danger btn-xs" onclick="deleteComm('${c.id}')">Del</button>
+        <button class="btn btn-ghost btn-xs" onclick="openCommModal('${r.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteComm('${r.id}')">Del</button>
       </div></td>
     </tr>`;
   }).join('');
   // Footer totals
-  const totalInv=comms.reduce((s,c)=>s+c.invoiceTotalExVat,0);
-  const totalComm=comms.reduce((s,c)=>s+c.totalCommission,0);
+  const totalInv=comms.reduce((s,r)=>s+r.invoiceTotalExVat,0);
+  const totalComm=comms.reduce((s,r)=>s+r.totalCommission,0);
   if(footer){
     footer.style.display='flex';
-    footer.innerHTML=`<span>${comms.length} record${comms.length!==1?'s':''}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
+    footer.innerHTML=`<span>${comms.length} entr${comms.length!==1?'ies':'y'}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
   }
 }
 
@@ -2144,13 +2183,16 @@ function exportCommission(){
   const toDate=document.getElementById('comm-to')?.value||'';
   let comms=[...DB.commissions];
   if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
-  if(fromDate)comms=comms.filter(c=>c.startDate>=fromDate);
-  if(toDate)comms=comms.filter(c=>c.startDate<=toDate);
-  if(!comms.length){showToast('No commission records to export.');return;}
-  // Build rows — one row per salesperson per commission entry
-  const hdr=['Description','Customer','Invoice Total (ex VAT)','Salesperson','Commission %','Commission Amount','Type','Start Date','End Date','Linked Invoice','Notes'];
+  // Expand recurring to monthly rows
+  let expRows=[];
+  comms.forEach(c=>expandCommToMonths(c).forEach(r=>expRows.push(r)));
+  if(fromDate)expRows=expRows.filter(r=>r._monthDate>=fromDate);
+  if(toDate)expRows=expRows.filter(r=>r._monthDate<=toDate);
+  if(!expRows.length){showToast('No commission records to export.');return;}
+  // Build rows — one row per salesperson per (expanded) entry
+  const hdr=['Description','Customer','Invoice Total (ex VAT)','Salesperson','Commission %','Commission Amount','Type','Month','Start Date','End Date','Linked Invoice','Notes'];
   const rows=[hdr];
-  comms.forEach(c=>{
+  expRows.forEach(c=>{
     c.salespersonEntries.forEach(e=>{
       rows.push([
         c.description||'',
@@ -2160,6 +2202,7 @@ function exportCommission(){
         e.pct,
         e.amount,
         c.commissionType==='recurring'?'Recurring (monthly)':'One-off',
+        c._monthLabel||'—',
         c.startDate||'',
         c.endDate||'',
         c.entryType==='linked'&&c.invoiceId?c.invoiceId:'',
@@ -2167,9 +2210,9 @@ function exportCommission(){
       ]);
     });
   });
-  // Summary by salesperson
+  // Summary by salesperson (across expanded rows)
   const spTotals={};
-  comms.forEach(c=>{
+  expRows.forEach(c=>{
     c.salespersonEntries.forEach(e=>{
       if(!spTotals[e.spName])spTotals[e.spName]={name:e.spName,invTotal:0,commTotal:0,count:0};
       spTotals[e.spName].invTotal+=c.invoiceTotalExVat;
