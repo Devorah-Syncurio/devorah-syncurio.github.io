@@ -251,6 +251,7 @@ tbody tr:hover{background:var(--bg)}
     <div class="nav-item" onclick="nav('recurring')"><span class="nav-icon">↻</span> Recurring</div>
     <div class="nav-item" onclick="nav('forecast')"><span class="nav-icon">◈</span> Forecast</div>
     <div class="nav-item" onclick="nav('customers')"><span class="nav-icon">◉</span> Customers</div>
+    <div class="nav-item" onclick="nav('commission')"><span class="nav-icon">%</span> Commission</div>
   </div>
 </nav>
 
@@ -410,6 +411,51 @@ tbody tr:hover{background:var(--bg)}
           <tbody id="cust-tbody"></tbody>
         </table>
         <div id="cust-empty" class="empty" style="display:none"><div class="empty-icon">◉</div><div class="empty-text">No customers yet.</div><button class="btn btn-primary btn-sm" onclick="openCustModal()">Add first customer</button></div>
+      </div>
+    </div>
+
+    <!-- COMMISSION -->
+    <div class="view" id="view-commission">
+      <!-- Salespeople Management -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-hdr">
+          <span class="card-title">Sales Team</span>
+          <button class="btn btn-primary btn-sm" onclick="openSpModal()">+ Add Salesperson</button>
+        </div>
+        <div id="sp-list" style="padding:16px 22px"></div>
+      </div>
+      <!-- Commission Entries -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Commission Records</span>
+          <div class="filters">
+            <select class="fltsel" id="comm-sp-filter" onchange="renderCommission()"><option value="">All salespeople</option></select>
+            <input type="date" class="sinp" id="comm-from" onchange="renderCommission()" style="width:140px">
+            <input type="date" class="sinp" id="comm-to" onchange="renderCommission()" style="width:140px">
+            <button class="btn btn-ghost btn-sm" onclick="exportCommission()">↓ Export to Excel</button>
+            <button class="btn btn-primary btn-sm" onclick="openCommModal()">+ Add Commission</button>
+          </div>
+        </div>
+        <table id="comm-table">
+          <thead><tr>
+            <th>Description / Customer</th>
+            <th>Salesperson(s)</th>
+            <th class="r">Invoice Total (ex VAT)</th>
+            <th class="r">Commission %</th>
+            <th class="r">Commission Amount</th>
+            <th>Type</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="comm-tbody"></tbody>
+        </table>
+        <div id="comm-empty" class="empty" style="display:none">
+          <div class="empty-icon">%</div>
+          <div class="empty-text">No commission records yet.</div>
+          <button class="btn btn-primary btn-sm" onclick="openCommModal()">Add first commission</button>
+        </div>
+        <div id="comm-footer" style="display:none;padding:12px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:24px;font-family:var(--mono);font-size:12px;color:var(--ink2)"></div>
       </div>
     </div>
 
@@ -595,6 +641,97 @@ tbody tr:hover{background:var(--bg)}
 </div>
 </div>
 
+<!-- SALESPERSON MODAL -->
+<div class="overlay" id="sp-modal">
+<div class="modal" style="width:420px">
+  <div class="modal-hdr"><div><div class="modal-title" id="sp-modal-title">Add Salesperson</div></div><button class="xbtn" onclick="closeOverlay('sp-modal')">✕</button></div>
+  <div class="fgrid">
+    <div class="fg full"><label class="flbl">Full Name *</label><input type="text" class="finp" id="sp-name" placeholder="e.g. Jane Smith"></div>
+  </div>
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeOverlay('sp-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveSp()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- COMMISSION MODAL -->
+<div class="overlay" id="comm-modal">
+<div class="modal" style="width:680px">
+  <div class="modal-hdr">
+    <div><div class="modal-title" id="comm-modal-title">Add Commission</div><div class="modal-sub">Enter commission details</div></div>
+    <button class="xbtn" onclick="closeOverlay('comm-modal')">✕</button>
+  </div>
+
+  <!-- Entry type toggle -->
+  <div class="fsec">
+    <div class="fsec-title">Entry Type</div>
+    <div style="display:flex;gap:10px;margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;border:1.5px solid var(--border2);border-radius:8px;flex:1;transition:border-color .15s" id="comm-type-linked-lbl">
+        <input type="radio" name="comm-entry-type" value="linked" id="comm-type-linked" onchange="toggleCommType()" style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Link to existing invoice</div><div style="font-size:11px;color:var(--ink3)">Auto-fills customer and amount</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;border:1.5px solid var(--border2);border-radius:8px;flex:1;transition:border-color .15s" id="comm-type-standalone-lbl">
+        <input type="radio" name="comm-entry-type" value="standalone" id="comm-type-standalone" onchange="toggleCommType()" style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Manual / standalone entry</div><div style="font-size:11px;color:var(--ink3)">Enter all details manually</div></div>
+      </label>
+    </div>
+  </div>
+
+  <!-- Linked invoice selector -->
+  <div class="fsec" id="comm-linked-section" style="display:none">
+    <div class="fsec-title">Select Invoice</div>
+    <div class="fgrid">
+      <div class="fg full">
+        <label class="flbl">Invoice</label>
+        <select class="fsel" id="comm-inv-sel" onchange="onCommInvSelect()"><option value="">— Select invoice —</option></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Details -->
+  <div class="fsec">
+    <div class="fsec-title">Details</div>
+    <div class="fgrid">
+      <div class="fg full"><label class="flbl">Description / Sale</label><input type="text" class="finp" id="comm-desc" placeholder="e.g. Monthly retainer – Jan 2026"></div>
+      <div class="fg"><label class="flbl">Customer</label><input type="text" class="finp" id="comm-customer" placeholder="Customer name"></div>
+      <div class="fg"><label class="flbl">Invoice Total (ex VAT) £</label><input type="number" class="finp" id="comm-inv-total" min="0" step="0.01" placeholder="0.00" oninput="recalcComm()"></div>
+      <div class="fg">
+        <label class="flbl">Commission Type</label>
+        <select class="fsel" id="comm-type-sel">
+          <option value="recurring">Recurring (monthly)</option>
+          <option value="one-off">One-off</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Start Date *</label><input type="date" class="finp" id="comm-start"></div>
+      <div class="fg"><label class="flbl">End Date</label><input type="date" class="finp" id="comm-end"><span class="fhint">Leave blank if open-ended or one-off</span></div>
+      <div class="fg full"><label class="flbl">Notes</label><input type="text" class="finp" id="comm-notes" placeholder="Optional"></div>
+    </div>
+  </div>
+
+  <!-- Salespeople -->
+  <div class="fsec">
+    <div class="fsec-title">Salesperson(s) &amp; Commission</div>
+    <div id="comm-sp-rows" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" id="comm-add-sp-btn" onclick="addCommSpRow()" style="display:none">+ Add second salesperson</button>
+    <div id="comm-sp-warning" style="font-size:12px;color:var(--accent2);margin-top:6px;display:none">Please add at least one salesperson to your team first.</div>
+  </div>
+
+  <!-- Total preview -->
+  <div class="totbox" style="margin-bottom:0">
+    <div class="trow"><span>Invoice total (ex VAT)</span><span class="tv" id="comm-preview-base">£0.00</span></div>
+    <div class="trow" id="comm-preview-sp1-row" style="display:none"><span id="comm-preview-sp1-lbl">Salesperson 1 commission</span><span class="tv" id="comm-preview-sp1-amt">£0.00</span></div>
+    <div class="trow" id="comm-preview-sp2-row" style="display:none"><span id="comm-preview-sp2-lbl">Salesperson 2 commission</span><span class="tv" id="comm-preview-sp2-amt">£0.00</span></div>
+    <div class="trow grand"><span>Total commission</span><span class="tv" id="comm-preview-total">£0.00</span></div>
+  </div>
+
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeOverlay('comm-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveComm()">Save Commission</button>
+  </div>
+</div>
+</div>
+
 <!-- CONFIRM -->
 <div class="conf-overlay" id="conf">
   <div class="conf-box">
@@ -613,7 +750,7 @@ const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const _supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
 const SESSION_ID=Math.random().toString(36).slice(2);
 let _saveTimer=null;
-let DB={"customers":[],"invoices":[],"schedules":[],"seq":1001};
+let DB={"customers":[],"invoices":[],"schedules":[],"seq":1001,"salespeople":[],"commissions":[]};
 if(!DB.schedules)DB.schedules=[];
 
 function persist(){
@@ -639,7 +776,7 @@ const today=()=>new Date().toISOString().split('T')[0];
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
 // ── Navigation ────────────────────────────────────────────────────────
-const TITLES={dashboard:'Dashboard',invoices:'Invoices',recurring:'Recurring',forecast:'Forecast',customers:'Customers'};
+const TITLES={dashboard:'Dashboard',invoices:'Invoices',recurring:'Recurring',forecast:'Forecast',customers:'Customers',commission:'Commission'};
 function nav(v){
   document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
@@ -651,6 +788,7 @@ function nav(v){
   if(v==='recurring')renderRecurring();
   if(v==='forecast')renderForecast();
   if(v==='customers')renderCustomers();
+  if(v==='commission')renderCommission();
 }
 
 // ── Overlays ──────────────────────────────────────────────────────────
@@ -1717,11 +1855,344 @@ function exportVarianceReport(){
   showToast('Variance report downloaded!');
 }
 
+// ── Salespeople ───────────────────────────────────────────────────────
+let editSpId=null;
+function openSpModal(id){
+  editSpId=id||null;
+  document.getElementById('sp-modal-title').textContent=id?'Edit Salesperson':'Add Salesperson';
+  const sp=id?DB.salespeople.find(x=>x.id===id):null;
+  document.getElementById('sp-name').value=sp?.name||'';
+  openOverlay('sp-modal');
+}
+function saveSp(){
+  const name=document.getElementById('sp-name').value.trim();
+  if(!name){showToast('Name is required.');return;}
+  if(editSpId){
+    const sp=DB.salespeople.find(x=>x.id===editSpId);
+    if(sp)sp.name=name;
+  }else{
+    DB.salespeople.push({id:'sp'+Date.now(),name});
+  }
+  persist();closeOverlay('sp-modal');renderCommission();showToast(editSpId?'Salesperson updated.':'Salesperson added!');
+}
+function deleteSp(id){
+  const sp=DB.salespeople.find(x=>x.id===id);if(!sp)return;
+  const inUse=DB.commissions.some(c=>c.salespersonEntries.some(e=>e.spId===id));
+  confirm2('Delete salesperson?',inUse?'This salesperson has commission records. They will remain but the name may show as removed.':'This will remove the salesperson from the team.','Delete',()=>{
+    DB.salespeople=DB.salespeople.filter(s=>s.id!==id);
+    persist();renderCommission();showToast('Removed.');
+  });
+}
+function renderSpList(){
+  const el=document.getElementById('sp-list');
+  if(!DB.salespeople.length){
+    el.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:8px 0">No salespeople added yet. Add your first team member above.</div>';
+    return;
+  }
+  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px">${DB.salespeople.map(sp=>`<div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px"><span style="font-weight:500;font-size:13px">${sp.name}</span><button class="btn btn-ghost btn-xs" onclick="openSpModal('${sp.id}')">Edit</button><button class="btn btn-danger btn-xs" onclick="deleteSp('${sp.id}')">Remove</button></div>`).join('')}</div>`;
+}
+
+// ── Commission modal helpers ───────────────────────────────────────────
+let editCommId=null;
+let _commSpRows=1; // current number of sp rows shown
+
+function toggleCommType(){
+  const linked=document.getElementById('comm-type-linked').checked;
+  document.getElementById('comm-linked-section').style.display=linked?'':'none';
+  if(linked) populateCommInvSel();
+}
+function populateCommInvSel(){
+  const sel=document.getElementById('comm-inv-sel');
+  const sorted=[...DB.invoices].sort((a,b)=>b.date.localeCompare(a.date));
+  sel.innerHTML='<option value="">— Select invoice —</option>'+sorted.map(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    const label=`${c?.name||'?'} — ${fmtD(inv.date)} — ${fmtGBP(inv.subtotal)} ex VAT`;
+    return`<option value="${inv.id}">${label}</option>`;
+  }).join('');
+}
+function onCommInvSelect(){
+  const id=document.getElementById('comm-inv-sel').value;
+  const inv=DB.invoices.find(x=>x.id===id);
+  if(!inv)return;
+  const c=DB.customers.find(x=>x.id===inv.customerId);
+  document.getElementById('comm-customer').value=c?.name||'';
+  document.getElementById('comm-inv-total').value=f2(inv.subtotal);
+  if(!document.getElementById('comm-desc').value){
+    document.getElementById('comm-desc').value=(c?.name||'')+(inv.serviceType?' — '+inv.serviceType:'');
+  }
+  if(!document.getElementById('comm-start').value){
+    document.getElementById('comm-start').value=inv.date;
+  }
+  recalcComm();
+}
+function buildCommSpRows(entries){
+  // entries = [{spId, pct}] or null for fresh
+  const container=document.getElementById('comm-sp-rows');
+  const addBtn=document.getElementById('comm-add-sp-btn');
+  const warn=document.getElementById('comm-sp-warning');
+  if(!DB.salespeople.length){
+    container.innerHTML='';
+    warn.style.display='';
+    addBtn.style.display='none';
+    return;
+  }
+  warn.style.display='none';
+  const opts=DB.salespeople.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('');
+  const count=entries?entries.length:1;
+  _commSpRows=count;
+  const rows=[];
+  for(let i=0;i<count;i++){
+    const e=entries?entries[i]:null;
+    rows.push(`<div class="fgrid" id="comm-sp-row-${i}" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg)">
+      <div class="fg"><label class="flbl">Salesperson ${count>1?i+1:''}</label>
+        <select class="fsel" id="comm-sp-sel-${i}" onchange="recalcComm()">
+          <option value="">— Select —</option>${opts}
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Commission % *</label>
+        <input type="number" class="finp" id="comm-sp-pct-${i}" min="0" max="100" step="0.01" placeholder="e.g. 10" value="${e?e.pct:''}" oninput="recalcComm()">
+      </div>
+      ${i>0?`<div class="fg" style="justify-content:flex-end;align-items:flex-end"><button class="btn btn-danger btn-sm" onclick="removeCommSpRow(${i})">Remove</button></div>`:''}
+    </div>`);
+    }
+  container.innerHTML=rows.join('');
+  if(entries){
+    entries.forEach((e,i)=>{
+      const sel=document.getElementById(`comm-sp-sel-${i}`);
+      if(sel)sel.value=e.spId||'';
+    });
+  }
+  addBtn.style.display=count<2?'':'none';
+  recalcComm();
+}
+function addCommSpRow(){
+  if(_commSpRows>=2)return;
+  const existing=[];
+  for(let i=0;i<_commSpRows;i++){
+    existing.push({spId:document.getElementById(`comm-sp-sel-${i}`)?.value||'',pct:parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0});
+  }
+  existing.push({spId:'',pct:0});
+  buildCommSpRows(existing);
+}
+function removeCommSpRow(idx){
+  const existing=[];
+  for(let i=0;i<_commSpRows;i++){
+    if(i===idx)continue;
+    existing.push({spId:document.getElementById(`comm-sp-sel-${i}`)?.value||'',pct:parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0});
+  }
+  buildCommSpRows(existing);
+}
+function recalcComm(){
+  const base=parseFloat(document.getElementById('comm-inv-total')?.value)||0;
+  document.getElementById('comm-preview-base').textContent=fmtGBP(base);
+  let totalComm=0;
+  for(let i=0;i<_commSpRows;i++){
+    const spId=document.getElementById(`comm-sp-sel-${i}`)?.value||'';
+    const pct=parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0;
+    const sp=DB.salespeople.find(x=>x.id===spId);
+    const amt=base*(pct/100);
+    totalComm+=amt;
+    const row=document.getElementById(`comm-preview-sp${i+1}-row`);
+    const lbl=document.getElementById(`comm-preview-sp${i+1}-lbl`);
+    const amtEl=document.getElementById(`comm-preview-sp${i+1}-amt`);
+    if(row&&lbl&&amtEl){
+      row.style.display=spId||pct?'':'none';
+      lbl.textContent=(sp?.name||`Salesperson ${i+1}`)+` (${pct}%)`;
+      amtEl.textContent=fmtGBP(amt);
+    }
+  }
+  // hide unused preview rows
+  for(let i=_commSpRows;i<2;i++){
+    const row=document.getElementById(`comm-preview-sp${i+1}-row`);
+    if(row)row.style.display='none';
+  }
+  document.getElementById('comm-preview-total').textContent=fmtGBP(totalComm);
+}
+
+function openCommModal(id){
+  editCommId=id||null;
+  const c=id?DB.commissions.find(x=>x.id===id):null;
+  document.getElementById('comm-modal-title').textContent=id?'Edit Commission':'Add Commission';
+  // Entry type
+  const linked=c?c.entryType==='linked':false;
+  document.getElementById('comm-type-linked').checked=linked;
+  document.getElementById('comm-type-standalone').checked=!linked;
+  document.getElementById('comm-linked-section').style.display=linked?'':'none';
+  if(linked){populateCommInvSel();document.getElementById('comm-inv-sel').value=c?.invoiceId||'';}
+  // Details
+  document.getElementById('comm-desc').value=c?.description||'';
+  document.getElementById('comm-customer').value=c?.customer||'';
+  document.getElementById('comm-inv-total').value=c?f2(c.invoiceTotalExVat):'';
+  document.getElementById('comm-type-sel').value=c?.commissionType||'recurring';
+  document.getElementById('comm-start').value=c?.startDate||today();
+  document.getElementById('comm-end').value=c?.endDate||'';
+  document.getElementById('comm-notes').value=c?.notes||'';
+  // Salespeople rows
+  buildCommSpRows(c?c.salespersonEntries.map(e=>({spId:e.spId,pct:e.pct})):null);
+  openOverlay('comm-modal');
+}
+
+function saveComm(){
+  const desc=document.getElementById('comm-desc').value.trim();
+  const customer=document.getElementById('comm-customer').value.trim();
+  const invTotal=parseFloat(document.getElementById('comm-inv-total').value)||0;
+  const startDate=document.getElementById('comm-start').value;
+  if(!desc){showToast('Please enter a description.');return;}
+  if(!startDate){showToast('Please set a start date.');return;}
+  if(!invTotal){showToast('Please enter the invoice total (ex VAT).');return;}
+  const entryType=document.getElementById('comm-type-linked').checked?'linked':'standalone';
+  const invoiceId=entryType==='linked'?document.getElementById('comm-inv-sel').value:'';
+  // Collect sp entries
+  const spEntries=[];
+  for(let i=0;i<_commSpRows;i++){
+    const spId=document.getElementById(`comm-sp-sel-${i}`)?.value||'';
+    const pct=parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0;
+    if(!spId){showToast('Please select a salesperson for each row.');return;}
+    if(!pct){showToast('Please enter a commission % for each salesperson.');return;}
+    const sp=DB.salespeople.find(x=>x.id===spId);
+    spEntries.push({spId,spName:sp?.name||'',pct,amount:invTotal*(pct/100)});
+  }
+  if(!spEntries.length){showToast('Please add at least one salesperson.');return;}
+  const totalCommission=spEntries.reduce((s,e)=>s+e.amount,0);
+  const payload={
+    entryType,invoiceId,description:desc,customer,invoiceTotalExVat:invTotal,
+    salespersonEntries:spEntries,totalCommission,
+    startDate,endDate:document.getElementById('comm-end').value,
+    commissionType:document.getElementById('comm-type-sel').value,
+    notes:document.getElementById('comm-notes').value.trim(),
+    createdAt:new Date().toISOString()
+  };
+  if(editCommId){
+    const idx=DB.commissions.findIndex(x=>x.id===editCommId);
+    Object.assign(DB.commissions[idx],payload);
+  }else{
+    payload.id='comm'+Date.now();
+    DB.commissions.unshift(payload);
+  }
+  persist();closeOverlay('comm-modal');showToast(editCommId?'Commission updated!':'Commission saved!');renderCommission();
+}
+
+function deleteComm(id){
+  confirm2('Delete commission record?','This cannot be undone.','Delete',()=>{
+    DB.commissions=DB.commissions.filter(c=>c.id!==id);
+    persist();renderCommission();showToast('Deleted.');
+  });
+}
+
+// ── Render commission view ─────────────────────────────────────────────
+function renderCommission(){
+  renderSpList();
+  // Update salesperson filter dropdown
+  const spFilter=document.getElementById('comm-sp-filter');
+  if(spFilter){
+    const cur=spFilter.value;
+    spFilter.innerHTML='<option value="">All salespeople</option>'+DB.salespeople.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('');
+    spFilter.value=cur;
+  }
+  const spId=document.getElementById('comm-sp-filter')?.value||'';
+  const fromDate=document.getElementById('comm-from')?.value||'';
+  const toDate=document.getElementById('comm-to')?.value||'';
+  let comms=[...DB.commissions];
+  // Filter by salesperson
+  if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
+  // Filter by date range (start date within range)
+  if(fromDate)comms=comms.filter(c=>c.startDate>=fromDate);
+  if(toDate)comms=comms.filter(c=>c.startDate<=toDate);
+  const tb=document.getElementById('comm-tbody');
+  const em=document.getElementById('comm-empty');
+  const footer=document.getElementById('comm-footer');
+  if(!comms.length){
+    if(tb)tb.innerHTML='';
+    if(em)em.style.display='block';
+    if(footer)footer.style.display='none';
+    return;
+  }
+  if(em)em.style.display='none';
+  if(tb)tb.innerHTML=comms.map(c=>{
+    const spNames=c.salespersonEntries.map(e=>`<div style="font-size:12px">${e.spName}: ${e.pct}% → ${fmtGBP(e.amount)}</div>`).join('');
+    const spPcts=c.salespersonEntries.map(e=>e.pct+'%').join(' / ');
+    const typeBadge=c.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
+    const linkedBadge=c.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
+    return`<tr>
+      <td><div style="font-weight:500">${c.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${c.customer||'—'}</div></td>
+      <td>${spNames}</td>
+      <td class="r">${fmtGBP(c.invoiceTotalExVat)}</td>
+      <td class="r" style="font-family:var(--mono);font-size:12px">${spPcts}</td>
+      <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(c.totalCommission)}</td>
+      <td>${typeBadge}</td>
+      <td class="muted" style="font-size:12px">${fmtD(c.startDate)}</td>
+      <td class="muted" style="font-size:12px">${c.endDate?fmtD(c.endDate):'—'}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-xs" onclick="openCommModal('${c.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteComm('${c.id}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  // Footer totals
+  const totalInv=comms.reduce((s,c)=>s+c.invoiceTotalExVat,0);
+  const totalComm=comms.reduce((s,c)=>s+c.totalCommission,0);
+  if(footer){
+    footer.style.display='flex';
+    footer.innerHTML=`<span>${comms.length} record${comms.length!==1?'s':''}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
+  }
+}
+
+// ── Commission Excel export ────────────────────────────────────────────
+function exportCommission(){
+  const spId=document.getElementById('comm-sp-filter')?.value||'';
+  const fromDate=document.getElementById('comm-from')?.value||'';
+  const toDate=document.getElementById('comm-to')?.value||'';
+  let comms=[...DB.commissions];
+  if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
+  if(fromDate)comms=comms.filter(c=>c.startDate>=fromDate);
+  if(toDate)comms=comms.filter(c=>c.startDate<=toDate);
+  if(!comms.length){showToast('No commission records to export.');return;}
+  // Build rows — one row per salesperson per commission entry
+  const hdr=['Description','Customer','Invoice Total (ex VAT)','Salesperson','Commission %','Commission Amount','Type','Start Date','End Date','Linked Invoice','Notes'];
+  const rows=[hdr];
+  comms.forEach(c=>{
+    c.salespersonEntries.forEach(e=>{
+      rows.push([
+        c.description||'',
+        c.customer||'',
+        c.invoiceTotalExVat,
+        e.spName,
+        e.pct,
+        e.amount,
+        c.commissionType==='recurring'?'Recurring (monthly)':'One-off',
+        c.startDate||'',
+        c.endDate||'',
+        c.entryType==='linked'&&c.invoiceId?c.invoiceId:'',
+        c.notes||''
+      ]);
+    });
+  });
+  // Summary by salesperson
+  const spTotals={};
+  comms.forEach(c=>{
+    c.salespersonEntries.forEach(e=>{
+      if(!spTotals[e.spName])spTotals[e.spName]={name:e.spName,invTotal:0,commTotal:0,count:0};
+      spTotals[e.spName].invTotal+=c.invoiceTotalExVat;
+      spTotals[e.spName].commTotal+=e.amount;
+      spTotals[e.spName].count++;
+    });
+  });
+  const sumHdr=['Salesperson','Commission Records','Invoice Total (ex VAT)','Total Commission'];
+  const sumRows=[sumHdr,...Object.values(spTotals).sort((a,b)=>b.commTotal-a.commTotal).map(s=>[s.name,s.count,s.invTotal,s.commTotal])];
+  const rangeLabel=(fromDate||'all')+'_to_'+(toDate||'all');
+  const spLabel=spId?(DB.salespeople.find(x=>x.id===spId)?.name||'unknown').replace(/\s+/g,'_'):'all';
+  dlXlsx([
+    {name:'Commission Detail',rows},
+    {name:'Summary by Salesperson',rows:sumRows}
+  ],`commission_${spLabel}_${rangeLabel}.xlsx`);
+  showToast('Commission exported!');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────
 (async()=>{
   try{
     const{data,error}=await _supa.from('app_state').select('data').eq('id',1).single();
-    if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];}
+    if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];if(!DB.salespeople)DB.salespeople=[];if(!DB.commissions)DB.commissions=[];}
   }catch(e){console.warn('Supabase load failed, starting empty.',e);}
   document.getElementById('loading-overlay').style.display='none';
   genRecurring();
@@ -1734,6 +2205,8 @@ function exportVarianceReport(){
       if(payload.new.last_session!==SESSION_ID){
         DB=payload.new.data;
         if(!DB.schedules)DB.schedules=[];
+        if(!DB.salespeople)DB.salespeople=[];
+        if(!DB.commissions)DB.commissions=[];
         genRecurring();
         renderDash();
         fillCustDd('');
