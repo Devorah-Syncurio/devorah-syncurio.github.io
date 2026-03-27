@@ -432,6 +432,7 @@ tbody tr:hover{background:var(--bg)}
             <select class="fltsel" id="comm-sp-filter" onchange="renderCommission()"><option value="">All salespeople</option></select>
             <input type="date" class="sinp" id="comm-from" onchange="renderCommission()" style="width:140px">
             <input type="date" class="sinp" id="comm-to" onchange="renderCommission()" style="width:140px">
+            <button class="btn btn-ghost btn-sm" onclick="clearCommFilters()">✕ Clear Filters</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCommission()">↓ Export to Excel</button>
             <button class="btn btn-primary btn-sm" onclick="openCommModal()">+ Add Commission</button>
           </div>
@@ -788,7 +789,47 @@ function nav(v){
   if(v==='recurring')renderRecurring();
   if(v==='forecast')renderForecast();
   if(v==='customers')renderCustomers();
-  if(v==='commission')renderCommission();
+  if(v==='commission'){
+    if(sessionStorage.getItem('syncurio_comm_auth')!=='ok'){showCommPin();return;}
+    renderCommission();
+  }
+}
+
+function showCommPin(){
+  if(document.getElementById('comm-pin-overlay'))return;
+  const ov=document.createElement('div');
+  ov.id='comm-pin-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(238,240,245,0.97);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;padding:48px 40px;width:340px;box-shadow:0 8px 40px rgba(28,43,58,0.13);text-align:center;">
+      <div style="font-size:26px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px;">
+        <span style="color:#F07830;">S</span><span style="color:#1C2B3A;">yncurio</span>
+      </div>
+      <div style="font-size:11px;color:#8a99a8;letter-spacing:2px;margin-bottom:8px;">invoice tracker</div>
+      <div style="font-size:13px;color:#1C2B3A;font-weight:600;margin-bottom:20px;">Commission Access</div>
+      <input id="comm-pin-input" type="password" placeholder="Enter commission code"
+        style="width:100%;box-sizing:border-box;padding:12px 16px;border:1.5px solid #dde2ea;border-radius:8px;font-size:15px;color:#1C2B3A;outline:none;margin-bottom:12px;"
+        onkeydown="if(event.key==='Enter')document.getElementById('comm-pin-btn').click()"
+      />
+      <div id="comm-pin-error" style="color:#e05;font-size:13px;margin-bottom:8px;min-height:18px;"></div>
+      <button id="comm-pin-btn"
+        style="width:100%;padding:12px;background:#F07830;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;"
+        onclick="(function(){
+          var v=document.getElementById('comm-pin-input').value;
+          if(v==='Z'){sessionStorage.setItem('syncurio_comm_auth','ok');document.getElementById('comm-pin-overlay').remove();nav('commission');}
+          else{document.getElementById('comm-pin-error').textContent='Incorrect code. Please try again.';}
+        })()"
+      >Unlock</button>
+    </div>`;
+  document.body.appendChild(ov);
+  setTimeout(()=>document.getElementById('comm-pin-input')&&document.getElementById('comm-pin-input').focus(),50);
+}
+
+function clearCommFilters(){
+  document.getElementById('comm-sp-filter').value='';
+  document.getElementById('comm-from').value='';
+  document.getElementById('comm-to').value='';
+  renderCommission();
 }
 
 // ── Overlays ──────────────────────────────────────────────────────────
@@ -2189,11 +2230,12 @@ function exportCommission(){
   if(fromDate)expRows=expRows.filter(r=>r._monthDate>=fromDate);
   if(toDate)expRows=expRows.filter(r=>r._monthDate<=toDate);
   if(!expRows.length){showToast('No commission records to export.');return;}
-  // Build rows — one row per salesperson per (expanded) entry
+  // Build rows — one row per salesperson per (expanded) entry, filtered to selected SP if set
   const hdr=['Description','Customer','Invoice Total (ex VAT)','Salesperson','Commission %','Commission Amount','Type','Month','Start Date','End Date','Linked Invoice','Notes'];
   const rows=[hdr];
   expRows.forEach(c=>{
-    c.salespersonEntries.forEach(e=>{
+    const entries=spId?c.salespersonEntries.filter(e=>e.spId===spId):c.salespersonEntries;
+    entries.forEach(e=>{
       rows.push([
         c.description||'',
         c.customer||'',
@@ -2210,10 +2252,11 @@ function exportCommission(){
       ]);
     });
   });
-  // Summary by salesperson (across expanded rows)
+  // Summary by salesperson (filtered to selected SP if set)
   const spTotals={};
   expRows.forEach(c=>{
-    c.salespersonEntries.forEach(e=>{
+    const entries=spId?c.salespersonEntries.filter(e=>e.spId===spId):c.salespersonEntries;
+    entries.forEach(e=>{
       if(!spTotals[e.spName])spTotals[e.spName]={name:e.spName,invTotal:0,commTotal:0,count:0};
       spTotals[e.spName].invTotal+=c.invoiceTotalExVat;
       spTotals[e.spName].commTotal+=e.amount;
