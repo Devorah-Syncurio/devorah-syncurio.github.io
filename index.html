@@ -1886,7 +1886,7 @@ function buildXlsx(sheets){
   function si(v){const k=String(v==null?'':v);if(sstIdx[k]===undefined){sstIdx[k]=sst.length;sst.push(k);}return sstIdx[k];}
   const xe=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   function cl(n){let s='';n++;while(n>0){s=String.fromCharCode(64+(n%26||26))+s;n=Math.floor((n-1)/26);}return s;}
-  function wsXml(rows){let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData>';rows.forEach((row,ri)=>{x+=`<row r="${ri+1}">`;row.forEach((cell,ci)=>{const ref=cl(ci)+(ri+1);if(typeof cell==='number'){x+=`<c r="${ref}" t="n"><v>${cell}</v></c>`;}else{x+=`<c r="${ref}" t="s"><v>${si(cell)}</v></c>`;}});x+='</row>';});return x+'</sheetData></worksheet>';}
+  function wsXml(rows){let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData>';rows.forEach((row,ri)=>{x+=`<row r="${ri+1}">`;row.forEach((cell,ci)=>{const ref=cl(ci)+(ri+1);const safeCell=(typeof cell==='number'&&!isNaN(cell))?cell:(typeof cell==='number'?0:cell);if(typeof safeCell==='number'){x+=`<c r="${ref}" t="n"><v>${safeCell}</v></c>`;}else{x+=`<c r="${ref}" t="s"><v>${si(cell)}</v></c>`;}});x+='</row>';});return x+'</sheetData></worksheet>';}
   const wsXmls=sheets.map(s=>wsXml(s.rows));
   const sstXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="'+sst.length+'" uniqueCount="'+sst.length+'">'+sst.map(v=>`<si><t xml:space="preserve">${xe(v)}</t></si>`).join('')+'</sst>';
   const wbXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((s,i)=>`<sheet name="${xe(s.name)}" sheetId="${i+1}" r:id="rId${i+2}"/>`).join('')+'</sheets></workbook>';
@@ -1924,7 +1924,7 @@ function showInvoiceChangesModal(){
   showOverlay('inv-chg-modal');
 }
 
-function exportInvoiceChanges(){
+function exportInvoiceChanges(){try{
   const aFrom=document.getElementById('ica-from').value;
   const aTo=document.getElementById('ica-to').value;
   const bFrom=document.getElementById('icb-from').value;
@@ -1932,7 +1932,7 @@ function exportInvoiceChanges(){
   if(!aFrom||!aTo||!bFrom||!bTo){showToast('Please fill in all four dates');return;}
 
   const inRange=(date,from,to)=>date>=from&&date<=to;
-  const r2=v=>Math.round(v*100)/100;
+  const r2=v=>{const n=Number(v);return isNaN(n)?0:Math.round(n*100)/100;};
 
   const fmtPeriod=(f,t)=>{
     const fd=new Date(f+'T00:00:00'),td=new Date(t+'T00:00:00');
@@ -2082,7 +2082,7 @@ function exportInvoiceChanges(){
   ], `invoice_changes_${aFrom}_${bFrom}.xlsx`);
   closeOverlay('inv-chg-modal');
   showToast('Invoice Changes exported!');
-}
+}catch(err){console.error('exportInvoiceChanges error:',err);showToast('Export error: '+err.message);}}
 
 // ── Variance Report Export ────────────────────────────────────────────
 function exportVarianceReport(){
