@@ -276,10 +276,10 @@ tbody tr:hover{background:var(--bg)}
         <button class="mbtn" onclick="shiftMonth(1)">&#8594;</button>
       </div>
       <div class="sgrid">
-        <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-count">—</div></div>
-        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
-        <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
-        <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:11px;color:var(--ink3);margin-top:2px;">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
+        <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-count">—</div></div>
+        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
+        <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
+        <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
       <div class="dgrid">
         <div style="display:flex;flex-direction:column;height:100%">
@@ -305,6 +305,32 @@ tbody tr:hover{background:var(--bg)}
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
           <!-- Revenue by company -->
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
+        </div>
+
+      <!-- Customer Invoice Changes -->
+      <div style="margin-top:20px">
+        <div class="card">
+          <div class="card-hdr" style="cursor:pointer;flex-wrap:wrap;gap:8px" onclick="toggleCard('inv-changes')">
+            <span class="card-title">Customer invoice changes</span>
+            <div style="display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap" onclick="event.stopPropagation()">
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3)">
+                <span style="font-weight:600;color:var(--ink2)">Period A:</span>
+                <input type="date" id="chg-a-from" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
+                <span>→</span>
+                <input type="date" id="chg-a-to" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink3)">
+                <span style="font-weight:600;color:var(--ink2)">Period B:</span>
+                <input type="date" id="chg-b-from" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
+                <span>→</span>
+                <input type="date" id="chg-b-to" style="font-size:12px;border:1px solid var(--border);border-radius:6px;padding:3px 7px;color:var(--ink1);background:#fff;cursor:pointer" onchange="renderChanges()">
+              </div>
+              <button onclick="event.stopPropagation();initChangePeriods()" style="font-size:11px;padding:3px 9px;border:1px solid var(--border);border-radius:6px;background:#fff;color:var(--ink3);cursor:pointer">Reset</button>
+            </div>
+            <span class="card-total-pill" id="inv-changes-total"></span>
+            <button class="card-toggle" id="inv-changes-arrow" aria-label="Toggle">▼</button>
+          </div>
+          <div class="card-body" id="inv-changes" style="display:none"></div>
         </div>
       </div>
     </div>
@@ -1492,7 +1518,222 @@ function openFcExport(){document.getElementById('fcexp-months').value=document.g
 // ── Dashboard ─────────────────────────────────────────────────────────
 let dashY=new Date().getFullYear(),dashM=new Date().getMonth();
 function shiftMonth(d){dashM+=d;if(dashM>11){dashM=0;dashY++;}if(dashM<0){dashM=11;dashY--;}renderDash();}
+
+function initChangePeriods(){
+  // Default: Period A = prev month, Period B = current month
+  const prevD=new Date(dashY,dashM-1,1);
+  const curD=new Date(dashY,dashM,1);
+  const lastPrev=new Date(dashY,dashM,0);
+  const lastCur=new Date(dashY,dashM+1,0);
+  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const aFrom=document.getElementById('chg-a-from');
+  const aTo=document.getElementById('chg-a-to');
+  const bFrom=document.getElementById('chg-b-from');
+  const bTo=document.getElementById('chg-b-to');
+  if(aFrom) aFrom.value=fmt(prevD);
+  if(aTo) aTo.value=fmt(lastPrev);
+  if(bFrom) bFrom.value=fmt(curD);
+  if(bTo) bTo.value=fmt(lastCur);
+}
+
+function renderChanges(){
+  const aFrom=document.getElementById('chg-a-from')?.value;
+  const aTo=document.getElementById('chg-a-to')?.value;
+  const bFrom=document.getElementById('chg-b-from')?.value;
+  const bTo=document.getElementById('chg-b-to')?.value;
+  if(!aFrom||!aTo||!bFrom||!bTo){initChangePeriods();return;}
+
+  const inRange=(date,from,to)=>date>=from&&date<=to;
+  const fmtPeriod=(f,t)=>{
+    const fd=new Date(f+'T00:00:00'), td=new Date(t+'T00:00:00');
+    if(f===t) return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(fd.getFullYear()===td.getFullYear()&&fd.getMonth()===td.getMonth())
+      return fd.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+td.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  };
+  const lblA=fmtPeriod(aFrom,aTo);
+  const lblB=fmtPeriod(bFrom,bTo);
+
+  // Group invoices by customer for each period
+  const pA={}, pB={};
+  DB.invoices.filter(i=>inRange(i.date,aFrom,aTo)).forEach(i=>{
+    if(!pA[i.customerId]) pA[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pA[i.customerId].total+=i.total;
+    pA[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pA[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pA[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+  DB.invoices.filter(i=>inRange(i.date,bFrom,bTo)).forEach(i=>{
+    if(!pB[i.customerId]) pB[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pB[i.customerId].total+=i.total;
+    pB[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pB[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pB[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+
+  const custIds=[...new Set([...Object.keys(pA),...Object.keys(pB)])];
+  const changes=[];
+  custIds.forEach(cid=>{
+    const c=DB.customers.find(x=>x.id===cid);
+    if(!c) return;
+    const hasA=!!pA[cid], hasB=!!pB[cid];
+    const totA=hasA?pA[cid].total:0, totB=hasB?pB[cid].total:0;
+    const subA=hasA?pA[cid].sub:0, subB=hasB?pB[cid].sub:0;
+    const diff=totB-totA;
+    const pct=totA?((diff/totA)*100):null;
+
+    // Detect line item changes (A → B)
+    const lineChanges=[];
+    if(hasA&&hasB){
+      const mapA={}, mapB={};
+      pA[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapA[k]) mapA[k]={qty:0,price:l.price,unit:l.unit||''}; mapA[k].qty+=Number(l.qty)||0; });
+      pB[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapB[k]) mapB[k]={qty:0,price:l.price,unit:l.unit||''}; mapB[k].qty+=Number(l.qty)||0; });
+      Object.keys(mapB).forEach(k=>{ if(!mapA[k]) lineChanges.push({type:'added',desc:k||'Unnamed',qty:mapB[k].qty,price:mapB[k].price}); });
+      Object.keys(mapA).forEach(k=>{ if(!mapB[k]) lineChanges.push({type:'removed',desc:k||'Unnamed',qty:mapA[k].qty,price:mapA[k].price}); });
+      Object.keys(mapB).forEach(k=>{
+        if(!mapA[k]) return;
+        const qd=mapB[k].qty-mapA[k].qty;
+        const pd=mapB[k].price-mapA[k].price;
+        if(Math.abs(qd)>0.001) lineChanges.push({type:'qty',desc:k||'Unnamed',fromQty:mapA[k].qty,toQty:mapB[k].qty,diff:qd,price:mapB[k].price});
+        if(Math.abs(pd)>0.001) lineChanges.push({type:'price',desc:k||'Unnamed',fromPrice:mapA[k].price,toPrice:mapB[k].price,qty:mapB[k].qty,diff:pd});
+      });
+    }
+
+    if(Math.abs(diff)<0.01&&lineChanges.length===0&&hasA&&hasB) return;
+    const status=!hasA&&hasB?'new':hasA&&!hasB?'gone':diff>0?'up':diff<0?'down':'same';
+    const serviceType=pB[cid]?.invoices[0]?.serviceType||pA[cid]?.invoices[0]?.serviceType||'';
+    changes.push({c,diff,pct,totA,totB,subA,subB,lineChanges,status,serviceType});
+  });
+
+  changes.sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+  const el=document.getElementById('inv-changes');
+  const pill=document.getElementById('inv-changes-total');
+  pill.textContent=changes.length+' change'+(changes.length!==1?'s':'');
+
+  if(!changes.length){
+    el.innerHTML=`<div style="padding:20px;color:var(--ink3);font-size:13px;text-align:center">No changes detected between ${esc(lblA)} and ${esc(lblB)}</div>`;
+    return;
+  }
+
+  const statusIcon={up:'↑',down:'↓',new:'★',gone:'✕',same:'→'};
+  const statusCol={up:'#1a9e5c',down:'#e03e3e',new:'#F07830',gone:'#8a99a8',same:'var(--ink3)'};
+  const statusBg={up:'#e8f5ee',down:'#fdecea',new:'#fff3e8',gone:'#f5f5f5',same:'#f8f9fa'};
+
+  el.innerHTML=`
+  <div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border);color:var(--ink3);font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">
+        <th style="padding:10px 14px;text-align:left;font-weight:600">Customer</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:600">${esc(lblA)}</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:600">${esc(lblB)}</th>
+        <th style="padding:10px 14px;text-align:right;font-weight:600">Change</th>
+        <th style="padding:10px 14px;text-align:left;font-weight:600">What changed</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${changes.map((ch,ri)=>{
+        const icon=statusIcon[ch.status];
+        const col=statusCol[ch.status];
+        const bg=statusBg[ch.status];
+        const diffStr=ch.diff>0?'+'+fmtGBP(ch.diff):(ch.diff<0?fmtGBP(ch.diff):'—');
+        const pctStr=ch.pct!==null?` (${ch.pct>0?'+':''}${ch.pct.toFixed(1)}%)`:' ';
+
+        // Period A display
+        const aExDisp=ch.totA?fmtGBP(ch.subA)+' ex':'—';
+        const aIncDisp=ch.totA?fmtGBP(ch.totA)+' inc':'';
+        // Period B display
+        const bExDisp=ch.totB?fmtGBP(ch.subB)+' ex':'—';
+        const bIncDisp=ch.totB?fmtGBP(ch.totB)+' inc':'';
+
+        // Customer info
+        const custInfo=`<div style="font-weight:700;color:var(--ink1);font-size:13px">${esc(ch.c.name)}</div>`
+          +(ch.c.company&&ch.c.company!==ch.c.name?`<div style="font-size:11px;color:var(--ink3);margin-top:1px">${esc(ch.c.company)}</div>`:'')
+          +(ch.serviceType?`<div style="font-size:11px;color:var(--ink3);margin-top:1px">${esc(ch.serviceType)}</div>`:'')
+          +(ch.c.email?`<div style="font-size:11px;color:#3560c8;margin-top:1px">${esc(ch.c.email)}</div>`:'');
+
+        // Line item change chips with before/after detail
+        let detailRows='';
+        if(ch.lineChanges.length){
+          detailRows=ch.lineChanges.map(lc=>{
+            if(lc.type==='added') return `
+              <div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:#e8f5ee;border-left:3px solid #1a9e5c;border-radius:0 6px 6px 0">
+                <span style="color:#1a9e5c;font-weight:700;font-size:13px">+</span>
+                <div>
+                  <div style="font-weight:600;color:#1a9e5c;font-size:12px">${esc(lc.desc)}</div>
+                  <div style="font-size:11px;color:#2d7a50">Added — qty ${lc.qty} × £${f2(lc.price)} = <strong>£${f2(lc.qty*lc.price)}</strong></div>
+                </div>
+              </div>`;
+            if(lc.type==='removed') return `
+              <div style="display:flex;align-items:center;gap:6px;margin:3px 0;padding:4px 8px;background:#fdecea;border-left:3px solid #e03e3e;border-radius:0 6px 6px 0">
+                <span style="color:#e03e3e;font-weight:700;font-size:13px">−</span>
+                <div>
+                  <div style="font-weight:600;color:#e03e3e;font-size:12px">${esc(lc.desc)}</div>
+                  <div style="font-size:11px;color:#a02828">Removed — was qty ${lc.qty} × £${f2(lc.price)} = <strong>£${f2(lc.qty*lc.price)}</strong></div>
+                </div>
+              </div>`;
+            if(lc.type==='qty'){
+              const impact=lc.diff*lc.price;
+              return `
+              <div style="margin:3px 0;padding:4px 8px;background:#fff3e8;border-left:3px solid #F07830;border-radius:0 6px 6px 0">
+                <div style="font-weight:600;color:#c05800;font-size:12px">${esc(lc.desc)}</div>
+                <div style="font-size:11px;color:#8B4F2A">
+                  Qty: <span style="background:#fde8d0;padding:1px 5px;border-radius:3px;font-weight:600">${lc.fromQty}</span>
+                  → <span style="background:#fde8d0;padding:1px 5px;border-radius:3px;font-weight:600">${lc.toQty}</span>
+                  &nbsp;(${lc.diff>0?'+':''}${lc.diff} × £${f2(lc.price)} = <strong style="color:${impact>=0?'#1a9e5c':'#e03e3e'}">${impact>=0?'+':''}£${f2(Math.abs(impact))}</strong>)
+                </div>
+              </div>`;
+            }
+            if(lc.type==='price'){
+              const impact=lc.diff*lc.qty;
+              return `
+              <div style="margin:3px 0;padding:4px 8px;background:#eef3ff;border-left:3px solid #3560c8;border-radius:0 6px 6px 0">
+                <div style="font-weight:600;color:#3560c8;font-size:12px">${esc(lc.desc)}</div>
+                <div style="font-size:11px;color:#2a4a9e">
+                  Price: <span style="background:#dce8ff;padding:1px 5px;border-radius:3px;font-weight:600">£${f2(lc.fromPrice)}</span>
+                  → <span style="background:#dce8ff;padding:1px 5px;border-radius:3px;font-weight:600">£${f2(lc.toPrice)}</span>
+                  &nbsp;(${lc.diff>0?'+':'−'}£${f2(Math.abs(lc.diff))} × qty ${lc.qty} = <strong style="color:${impact>=0?'#1a9e5c':'#e03e3e'}">${impact>=0?'+':''}£${f2(Math.abs(impact))}</strong>)
+                </div>
+              </div>`;
+            }
+            return '';
+          }).join('');
+        } else if(ch.status==='new'){
+          detailRows=`<div style="padding:4px 8px;background:#fff3e8;border-left:3px solid #F07830;border-radius:0 6px 6px 0;font-size:12px;color:#c05800;font-weight:600">★ New customer — no prior invoice in Period A</div>`;
+        } else if(ch.status==='gone'){
+          detailRows=`<div style="padding:4px 8px;background:#f5f5f5;border-left:3px solid #8a99a8;border-radius:0 6px 6px 0;font-size:12px;color:#6a7a88;font-weight:600">✕ No invoice in Period B</div>`;
+        } else {
+          detailRows=`<div style="font-size:12px;color:var(--ink3);padding:4px 0">Total changed (no line item detail)</div>`;
+        }
+
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 14px;vertical-align:top">${custInfo}</td>
+          <td style="padding:12px 14px;text-align:right;vertical-align:top;font-family:var(--mono)">
+            <div style="font-weight:600;color:var(--ink1);font-size:13px">${aExDisp}</div>
+            <div style="font-size:11px;color:var(--ink3)">${aIncDisp}</div>
+          </td>
+          <td style="padding:12px 14px;text-align:right;vertical-align:top;font-family:var(--mono)">
+            <div style="font-weight:700;color:var(--ink1);font-size:13px">${bExDisp}</div>
+            <div style="font-size:11px;color:var(--ink3)">${bIncDisp}</div>
+          </td>
+          <td style="padding:12px 14px;text-align:right;vertical-align:top">
+            <div style="display:inline-flex;align-items:center;gap:4px;background:${bg};color:${col};font-weight:700;font-size:14px;padding:4px 10px;border-radius:8px">${icon} ${diffStr}</div>
+            <div style="font-size:11px;color:${col};margin-top:3px;font-weight:600">${pctStr}</div>
+          </td>
+          <td style="padding:12px 14px;vertical-align:top;min-width:240px">${detailRows}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+  </div>`;
+}
+
+}
+
 function renderDash(){
+  // Initialise period pickers on first load
+  if(!document.getElementById('chg-a-from')?.value) initChangePeriods();
   const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
   document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
   const invs=DB.invoices.filter(i=>mk(i.date)===key);
@@ -1513,19 +1754,22 @@ function renderDash(){
   const nextTotalEx=nextFc.length?nextFc[0].recurSub:0;
   const recurTotal=recurInvs.reduce((s,i)=>s+i.total,0);
   const recurEx=recurInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
-  document.getElementById('ds-total').textContent=fmtPound(total)+' inc. VAT';
-  document.getElementById('ds-total-ex').textContent=fmtPound(totalEx)+' ex. VAT';
+  // ex VAT = big number, inc VAT = small sub
+  document.getElementById('ds-total').textContent=fmtPound(totalEx)+' ex. VAT';
+  document.getElementById('ds-total-ex').textContent=fmtPound(total)+' inc. VAT';
   document.getElementById('ds-count').textContent=invs.length+' invoice'+(invs.length!==1?'s':'');
-  document.getElementById('ds-next').textContent=fmtPound(nextTotal)+' inc. VAT';
-  document.getElementById('ds-next-ex').textContent=fmtPound(nextTotalEx)+' ex. VAT';
+  document.getElementById('ds-next').textContent=fmtPound(nextTotalEx)+' ex. VAT';
+  document.getElementById('ds-next-ex').textContent=fmtPound(nextTotal)+' inc. VAT';
   document.getElementById('ds-next-sub').textContent=nextCount+' recurring schedule'+(nextCount!==1?'s':'');
-  document.getElementById('ds-recur').textContent=fmtPound(recurTotal)+' inc. VAT';
-  document.getElementById('ds-recur-ex').textContent=fmtPound(recurEx)+' ex. VAT';
+  document.getElementById('ds-recur').textContent=fmtPound(recurEx)+' ex. VAT';
+  document.getElementById('ds-recur-ex').textContent=fmtPound(recurTotal)+' inc. VAT';
   document.getElementById('ds-recur-sub').textContent=recurInvs.length+' recurring invoice'+(recurInvs.length!==1?'s':'');
-  document.getElementById('ds-max').textContent=maxInv?(fmtPound(maxInv.total)+' inc. VAT'):'—';
-  document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.sub||maxInv.total/(1+(maxInv.vatRate||20)/100))+' ex. VAT':'—';
+  const maxEx=maxInv?fmtPound(maxInv.sub||maxInv.total/(1+(maxInv.vatRate||20)/100)):'—';
+  document.getElementById('ds-max').textContent=maxInv?(maxEx+' ex. VAT'):'—';
+  document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
+  renderChanges();
   // (#4) Monthly trend: 6 past months + current + next month forecast
   const bars=[];
   for(let i=5;i>=0;i--){
