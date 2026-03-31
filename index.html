@@ -2496,11 +2496,15 @@ function renderCommission(){
       </div></td>
     </tr>`;
   }).join('');
-  // Footer totals
+  // Footer totals — expand recurring to monthly rows then apply same date filter as export
+  let expForFooter=[];
+  comms.forEach(c=>expandCommToMonths(c).forEach(r=>expForFooter.push(r)));
+  if(fromDate)expForFooter=expForFooter.filter(r=>r._monthDate>=fromDate);
+  if(toDate)expForFooter=expForFooter.filter(r=>r._monthDate<=toDate);
   const totalInv=comms.reduce((s,r)=>s+r.invoiceTotalExVat,0);
   const totalComm=spId
-    ? comms.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===spId)?.amount||0),0)
-    : comms.reduce((s,r)=>s+r.totalCommission,0);
+    ? expForFooter.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===spId)?.amount||0),0)
+    : expForFooter.reduce((s,r)=>s+r.totalCommission,0);
   if(footer){
     footer.style.display='flex';
     footer.innerHTML=`<span>${comms.length} entr${comms.length!==1?'ies':'y'}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
