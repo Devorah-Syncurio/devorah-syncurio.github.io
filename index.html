@@ -310,6 +310,8 @@ tbody tr:hover{background:var(--bg)}
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
           <!-- Revenue by company -->
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
+          <!-- Payment method breakdown -->
+          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('pay-method-list')"><span class="card-title">Forecast by payment method</span><span class="card-total-pill" id="pay-method-list-total"></span><button class="card-toggle" id="pay-method-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="pay-method-list"></div></div>
         </div>
 
     </div>
@@ -499,12 +501,12 @@ tbody tr:hover{background:var(--bg)}
           <option value="HR and Governance">HR and Governance</option>
         </select>
       </div>
-      <div class="fg"><label class="flbl">Invoice date *</label><input type="date" class="finp" id="f-date"></div>
+      <div class="fg" id="inv-date-row"><label class="flbl">Invoice date *</label><input type="date" class="finp" id="f-date"></div>
       <div class="fg"><label class="flbl">Notes</label><input type="text" class="finp" id="f-notes" placeholder="Optional"></div>
       <input type="hidden" id="f-cur" value="£">
     </div>
   </div>
-  <div class="fsec">
+  <div class="fsec" id="billing-period-sec">
     <div class="fsec-title">Billing period</div>
     <div class="fgrid">
       <div class="fg"><label class="flbl">Period start *</label><input type="date" class="finp" id="f-ps"></div>
@@ -523,6 +525,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="fg"><label class="flbl">Schedule ends (optional)</label><input type="date" class="finp" id="f-re"></div>
         <div class="fg"><label class="flbl">Day of month to issue</label><input type="number" class="finp" id="f-rd" min="1" max="28" value="1"></div>
         <div class="fg"><label class="flbl">Schedule name (optional)</label><input type="text" class="finp" id="f-rn" placeholder="e.g. Monthly retainer"></div>
+        <div class="fg"><label class="flbl">Payment method</label><select class="fsel" id="f-pm"><option value="">— Select —</option><option value="Direct Debit">Direct Debit</option><option value="Standing Order">Standing Order</option><option value="Upon Invoice">Upon Invoice</option></select></div>
       </div>
     </div>
   </div>
@@ -539,7 +542,7 @@ tbody tr:hover{background:var(--bg)}
   </div>
   <div class="mfooter">
     <button class="btn btn-ghost" onclick="closeOverlay('inv-modal')">Cancel</button>
-    <button class="btn btn-primary" onclick="saveInv()">Save Invoice</button>
+    <button class="btn btn-primary" id="inv-modal-save-btn" onclick="saveInv()">Save Invoice</button>
   </div>
 </div>
 </div>
@@ -880,6 +883,14 @@ function toggleRecur(){
   document.getElementById('rtog').classList.toggle('on',recurOn);
   document.getElementById('rtog-txt').textContent=recurOn?'Monthly recurrence on':'Monthly recurrence off';
   document.getElementById('rdet').classList.toggle('vis',recurOn);
+  // Hide billing period and invoice date when in recurring mode (auto-managed by schedule)
+  const bps=document.getElementById('billing-period-sec');
+  const idr=document.getElementById('inv-date-row');
+  if(bps) bps.style.display=recurOn?'none':'';
+  if(idr) idr.style.display=recurOn?'none':'';
+  // Update save button label
+  const sb=document.getElementById('inv-modal-save-btn');
+  if(sb) sb.textContent=recurOn?(editSchedId?'Save Schedule':'Save Schedule'):'Save Invoice';
 }
 function setRecur(on){if(recurOn!==on)toggleRecur();}
 
@@ -1106,14 +1117,17 @@ function openInvModal(id,forceRecur,presetCustId){
   document.getElementById('f-notes').value=inv?.notes||'';
   document.getElementById('vat-sel').value=String(inv?.vatRate??20);
   recurOn=false;setRecur(!!(forceRecur||inv?.isRecurring));
+  // Save button updated by toggleRecur; ensure correct for non-recurring case
+  const _sb=document.getElementById('inv-modal-save-btn');if(_sb&&!(forceRecur||inv?.isRecurring))_sb.textContent='Save Invoice';
   if(sched){
     document.getElementById('f-rs').value=sched.schedStart||'';
     document.getElementById('f-re').value=sched.schedEnd||'';
     document.getElementById('f-rd').value=sched.dayOfMonth||1;
     document.getElementById('f-rn').value=sched.name||'';
+    document.getElementById('f-pm').value=sched.paymentMethod||'';
   }else{
     document.getElementById('f-rs').value=today().slice(0,7)+'-01';
-    document.getElementById('f-re').value='';document.getElementById('f-rd').value=1;document.getElementById('f-rn').value='';
+    document.getElementById('f-re').value='';document.getElementById('f-rd').value=1;document.getElementById('f-rn').value='';document.getElementById('f-pm').value='';
   }
   lines=inv?inv.lines.map(l=>({...l})):[{desc:'',qty:1,price:0},{desc:'',qty:1,price:0}];
   renderLines();openOverlay('inv-modal');
@@ -1125,7 +1139,7 @@ function openSchedModal(sid){
   document.getElementById('inv-modal-title').textContent='Edit Schedule';
   document.getElementById('inv-modal-sub').textContent='Changes apply to past and future generated invoices';
   document.getElementById('f-service').value=s.serviceType||'';
-  document.getElementById('f-date').value=today();
+  document.getElementById('f-date').value=s.schedStart?s.schedStart.slice(0,7)+'-01':today();
   document.getElementById('f-cur').value=s.currency;
   document.getElementById('f-ps').value='';document.getElementById('f-pe').value='';
   document.getElementById('f-notes').value=s.notes||'';
@@ -1135,6 +1149,7 @@ function openSchedModal(sid){
   document.getElementById('f-re').value=s.schedEnd||'';
   document.getElementById('f-rd').value=s.dayOfMonth||1;
   document.getElementById('f-rn').value=s.name||'';
+  document.getElementById('f-pm').value=s.paymentMethod||'';
   lines=s.lines.map(l=>({...l}));renderLines();openOverlay('inv-modal');
 }
 function addLine(){lines.push({desc:'',qty:1,price:0});renderLines();}
@@ -1184,7 +1199,7 @@ function saveInv(){
     if(!rs){showToast('Please set a schedule start date.');return;}
     Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,
       schedStart:rs.slice(0,7),schedEnd:document.getElementById('f-re').value?document.getElementById('f-re').value.slice(0,7):'',
-      dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim()});
+      dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim(),paymentMethod:document.getElementById('f-pm').value});
     closeOverlay('inv-modal');
     const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
     if(existingCount>0){
@@ -1214,7 +1229,7 @@ function saveInv(){
       if(inv?.scheduleId){
         const s=DB.schedules.find(x=>x.id===inv.scheduleId);
         if(s){
-          Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name});
+          Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:document.getElementById('f-pm').value});
           closeOverlay('inv-modal');
           const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
           if(existingCount>0){
@@ -1235,7 +1250,7 @@ function saveInv(){
       }
     }else{
       const sid='s'+Date.now();
-      const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType};
+      const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType,paymentMethod:document.getElementById('f-pm').value};
       DB.schedules.push(sched);
       regenSchedule(sched);
     }
@@ -1503,7 +1518,7 @@ function renderRecurring(){
       <div class="rc-left"><div class="rc-dot" style="background:${col}"></div>
         <div class="rc-info">
           <div class="rc-name">${s.name||c?.name||'Unnamed'} ${badge}${s.serviceType?` <span class="badge b-period">${s.serviceType}</span>`:''}</div>
-          <div class="rc-meta">${c?.name||'?'} · from ${startLbl} · ${endLbl} · ${gen} invoice${gen!==1?'s':''} · day ${s.dayOfMonth||1}</div>
+          <div class="rc-meta">${c?.name||'?'} · from ${startLbl} · ${endLbl} · ${gen} invoice${gen!==1?'s':''} · day ${s.dayOfMonth||1}${s.paymentMethod?` · <span style="color:var(--teal);font-weight:600">${s.paymentMethod}</span>`:''}</div>
         </div>
       </div>
       <div class="rc-right">
@@ -1699,10 +1714,60 @@ function renderDash(){
       <div>${ci.length?`<div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="${invClick}" title="View invoices this month">${fmtGBP(ci.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0))} ex.</div><div style="font-family:var(--mono);font-size:10px;color:var(--ink3);cursor:pointer" onclick="${invClick}">${fmtGBP(ci.reduce((s,i)=>s+i.total,0))} inc.</div></div>`:'<span style="font-size:11px;color:var(--ink3)">no invoice</span>'}</div>
     </div>`;
   }).join('');
+
+  // Payment method breakdown (next month forecast by payment method)
+  const pmCard=document.getElementById('pay-method-list');
+  const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
+  const pmData={};
+  PM_LABELS.forEach(pm=>{pmData[pm]={sub:0,total:0,count:0};});
+  pmData['Unspecified']={sub:0,total:0,count:0};
+  DB.schedules.forEach(s=>{
+    if(!s.active)return;
+    if(nextKey<s.schedStart)return;
+    if(s.schedEnd&&nextKey>s.schedEnd)return;
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const vat=sub*(s.vatRate/100);
+    const tot=sub+vat;
+    const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
+    pmData[pm].sub+=sub;pmData[pm].total+=tot;pmData[pm].count++;
+  });
+  const pmEntries=Object.entries(pmData).filter(([,v])=>v.count>0);
+  const pmGrandSub=pmEntries.reduce((s,[,v])=>s+v.sub,0);
+  const pmGrandTotal=pmEntries.reduce((s,[,v])=>s+v.total,0);
+  setCardTotal('pay-method-list',fmtGBP(pmGrandSub),'inc. VAT '+fmtGBP(pmGrandTotal));
+  const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
+  const PM_COLORS={'Direct Debit':'var(--teal)','Standing Order':'var(--gold)','Upon Invoice':'var(--accent)','Unspecified':'var(--ink3)'};
+  if(pmCard){
+    if(!pmEntries.length){
+      pmCard.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No recurring schedules active next month.</div>';
+    }else{
+      pmCard.innerHTML=pmEntries.map(([pm,v],idx)=>{
+        const pct=pmGrandTotal?Math.round(v.total/pmGrandTotal*100):0;
+        const border=idx<pmEntries.length-1?'border-bottom:1px solid var(--border)':'';
+        return`<div style="padding:10px 0;${border}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">${PM_ICONS[pm]||'💳'}</span>
+              <span style="font-weight:600;font-size:13px;color:${PM_COLORS[pm]||'var(--ink)'}">${pm}</span>
+              <span style="font-size:11px;color:var(--ink3)">${v.count} schedule${v.count!==1?'s':''}</span>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--mono);font-size:12px;font-weight:600">${fmtGBP(v.sub)} ex.</div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--ink3)">inc. ${fmtGBP(v.total)}</div>
+            </div>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${PM_COLORS[pm]||'var(--ink3)'};border-radius:4px;transition:width .3s"></div>
+          </div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:3px;text-align:right;font-family:var(--mono)">${pct}% of next month forecast</div>
+        </div>`;
+      }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-size:12px;font-weight:600">Total</span><div style="text-align:right"><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal)">${fmtGBP(pmGrandSub)} ex. VAT</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">inc. VAT ${fmtGBP(pmGrandTotal)}</div></div></div>`;
+    }
+  }
 }
 
 // ── Collapsible card toggle ────────────────────────────────────────────
-const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false};
+const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false,'pay-method-list':false};
 function applyCardState(bodyId){
   const open=cardStates[bodyId];
   const body=document.getElementById(bodyId);
