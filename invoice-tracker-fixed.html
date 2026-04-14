@@ -1,0 +1,2724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  var pwd = sessionStorage.getItem('syncurio_auth');
+  if(pwd !== 'ok'){
+    document.addEventListener('DOMContentLoaded', function(){
+      var overlay = document.createElement('div');
+      overlay.id = 'auth-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:#EEF0F5;display:flex;align-items:center;justify-content:center;z-index:99999;font-family:Inter,sans-serif;';
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:48px 40px;width:360px;box-shadow:0 8px 40px rgba(28,43,58,0.13);text-align:center;">
+          <div style="font-size:32px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px;">
+            <span style="color:#F07830;">S</span><span style="color:#1C2B3A;">yncurio</span>
+          </div>
+          <div style="font-size:12px;color:#8a99a8;letter-spacing:2px;margin-bottom:32px;">invoice tracker</div>
+          <input id="pwd-input" type="password" placeholder="Enter password" autocomplete="new-password"
+            style="width:100%;box-sizing:border-box;padding:12px 16px;border:1.5px solid #dde2ea;border-radius:8px;font-size:15px;color:#1C2B3A;outline:none;margin-bottom:12px;"
+            onkeydown="if(event.key==='Enter')document.getElementById('pwd-btn').click()"
+          />
+          <div id="pwd-error" style="color:#e05;font-size:13px;margin-bottom:8px;min-height:18px;"></div>
+          <button id="pwd-btn"
+            style="width:100%;padding:12px;background:#F07830;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;"
+            onclick="(function(){
+              var v=document.getElementById('pwd-input').value;
+              if(v==='Syncurio2026'){sessionStorage.setItem('syncurio_auth','ok');document.getElementById('auth-overlay').remove();}
+              else{document.getElementById('pwd-error').textContent='Incorrect password. Please try again.';}
+            })()"
+          >Sign In</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      setTimeout(function(){ var el=document.getElementById('pwd-input'); if(el){el.value='';el.focus();} }, 100);
+    });
+  }
+})();
+</script>
+<title>Ledger — Invoice Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Figtree:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#eef0f5;--bg2:#e1e5ed;--surface:#fff;--border:#d2d7e3;--border2:#b8c0cf;
+  --ink:#1C2B3A;--ink2:#3d5068;--ink3:#7a8fa6;
+  --accent:#F07830;--accent-light:#FEF0E6;
+  --accent2:#c4401a;--accent2-light:#f5ece8;
+  --gold:#2E86AB;--gold-light:#e0f2fa;
+  --teal:#0e6e72;--teal-light:#e4f4f5;
+  --serif:'Instrument Serif',serif;--sans:'Figtree',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
+.shell{display:flex;min-height:100vh}
+.sidebar{width:230px;flex-shrink:0;background:#1C2333;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;overflow-y:auto}
+.main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.logo-block{padding:32px 24px 28px;border-bottom:1px solid rgba(255,255,255,0.08)}
+.logo{font-family:var(--serif);font-size:36px;color:#fff;letter-spacing:-1px;line-height:1}
+.logo em{font-style:normal;color:#F07830}
+.logo-sub{font-size:12px;color:rgba(255,255,255,0.35);margin-top:8px;font-family:var(--mono);letter-spacing:1px}
+.nav{padding:16px 0}
+.nav-lbl{font-size:10px;color:rgba(255,255,255,0.25);letter-spacing:2px;text-transform:uppercase;padding:12px 24px 6px;font-family:var(--mono)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;transition:all 0.15s;border-left:2px solid transparent;user-select:none}
+.nav-item:hover{color:rgba(255,255,255,0.9);background:rgba(240,120,48,0.08)}
+.nav-item.active{color:#fff;border-left:3px solid #F07830;background:rgba(240,120,48,0.18)}
+.nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:20px 24px;border-top:1px solid rgba(255,255,255,0.08)}
+.sidebar-footer p{font-size:11px;color:rgba(255,255,255,0.25);font-family:var(--mono)}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(28,43,58,0.05)}
+.page-title{font-family:var(--serif);font-size:26px;letter-spacing:-0.5px}
+.topbar-right{display:flex;gap:10px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:6px;border:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;transition:all 0.15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#d4661f;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--ink2);border:1px solid var(--border2)}.btn-ghost:hover{background:#FDE8D0;border-color:#F07830;color:#C05A10}
+.btn-danger{background:var(--accent2-light);color:var(--accent2);border:1px solid rgba(196,64,26,0.2)}.btn-danger:hover{background:rgba(196,64,26,0.15)}
+.btn-teal{background:var(--teal-light);color:var(--teal);border:1px solid rgba(14,110,114,0.2)}.btn-teal:hover{background:rgba(14,110,114,0.15)}
+.btn-sm{padding:5px 12px;font-size:12px}.btn-xs{padding:3px 9px;font-size:11px}
+.content{padding:28px 32px;flex:1}
+.view{display:none}.view.active{display:block}
+/* Stats */
+.mnav{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.mdisp{font-family:var(--serif);font-size:22px;min-width:200px;text-align:center}
+.mbtn{width:34px;height:34px;border-radius:50%;background:var(--surface);border:1px solid var(--border2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;color:var(--ink2)}
+.mbtn:hover{background:#FDE8D0;border-color:#F07830;color:#C05A10}
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06)}
+.stat-bar{position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
+.stat-bar.gold{background:var(--gold)}.stat-bar.rust{background:var(--accent2)}.stat-bar.slate{background:var(--ink3)}.stat-bar.teal{background:var(--teal)}
+.stat-lbl{font-size:11px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px}
+.stat-val{font-family:var(--serif);font-size:30px;letter-spacing:-1px;line-height:1}
+.stat-sub{font-size:11px;color:var(--ink3);margin-top:5px;font-family:var(--mono)}
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(28,43,58,0.06)}
+.card-hdr{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg)}
+.card-title{font-weight:600;font-size:14px;flex:1}
+.card-toggle{background:none;border:none;cursor:pointer;padding:0 0 0 6px;color:var(--ink3);font-size:14px;line-height:1;transition:transform .2s;display:inline-flex;align-items:center}
+.card-toggle.collapsed{transform:rotate(-90deg)}
+.card-total-pill{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;margin-left:8px;opacity:0;pointer-events:none;transition:opacity .15s}
+.card-total-pill.visible{opacity:1}
+.card-body{padding:20px 22px}
+/* Tables */
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--bg);border-bottom:2px solid var(--border2)}
+th{text-align:left;padding:10px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);font-family:var(--mono);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{color:var(--ink2)}
+th.r{text-align:right}
+th .sort-icon{display:inline-block;margin-left:4px;opacity:0.4;font-size:9px}
+th.sorted .sort-icon{opacity:1;color:var(--accent)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+td.r{text-align:right;font-family:var(--mono);font-size:12px}
+td.muted{color:var(--ink3)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--bg)}
+/* Charts */
+.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.bar-name{font-size:12px;font-weight:600;width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.bar-track{flex:1;height:18px;background:var(--bg2);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;transition:width 0.4s}
+.bar-fill span{font-size:10px;font-family:var(--mono);color:#fff;white-space:nowrap}
+.bar-val{font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:600;min-width:68px;text-align:right}
+.mbars{display:flex;align-items:flex-end;gap:4px;height:100px;margin-top:8px}
+.mbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center}
+.mbar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height 0.3s}
+.mbar.past{background:var(--accent)}
+.mbar.current{background:var(--gold)}
+.mbar.forecast{background:var(--teal);opacity:0.7}
+/* Modals */
+.overlay{position:fixed;inset:0;background:rgba(26,25,22,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:30px;width:660px;max-height:90vh;overflow-y:auto;transform:translateY(12px);transition:transform 0.2s;box-shadow:0 8px 32px rgba(28,43,58,0.18)}
+.overlay.open .modal{transform:translateY(0)}
+.modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.modal-title{font-family:var(--serif);font-size:24px;letter-spacing:-0.3px}
+.modal-sub{font-size:12px;color:var(--ink3);margin-top:3px;font-family:var(--mono)}
+.xbtn{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:20px;padding:2px;line-height:1}
+.xbtn:hover{color:var(--ink)}
+/* Forms */
+.fsec{margin-bottom:20px}
+.fsec-title{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);font-family:var(--mono);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.full{grid-column:1/-1}
+.flbl{font-size:11px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:var(--mono)}
+.finp,.fsel,.ftxt{background:var(--bg);border:1px solid var(--border2);color:var(--ink);padding:9px 12px;border-radius:7px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color 0.15s,box-shadow 0.15s}
+.finp:focus,.fsel:focus,.ftxt:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,92,63,0.1)}
+.fsel option{background:var(--surface)}
+.ftxt{resize:vertical;min-height:60px;width:100%}
+.fhint{font-size:11px;color:var(--ink3);font-family:var(--mono)}
+/* Customer search combo */
+.cust-dd{display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-top:none;border-radius:0 0 7px 7px;max-height:200px;overflow-y:auto;z-index:500;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+.cust-dd-item{padding:9px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border)}
+.cust-dd-item:hover{background:var(--bg)}
+.cust-dd-item:last-child{border-bottom:none}
+/* Recur toggle */
+.rtog{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);border-radius:8px;border:1px solid var(--border2);cursor:pointer;transition:border-color 0.15s;grid-column:1/-1}
+.rtog:hover{border-color:var(--teal)}.rtog.on{border-color:var(--teal);background:var(--teal-light)}
+.tsw{width:36px;height:20px;border-radius:10px;background:var(--border2);position:relative;flex-shrink:0;transition:background 0.2s}
+.tsw.on{background:var(--teal)}
+.tsw::after{content:'';position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.tsw.on::after{transform:translateX(16px)}
+.rtog-txt{font-size:13px;font-weight:600;color:var(--ink2)}.rtog-txt.on{color:var(--teal)}
+.rtog-sub{font-size:11px;color:var(--ink3);font-family:var(--mono)}
+.rdet{display:none;grid-column:1/-1}.rdet.vis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* Badges */
+.seg-ctrl{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg-btn{padding:5px 14px;font-size:12px;font-weight:500;background:transparent;border:none;color:var(--ink2);cursor:pointer;border-right:1px solid var(--border);transition:background .15s,color .15s}
+.seg-btn:last-child{border-right:none}
+.seg-btn:hover{background:rgba(240,120,48,0.08);color:var(--accent)}
+.seg-btn.active{background:var(--accent);color:#fff}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-family:var(--mono);font-weight:600;white-space:nowrap}
+.b-recur{background:var(--teal-light);color:var(--teal);border:1px solid rgba(14,110,114,0.2)}
+.b-period{background:var(--gold-light);color:var(--gold);border:1px solid rgba(46,134,171,0.2)}
+.b-ended{background:var(--accent2-light);color:var(--accent2);border:1px solid rgba(196,64,26,0.15)}
+.b-active{background:var(--accent-light);color:var(--accent);border:1px solid rgba(43,92,63,0.2)}
+/* Line items */
+.li-hdr{display:grid;grid-template-columns:1fr 70px 110px 90px 28px;gap:8px;margin-bottom:6px}
+.li-hdr span{font-size:10px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.5px}
+.li-hdr span.r{text-align:right}
+.li-row{display:grid;grid-template-columns:1fr 70px 110px 90px 28px;gap:8px;margin-bottom:8px;align-items:center}
+.li-tot{font-family:var(--mono);font-size:12px;color:var(--ink2);text-align:right;padding:9px 0}
+.rmbtn{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:16px;width:28px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;line-height:1}
+.rmbtn:hover{background:var(--accent2-light);color:var(--accent2)}
+.totbox{background:var(--bg);border-radius:8px;padding:14px 16px;margin-top:14px}
+.trow{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;color:var(--ink2)}
+.trow:last-child{margin-bottom:0}
+.trow.grand{border-top:1px solid var(--border2);margin-top:10px;padding-top:10px;font-weight:600;font-size:16px;color:var(--ink)}
+.trow.grand .tv{font-family:var(--serif);font-size:20px;color:var(--accent)}
+.tv{font-family:var(--mono);font-size:13px}
+.mfooter{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+/* Filters */
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sinp{background:var(--bg);border:1px solid var(--border2);color:var(--ink);padding:7px 12px;border-radius:6px;font-family:var(--sans);font-size:13px;outline:none;width:160px;transition:border-color 0.15s}
+.sinp:focus{border-color:var(--accent)}
+.fltsel{background:var(--bg);border:1px solid var(--border2);color:var(--ink);padding:7px 10px;border-radius:6px;font-family:var(--sans);font-size:13px;outline:none;cursor:pointer}
+/* Recurring cards */
+.rc{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.rc:hover{border-color:var(--border2)}
+.rc-left{display:flex;align-items:center;gap:14px;flex:1;min-width:0}
+.rc-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rc-info{min-width:0}
+.rc-name{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rc-meta{font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:2px}
+.rc-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.rc-amt{font-family:var(--serif);font-size:20px;color:var(--accent);letter-spacing:-0.5px}
+.rc-freq{font-size:11px;color:var(--ink3);font-family:var(--mono);text-align:right}
+/* Export preview */
+.exp-prev{background:var(--bg);border-radius:8px;padding:12px 16px;margin:16px 0;font-size:12px;font-family:var(--mono);color:var(--ink3);line-height:1.8}
+.exp-prev strong{color:var(--ink2)}
+/* Dashboard layout */
+.dgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:stretch}
+/* Trend legend */
+.trend-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--ink3)}
+.trend-legend span{display:flex;align-items:center;gap:5px}
+.trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
+/* Empty */
+.empty{text-align:center;padding:40px 24px;color:var(--ink3)}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:0.4}
+.empty-text{font-size:13px;margin-bottom:14px}
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);transition:transform 0.25s;box-shadow:0 8px 32px rgba(0,0,0,0.3);max-width:320px;pointer-events:none}
+.toast.show{transform:translateY(0)}
+/* Confirm */
+.conf-overlay{position:fixed;inset:0;background:rgba(26,25,22,0.5);display:flex;align-items:center;justify-content:center;z-index:2000;backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity 0.15s}
+.conf-overlay.open{opacity:1;pointer-events:all}
+.conf-box{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:380px;text-align:center}
+.conf-title{font-family:var(--serif);font-size:20px;margin-bottom:8px}
+.conf-msg{font-size:13px;color:var(--ink2);margin-bottom:20px;line-height:1.6}
+.conf-btns{display:flex;gap:10px;justify-content:center}
+.regen-choice-btn{display:block;width:100%;text-align:left;padding:12px 16px;border-radius:8px;border:1px solid var(--border2);background:var(--surface);cursor:pointer;margin-bottom:8px;transition:background 0.15s,border-color 0.15s}
+.regen-choice-btn:hover{background:rgba(240,120,48,0.07);border-color:var(--accent)}
+.regen-choice-btn .rcb-title{font-weight:600;font-size:14px;color:var(--ink1);margin-bottom:3px}
+.regen-choice-btn .rcb-sub{font-size:12px;color:var(--ink3);line-height:1.4}
+@keyframes spin{to{transform:rotate(360deg)}}
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:900px){.sgrid{grid-template-columns:1fr 1fr}.dgrid{grid-template-columns:1fr}.sidebar{width:190px}.main{margin-left:190px}}
+@media(max-width:640px){.sidebar{display:none}.main{margin-left:0}}
+</style>
+</head>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<body>
+<div id="loading-overlay" style="position:fixed;inset:0;background:#EEF0F5;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px">
+  <div style="font-size:36px;font-weight:800;color:#1C2B3A;letter-spacing:-1px"><span style="color:#F07830">S</span>yncurio</div>
+  <div style="font-size:13px;color:#5a6a7a;letter-spacing:2px">LOADING…</div>
+  <div style="width:48px;height:4px;background:#e0e4ed;border-radius:4px;overflow:hidden;margin-top:4px"><div id="load-bar" style="height:100%;width:30%;background:#F07830;border-radius:4px;animation:loadpulse 1s ease-in-out infinite"></div></div>
+</div>
+<style>@keyframes loadpulse{0%,100%{opacity:.4}50%{opacity:1}}</style>
+<div class="shell">
+
+<nav class="sidebar">
+  <div class="logo-block"><div class="logo"><em>S</em>yncurio</div><div class="logo-sub">invoice tracker</div></div>
+  <div class="nav">
+    <div class="nav-lbl">Navigation</div>
+    <div class="nav-item active" onclick="nav('dashboard')"><span class="nav-icon">▦</span> Dashboard</div>
+    <div class="nav-item" onclick="nav('invoices')"><span class="nav-icon">≡</span> Invoices</div>
+    <div class="nav-item" onclick="nav('recurring')"><span class="nav-icon">↻</span> Recurring</div>
+    <div class="nav-item" onclick="nav('forecast')"><span class="nav-icon">◈</span> Forecast</div>
+    <div class="nav-item" onclick="nav('customers')"><span class="nav-icon">◉</span> Customers</div>
+    <div class="nav-item" onclick="nav('commission')"><span class="nav-icon">%</span> Commission</div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="pageTitle">Dashboard</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="openExport()">↓ Export to Excel</button>
+      <button class="btn btn-ghost" onclick="exportVarianceReport()" title="Export variance comparison between current month actuals and next month forecast">↓ Variance Report</button>
+      <button class="btn btn-ghost" onclick="showInvoiceChangesModal()" title="Compare invoices across two date ranges">↓ Invoice Changes</button>
+      <button class="btn btn-ghost" onclick="openCustModal()">+ Customer</button>
+      <button class="btn btn-primary" onclick="openInvModal()">+ New Invoice</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="view-dashboard">
+      <div class="mnav">
+        <button class="mbtn" onclick="shiftMonth(-1)">&#8592;</button>
+        <div class="mdisp" id="dash-month">—</div>
+        <button class="mbtn" onclick="shiftMonth(1)">&#8594;</button>
+      </div>
+      <div class="sgrid">
+        <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-count">—</div></div>
+        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
+        <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
+        <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
+      </div>
+      <div class="dgrid">
+        <div style="display:flex;flex-direction:column;height:100%">
+          <!-- Monthly trend with 6 past + forecast -->
+          <div class="card" style="flex:1">
+            <div class="card-hdr"><span class="card-title">Monthly trend</span>
+              <div class="trend-legend">
+                <span><i style="background:var(--accent)"></i> Actual</span>
+                <span><i style="background:var(--gold)"></i> Current</span>
+                <span><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="mbars" id="trend-bars"></div>
+              <div style="display:flex;gap:4px;margin-top:6px" id="trend-labels"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;justify-content:space-between;height:100%">
+          <!-- Next month forecast breakdown -->
+          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
+          <!-- All customers this month -->
+          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
+          <!-- Revenue by company -->
+          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
+          <!-- Payment method breakdown -->
+          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('pay-method-list')"><span class="card-title">Forecast by payment method</span><span class="card-total-pill" id="pay-method-list-total"></span><button class="card-toggle" id="pay-method-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="pay-method-list"></div></div>
+        </div>
+
+    </div>
+    </div>
+
+    <!-- INVOICES -->
+    <div class="view" id="view-invoices">
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">All Invoices</span>
+          <div class="filters">
+            <input class="sinp" id="inv-search" placeholder="Search…" oninput="renderInvoices()">
+            <select class="fltsel" id="inv-cf" onchange="renderInvoices()"><option value="">All</option></select>
+            <select class="fltsel" id="inv-mf" onchange="renderInvoices()"><option value="">All months</option></select>
+            <select class="fltsel" id="inv-rf" onchange="renderInvoices()">
+              <option value="">All types</option>
+              <option value="r">Recurring only</option>
+              <option value="o">One-off only</option>
+            </select>
+          </div>
+        </div>
+        <table id="inv-table">
+          <thead><tr>
+            <th onclick="sortTable('inv','cust',this)">Customer <span class="sort-icon">⇅</span></th>
+            <th onclick="sortTable('inv','date',this)">Invoice date <span class="sort-icon">⇅</span></th>
+            <th>Period covered</th>
+            <th class="r" onclick="sortTable('inv','subtotal',this)">Subtotal <span class="sort-icon">⇅</span></th>
+            <th class="r">VAT</th>
+            <th class="r" onclick="sortTable('inv','total',this)">Total <span class="sort-icon">⇅</span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+        <div id="inv-empty" class="empty" style="display:none"><div class="empty-icon">≡</div><div class="empty-text">No invoices found.</div><button class="btn btn-primary btn-sm" onclick="openInvModal()">Create first invoice</button></div>
+      </div>
+    </div>
+
+    <!-- RECURRING -->
+    <div class="view" id="view-recurring">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap">
+        <p style="color:var(--ink2);font-size:13px">Recurring invoices generate automatically each month.</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <input class="sinp" id="recur-search" placeholder="Search schedules…" oninput="renderRecurring()" style="width:200px">
+          <div class="seg-ctrl" id="recur-status-filter">
+            <button class="seg-btn active" data-val="all" onclick="setRecurFilter('all')">All</button>
+            <button class="seg-btn" data-val="active" onclick="setRecurFilter('active')">Active</button>
+            <button class="seg-btn" data-val="paused" onclick="setRecurFilter('paused')">Paused</button>
+          </div>
+          <button class="btn btn-primary" onclick="openInvModal(null,true)">+ New Schedule</button>
+        </div>
+      </div>
+      <div id="recur-list"></div>
+    </div>
+
+    <!-- FORECAST -->
+    <div class="view" id="view-forecast">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+        <p style="color:var(--ink2);font-size:13px;max-width:560px">Confirmed invoicing forecast based on your active recurring schedules only.</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <label style="font-size:13px;color:var(--ink2);font-weight:500">Months ahead</label>
+          <select class="fltsel" id="fc-months" onchange="renderForecast()"><option value="1">1</option><option value="3">3</option><option value="6" selected>6</option><option value="12">12</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="openFcExport()">↓ Export forecast</button>
+        </div>
+      </div>
+      <div class="sgrid" id="fc-stats"></div>
+      <div class="card">
+        <div class="card-hdr"><span class="card-title">Month-by-month projection</span><span id="fc-basis" style="font-size:12px;color:var(--ink3);font-family:var(--mono)"></span></div>
+        <table>
+          <thead><tr><th>Month</th><th class="r">Confirmed recurring</th><th class="r">VAT</th><th class="r">Total inc. VAT</th></tr></thead>
+          <tbody id="fc-tbody"></tbody>
+        </table>
+      </div>
+      <div class="dgrid">
+        <div class="card"><div class="card-hdr"><span class="card-title">Recurring by customer</span></div><div class="card-body" id="fc-cust-bars"></div></div>
+        <div class="card"><div class="card-hdr"><span class="card-title">Active schedules</span></div><div class="card-body" id="fc-scheds"></div></div>
+      </div>
+    </div>
+
+    <!-- CUSTOMERS -->
+    <div class="view" id="view-customers">
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Customers</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="fltsel" id="cust-sort" onchange="renderCustomers()">
+              <option value="name-az">Name A–Z</option>
+              <option value="name-za">Name Z–A</option>
+              <option value="company-az">Company A–Z</option>
+              <option value="total-desc">Total billed ↓</option>
+              <option value="total-asc">Total billed ↑</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openCustModal()">+ Add customer</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr>
+            <th></th>
+            <th onclick="setCustSort('name-az','name-za',this)">Name <span class="sort-icon">⇅</span></th>
+            <th onclick="setCustSort('company-az','company-az',this)">Company <span class="sort-icon">⇅</span></th>
+            <th>Email</th>
+            <th class="r">Invoices</th>
+            <th class="r" onclick="setCustSort('total-desc','total-asc',this)">Total billed <span class="sort-icon">⇅</span></th>
+            <th></th>
+          </tr></thead>
+          <tbody id="cust-tbody"></tbody>
+        </table>
+        <div id="cust-empty" class="empty" style="display:none"><div class="empty-icon">◉</div><div class="empty-text">No customers yet.</div><button class="btn btn-primary btn-sm" onclick="openCustModal()">Add first customer</button></div>
+      </div>
+    </div>
+
+    <!-- COMMISSION -->
+    <div class="view" id="view-commission">
+      <!-- Salespeople Management -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-hdr">
+          <span class="card-title">Sales Team</span>
+          <button class="btn btn-primary btn-sm" onclick="openSpModal()">+ Add Salesperson</button>
+        </div>
+        <div id="sp-list" style="padding:16px 22px"></div>
+      </div>
+      <!-- Commission Entries -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title">Commission Records</span>
+          <div class="filters">
+            <select class="fltsel" id="comm-sp-filter" onchange="renderCommission()"><option value="">All salespeople</option></select>
+            <input type="date" class="sinp" id="comm-from" onchange="renderCommission()" style="width:140px">
+            <input type="date" class="sinp" id="comm-to" onchange="renderCommission()" style="width:140px">
+            <button class="btn btn-ghost btn-sm" onclick="clearCommFilters()">✕ Clear Filters</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportCommission()">↓ Export to Excel</button>
+            <button class="btn btn-primary btn-sm" onclick="openCommModal()">+ Add Commission</button>
+          </div>
+        </div>
+        <table id="comm-table">
+          <thead><tr>
+            <th>Description / Customer</th>
+            <th>Salesperson(s)</th>
+            <th class="r">Invoice Total (ex VAT)</th>
+            <th class="r">Commission %</th>
+            <th class="r">Commission Amount</th>
+            <th>Type</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="comm-tbody"></tbody>
+        </table>
+        <div id="comm-empty" class="empty" style="display:none">
+          <div class="empty-icon">%</div>
+          <div class="empty-text">No commission records yet.</div>
+          <button class="btn btn-primary btn-sm" onclick="openCommModal()">Add first commission</button>
+        </div>
+        <div id="comm-footer" style="display:none;padding:12px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:24px;font-family:var(--mono);font-size:12px;color:var(--ink2)"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- INVOICE MODAL -->
+<div class="overlay" id="inv-modal">
+<div class="modal">
+  <div class="modal-hdr">
+    <div><div class="modal-title" id="inv-modal-title">New Invoice</div><div class="modal-sub" id="inv-modal-sub">Enter details and line items</div></div>
+    <button class="xbtn" onclick="closeOverlay('inv-modal')">✕</button>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">Invoice details</div>
+    <div class="fgrid">
+      <!-- Searchable customer -->
+      <div class="fg">
+        <label class="flbl">Customer *</label>
+        <div style="position:relative">
+          <input type="text" class="finp" id="f-cust-search" placeholder="Search customer…" autocomplete="off" oninput="filterCustDd()" onfocus="showCustDd()" onblur="hideCustDd()">
+          <input type="hidden" id="f-cust">
+          <div class="cust-dd" id="f-cust-dd"></div>
+        </div>
+      </div>
+      <!-- Service type dropdown (#1) -->
+      <div class="fg">
+        <label class="flbl">Service type</label>
+        <select class="fsel" id="f-service">
+          <option value="">Select service type…</option>
+          <option value="Residents">Residents</option>
+          <option value="Residents and HR">Residents and HR</option>
+          <option value="HR and Governance">HR and Governance</option>
+        </select>
+      </div>
+      <div class="fg" id="inv-date-row"><label class="flbl">Invoice date *</label><input type="date" class="finp" id="f-date"></div>
+      <div class="fg"><label class="flbl">Notes</label><input type="text" class="finp" id="f-notes" placeholder="Optional"></div>
+      <input type="hidden" id="f-cur" value="£">
+    </div>
+  </div>
+  <div class="fsec" id="billing-period-sec">
+    <div class="fsec-title">Billing period</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">Period start *</label><input type="date" class="finp" id="f-ps"></div>
+      <div class="fg"><label class="flbl">Period end (optional)</label><input type="date" class="finp" id="f-pe"><span class="fhint">Leave blank for open-ended</span></div>
+    </div>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">Recurrence</div>
+    <div class="fgrid">
+      <div class="rtog" id="rtog" onclick="toggleRecur()">
+        <div class="tsw" id="tsw"></div>
+        <div><div class="rtog-txt" id="rtog-txt">Monthly recurrence off</div><div class="rtog-sub">Turn on to repeat this invoice each month</div></div>
+      </div>
+      <div class="rdet" id="rdet">
+        <div class="fg"><label class="flbl">Schedule starts *</label><input type="date" class="finp" id="f-rs"><span class="fhint">First month to generate</span></div>
+        <div class="fg"><label class="flbl">Schedule ends (optional)</label><input type="date" class="finp" id="f-re"></div>
+        <div class="fg"><label class="flbl">Day of month to issue</label><input type="number" class="finp" id="f-rd" min="1" max="28" value="1"></div>
+        <div class="fg"><label class="flbl">Schedule name (optional)</label><input type="text" class="finp" id="f-rn" placeholder="e.g. Monthly retainer"></div>
+        <div class="fg"><label class="flbl">Payment method</label><select class="fsel" id="f-pm"><option value="">— Select —</option><option value="Direct Debit">Direct Debit</option><option value="Standing Order">Standing Order</option><option value="Upon Invoice">Upon Invoice</option></select></div>
+      </div>
+    </div>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">Line items</div>
+    <div class="li-hdr"><span>Description</span><span>Beds</span><span class="r">Price per bed</span><span class="r">Total</span><span></span></div>
+    <div id="li-wrap"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addLine()" style="margin-top:4px">+ Add line</button>
+    <div class="totbox">
+      <div class="trow"><span>Subtotal</span><span class="tv" id="t-sub">£0.00</span></div>
+      <div class="trow"><span>VAT <select id="vat-sel" onchange="recalc()" style="border:none;background:transparent;font-family:var(--mono);font-size:12px;color:var(--ink3);cursor:pointer;outline:none;margin-left:4px"><option value="0">0%</option><option value="5">5%</option><option value="20" selected>20%</option></select></span><span class="tv" id="t-vat">£0.00</span></div>
+      <div class="trow grand"><span>Total</span><span class="tv" id="t-total">£0.00</span></div>
+    </div>
+  </div>
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeOverlay('inv-modal')">Cancel</button>
+    <button class="btn btn-primary" id="inv-modal-save-btn" onclick="saveInv()">Save Invoice</button>
+  </div>
+</div>
+</div>
+
+<!-- CUSTOMER MODAL -->
+<div class="overlay" id="cust-modal">
+<div class="modal" style="width:500px">
+  <div class="modal-hdr"><div><div class="modal-title" id="cust-modal-title">Add Customer</div></div><button class="xbtn" onclick="closeOverlay('cust-modal')">✕</button></div>
+  <div class="fgrid">
+    <div class="fg"><label class="flbl">Name *</label><input type="text" class="finp" id="c-name" placeholder="Full name"></div>
+    <div class="fg"><label class="flbl">Company</label><input type="text" class="finp" id="c-co" placeholder="Company Ltd"></div>
+    <div class="fg full"><label class="flbl">Email</label><input type="email" class="finp" id="c-email" placeholder="name@company.com"></div>
+  </div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
+    <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;font-weight:600">Quick action after saving:</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="saveCustThen('invoice')">Save + New Invoice</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveCustThen('recurring')">Save + New Schedule</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCust()">Save Customer</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- VIEW INVOICE MODAL -->
+<div class="overlay" id="view-modal">
+<div class="modal">
+  <div class="modal-hdr"><div><div class="modal-title" id="vm-title">Invoice</div><div class="modal-sub" id="vm-sub"></div></div><button class="xbtn" onclick="closeOverlay('view-modal')">✕</button></div>
+  <div id="vm-body"></div>
+  <div class="mfooter"><button class="btn btn-ghost" onclick="closeOverlay('view-modal')">Close</button><button class="btn btn-ghost" id="vm-edit">Edit</button></div>
+</div>
+</div>
+
+<!-- EXPORT MODAL -->
+<div class="overlay" id="exp-modal">
+<div class="modal" style="width:540px">
+  <div class="modal-hdr"><div><div class="modal-title">Export to Excel</div><div class="modal-sub">Choose a date range and download your invoice data</div></div><button class="xbtn" onclick="closeOverlay('exp-modal')">✕</button></div>
+  <div class="fsec">
+    <div class="fsec-title">Date range</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">From</label><input type="date" class="finp" id="exp-from" onchange="updateExpPreview()"></div>
+      <div class="fg"><label class="flbl">To</label><input type="date" class="finp" id="exp-to" onchange="updateExpPreview()"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="setExpRange('tm')">This month</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExpRange('lm')">Last month</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExpRange('ty')">This year</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExpRange('ly')">Last year</button>
+      <button class="btn btn-ghost btn-sm" onclick="setExpRange('all')">All time</button>
+    </div>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">Filter</div>
+    <div class="fgrid">
+      <div class="fg"><label class="flbl">Customer / Company</label><select class="fsel" id="exp-cf" onchange="updateExpPreview()"><option value="">All</option></select></div>
+      <div class="fg"><label class="flbl">Invoice type</label><select class="fsel" id="exp-rf" onchange="updateExpPreview()"><option value="">All types</option><option value="r">Recurring only</option><option value="o">One-off only</option></select></div>
+    </div>
+  </div>
+  <div class="fsec">
+    <div class="fsec-title">Options</div>
+    <div class="fgrid">
+      <div class="fg">
+        <label class="flbl">Group by</label>
+        <select class="fsel" id="exp-grp" onchange="updateExpPreview()">
+          <option value="none">No grouping — flat list</option>
+          <option value="all-cust">All Customers - detailed</option>
+          <option value="per-cust">One sheet per customer</option>
+          <option value="month">Group by month</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="flbl">Include line items</label>
+        <select class="fsel" id="exp-lines" onchange="updateExpPreview()">
+          <option value="summary">Summary (one row per invoice)</option>
+          <option value="detail">Detailed (one row per line item)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="exp-prev" id="exp-prev">Select a date range to see a preview.</div>
+  <div class="mfooter"><button class="btn btn-ghost" onclick="closeOverlay('exp-modal')">Cancel</button><button class="btn btn-primary" onclick="doExport()">↓ Download Excel</button></div>
+</div>
+</div>
+
+<!-- FORECAST EXPORT MODAL -->
+<div class="overlay" id="fcexp-modal">
+<div class="modal" style="width:500px">
+  <div class="modal-hdr"><div><div class="modal-title">Export Forecast</div><div class="modal-sub">Download confirmed recurring invoicing as Excel</div></div><button class="xbtn" onclick="closeOverlay('fcexp-modal')">✕</button></div>
+  <div class="fsec">
+    <div class="fsec-title">Date range</div>
+    <div class="fgrid">
+      <div class="fg full"><label class="flbl">Range type</label><select class="fsel" id="fcexp-range-type" onchange="toggleFcExpRange()"><option value="months">Months ahead from today</option><option value="custom">Custom date range</option></select></div>
+      <div class="fg" id="fcexp-months-wrap"><label class="flbl">Months ahead</label><select class="fsel" id="fcexp-months"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option><option value="24">24 months</option></select></div>
+      <div class="fg" id="fcexp-from-wrap" style="display:none"><label class="flbl">From</label><input type="date" class="finp" id="fcexp-from"></div>
+      <div class="fg" id="fcexp-to-wrap" style="display:none"><label class="flbl">To</label><input type="date" class="finp" id="fcexp-to"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" id="fcexp-presets" style="display:none">
+      <button class="btn btn-ghost btn-sm" onclick="setFcExpPreset('q1')">Next quarter</button>
+      <button class="btn btn-ghost btn-sm" onclick="setFcExpPreset('h1')">Next 6 months</button>
+      <button class="btn btn-ghost btn-sm" onclick="setFcExpPreset('y1')">Next 12 months</button>
+      <button class="btn btn-ghost btn-sm" onclick="setFcExpPreset('y2')">Next 24 months</button>
+    </div>
+  </div>
+  <div class="fsec"><div class="fg"><label class="flbl">Detail level</label><select class="fsel" id="fcexp-detail"><option value="summary">Monthly summary</option><option value="customer">Breakdown by customer</option></select></div></div>
+  <div class="mfooter"><button class="btn btn-ghost" onclick="closeOverlay('fcexp-modal')">Cancel</button><button class="btn btn-primary" onclick="doFcExport()">↓ Download Excel</button></div>
+</div>
+</div>
+
+<!-- SALESPERSON MODAL -->
+<div class="overlay" id="sp-modal">
+<div class="modal" style="width:420px">
+  <div class="modal-hdr"><div><div class="modal-title" id="sp-modal-title">Add Salesperson</div></div><button class="xbtn" onclick="closeOverlay('sp-modal')">✕</button></div>
+  <div class="fgrid">
+    <div class="fg full"><label class="flbl">Full Name *</label><input type="text" class="finp" id="sp-name" placeholder="e.g. Jane Smith"></div>
+  </div>
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeOverlay('sp-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveSp()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- COMMISSION MODAL -->
+<div class="overlay" id="comm-modal">
+<div class="modal" style="width:680px">
+  <div class="modal-hdr">
+    <div><div class="modal-title" id="comm-modal-title">Add Commission</div><div class="modal-sub">Enter commission details</div></div>
+    <button class="xbtn" onclick="closeOverlay('comm-modal')">✕</button>
+  </div>
+
+  <!-- Entry type toggle -->
+  <div class="fsec">
+    <div class="fsec-title">Entry Type</div>
+    <div style="display:flex;gap:10px;margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;border:1.5px solid var(--border2);border-radius:8px;flex:1;transition:border-color .15s" id="comm-type-linked-lbl">
+        <input type="radio" name="comm-entry-type" value="linked" id="comm-type-linked" onchange="toggleCommType()" style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Link to existing invoice</div><div style="font-size:11px;color:var(--ink3)">Auto-fills customer and amount</div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:10px 16px;border:1.5px solid var(--border2);border-radius:8px;flex:1;transition:border-color .15s" id="comm-type-standalone-lbl">
+        <input type="radio" name="comm-entry-type" value="standalone" id="comm-type-standalone" onchange="toggleCommType()" style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Manual / standalone entry</div><div style="font-size:11px;color:var(--ink3)">Enter all details manually</div></div>
+      </label>
+    </div>
+  </div>
+
+  <!-- Linked invoice selector -->
+  <div class="fsec" id="comm-linked-section" style="display:none">
+    <div class="fsec-title">Select Invoice</div>
+    <div class="fgrid">
+      <div class="fg full">
+        <label class="flbl">Invoice</label>
+        <select class="fsel" id="comm-inv-sel" onchange="onCommInvSelect()"><option value="">— Select invoice —</option></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Details -->
+  <div class="fsec">
+    <div class="fsec-title">Details</div>
+    <div class="fgrid">
+      <div class="fg full"><label class="flbl">Description / Sale</label><input type="text" class="finp" id="comm-desc" placeholder="e.g. Monthly retainer – Jan 2026"></div>
+      <div class="fg"><label class="flbl">Customer</label><input type="text" class="finp" id="comm-customer" placeholder="Customer name"></div>
+      <div class="fg"><label class="flbl">Invoice Total (ex VAT) £</label><input type="number" class="finp" id="comm-inv-total" min="0" step="0.01" placeholder="0.00" oninput="recalcComm()"></div>
+      <div class="fg">
+        <label class="flbl">Commission Type</label>
+        <select class="fsel" id="comm-type-sel">
+          <option value="recurring">Recurring (monthly)</option>
+          <option value="one-off">One-off</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Start Date *</label><input type="date" class="finp" id="comm-start"></div>
+      <div class="fg"><label class="flbl">End Date</label><input type="date" class="finp" id="comm-end"><span class="fhint">Leave blank if open-ended or one-off</span></div>
+      <div class="fg full"><label class="flbl">Notes</label><input type="text" class="finp" id="comm-notes" placeholder="Optional"></div>
+    </div>
+  </div>
+
+  <!-- Salespeople -->
+  <div class="fsec">
+    <div class="fsec-title">Salesperson(s) &amp; Commission</div>
+    <div id="comm-sp-rows" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" id="comm-add-sp-btn" onclick="addCommSpRow()" style="display:none">+ Add second salesperson</button>
+    <div id="comm-sp-warning" style="font-size:12px;color:var(--accent2);margin-top:6px;display:none">Please add at least one salesperson to your team first.</div>
+  </div>
+
+  <!-- Total preview -->
+  <div class="totbox" style="margin-bottom:0">
+    <div class="trow"><span>Invoice total (ex VAT)</span><span class="tv" id="comm-preview-base">£0.00</span></div>
+    <div class="trow" id="comm-preview-sp1-row" style="display:none"><span id="comm-preview-sp1-lbl">Salesperson 1 commission</span><span class="tv" id="comm-preview-sp1-amt">£0.00</span></div>
+    <div class="trow" id="comm-preview-sp2-row" style="display:none"><span id="comm-preview-sp2-lbl">Salesperson 2 commission</span><span class="tv" id="comm-preview-sp2-amt">£0.00</span></div>
+    <div class="trow grand"><span>Total commission</span><span class="tv" id="comm-preview-total">£0.00</span></div>
+  </div>
+
+  <div class="mfooter">
+    <button class="btn btn-ghost" onclick="closeOverlay('comm-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="saveComm()">Save Commission</button>
+  </div>
+</div>
+</div>
+
+<!-- CONFIRM -->
+<div class="conf-overlay" id="conf">
+  <div class="conf-box">
+    <div class="conf-title" id="conf-title">Are you sure?</div>
+    <div class="conf-msg" id="conf-msg"></div>
+    <div class="conf-btns"><button class="btn btn-ghost" onclick="closeConf()">Cancel</button><button class="btn btn-danger" id="conf-ok">Confirm</button></div>
+  </div>
+</div>
+
+<div class="conf-overlay" id="regen-conf">
+  <div class="conf-box" style="max-width:460px">
+    <div class="conf-title" id="regen-title">Update existing invoices?</div>
+    <div class="conf-msg" id="regen-msg" style="margin-bottom:16px"></div>
+    <button class="regen-choice-btn" id="regen-btn-update">
+      <div class="rcb-title">🔄 Update invoices</div>
+      <div class="rcb-sub">Delete all invoices generated by this template and recreate them with the new settings. Existing manual edits to individual invoices will be lost.</div>
+    </button>
+    <button class="regen-choice-btn" id="regen-btn-keep">
+      <div class="rcb-title">📋 Keep existing invoices</div>
+      <div class="rcb-sub">Leave all existing invoices untouched. Only create new invoices for months not yet covered by this template.</div>
+    </button>
+    <button class="btn btn-ghost" onclick="closeRegenConf()" style="width:100%;margin-top:4px">Cancel</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DB (Supabase) ─────────────────────────────────────────────────────
+const SUPA_URL='https://brrisemsnidmcztjntop.supabase.co';
+const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJycmlzZW1zbmlkbWN6dGpudG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MzEwNzYsImV4cCI6MjA5MDEwNzA3Nn0.kqEWO5WbIMXbTq1tWiKyXtg9z_kfDXFeejDNwtL8eVc';
+const _supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+const SESSION_ID=Math.random().toString(36).slice(2);
+let _saveTimer=null;
+let DB={"customers":[],"invoices":[],"schedules":[],"seq":1001,"salespeople":[],"commissions":[]};
+if(!DB.schedules)DB.schedules=[];
+
+function persist(){
+  if(_saveTimer)clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    await _supa.from('app_state').upsert({id:1,data:DB,updated_at:new Date().toISOString(),last_session:SESSION_ID});
+  },500);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+const COLS=['#2b5c3f','#c4401a','#1a4a7a','#7a1a5c','#4a7a1a','#7a4a1a','#1a6a7a','#6a1a7a'];
+const f2=n=>Number(n).toFixed(2);
+const fmtGBP=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort=n=>{if(n>=1000000)return'£'+(n/1e6).toFixed(1)+'m';if(n>=10000)return'£'+(n/1000).toFixed(0)+'k';return'£'+Math.round(n).toLocaleString('en-GB');};
+const fmtPound=n=>'£'+Math.round(n).toLocaleString('en-GB');
+const fmtD=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
+const fmtDfull=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
+const mk=d=>d?d.substring(0,7):'';
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const today=()=>new Date().toISOString().split('T')[0];
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+// ── Navigation ────────────────────────────────────────────────────────
+const TITLES={dashboard:'Dashboard',invoices:'Invoices',recurring:'Recurring',forecast:'Forecast',customers:'Customers',commission:'Commission'};
+function nav(v){
+  document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('pageTitle').textContent=TITLES[v];
+  document.querySelectorAll('.nav-item').forEach(e=>{if(e.textContent.trim().toLowerCase().startsWith(v.slice(0,4)))e.classList.add('active');});
+  if(v==='dashboard')renderDash();
+  if(v==='invoices'){renderInvoices();refreshFilters();}
+  if(v==='recurring')renderRecurring();
+  if(v==='forecast')renderForecast();
+  if(v==='customers')renderCustomers();
+  if(v==='commission'){
+    if(sessionStorage.getItem('syncurio_comm_auth')!=='ok'){showCommPin();return;}
+    renderCommission();
+  }
+}
+
+function showCommPin(){
+  if(document.getElementById('comm-pin-overlay'))return;
+  const ov=document.createElement('div');
+  ov.id='comm-pin-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(238,240,245,0.97);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;';
+  ov.innerHTML=`
+    <div style="background:#fff;border-radius:16px;padding:48px 40px;width:340px;box-shadow:0 8px 40px rgba(28,43,58,0.13);text-align:center;">
+      <div style="font-size:26px;font-weight:700;margin-bottom:4px;letter-spacing:-0.5px;">
+        <span style="color:#F07830;">S</span><span style="color:#1C2B3A;">yncurio</span>
+      </div>
+      <div style="font-size:11px;color:#8a99a8;letter-spacing:2px;margin-bottom:8px;">invoice tracker</div>
+      <div style="font-size:13px;color:#1C2B3A;font-weight:600;margin-bottom:20px;">Commission Access</div>
+      <input id="comm-pin-input" type="password" placeholder="Enter commission code" autocomplete="new-password"
+        style="width:100%;box-sizing:border-box;padding:12px 16px;border:1.5px solid #dde2ea;border-radius:8px;font-size:15px;color:#1C2B3A;outline:none;margin-bottom:12px;"
+        onkeydown="if(event.key==='Enter')document.getElementById('comm-pin-btn').click()"
+      />
+      <div id="comm-pin-error" style="color:#e05;font-size:13px;margin-bottom:8px;min-height:18px;"></div>
+      <button id="comm-pin-btn"
+        style="width:100%;padding:12px;background:#F07830;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;"
+        onclick="(function(){
+          var v=document.getElementById('comm-pin-input').value;
+          if(v==='Z'){sessionStorage.setItem('syncurio_comm_auth','ok');document.getElementById('comm-pin-overlay').remove();nav('commission');}
+          else{document.getElementById('comm-pin-error').textContent='Incorrect code. Please try again.';}
+        })()"
+      >Unlock</button>
+    </div>`;
+  document.body.appendChild(ov);
+  setTimeout(()=>{var el=document.getElementById('comm-pin-input');if(el){el.value='';el.focus();}},100);
+}
+
+function clearCommFilters(){
+  document.getElementById('comm-sp-filter').value='';
+  document.getElementById('comm-from').value='';
+  document.getElementById('comm-to').value='';
+  renderCommission();
+}
+
+// ── Overlays ──────────────────────────────────────────────────────────
+function openOverlay(id){document.getElementById(id).classList.add('open');}
+function showOverlay(id){document.getElementById(id).classList.add('open');}
+function closeOverlay(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)closeOverlay(el.id);}));
+
+// ── Confirm ───────────────────────────────────────────────────────────
+let confCb=null;
+function confirm2(title,msg,label,cb){
+  document.getElementById('conf-title').textContent=title;
+  document.getElementById('conf-msg').textContent=msg;
+  document.getElementById('conf-ok').textContent=label||'Confirm';
+  confCb=cb;document.getElementById('conf').classList.add('open');
+}
+function closeConf(){document.getElementById('conf').classList.remove('open');confCb=null;}
+document.getElementById('conf-ok').onclick=()=>{const cb=confCb;closeConf();if(cb)cb();};
+
+// ── Recur toggle ──────────────────────────────────────────────────────
+let recurOn=false;
+function toggleRecur(){
+  recurOn=!recurOn;
+  document.getElementById('tsw').classList.toggle('on',recurOn);
+  document.getElementById('rtog-txt').classList.toggle('on',recurOn);
+  document.getElementById('rtog').classList.toggle('on',recurOn);
+  document.getElementById('rtog-txt').textContent=recurOn?'Monthly recurrence on':'Monthly recurrence off';
+  document.getElementById('rdet').classList.toggle('vis',recurOn);
+  // Hide billing period and invoice date when in recurring mode (auto-managed by schedule)
+  const bps=document.getElementById('billing-period-sec');
+  const idr=document.getElementById('inv-date-row');
+  if(bps) bps.style.display=recurOn?'none':'';
+  if(idr) idr.style.display=recurOn?'none':'';
+  // Update save button label
+  const sb=document.getElementById('inv-modal-save-btn');
+  if(sb) sb.textContent=recurOn?(editSchedId?'Save Schedule':'Save Schedule'):'Save Invoice';
+}
+function setRecur(on){if(recurOn!==on)toggleRecur();}
+
+// ── Customer searchable dropdown ──────────────────────────────────────
+function fillCustDd(selectedId){
+  document.getElementById('f-cust').value=selectedId||'';
+  const c=DB.customers.find(x=>x.id===selectedId);
+  document.getElementById('f-cust-search').value=c?c.name+(c.company?' · '+c.company:''):'';
+  renderCustDdOptions('');
+}
+function renderCustDdOptions(q){
+  const dd=document.getElementById('f-cust-dd');
+  const list=q?DB.customers.filter(c=>(c.name+' '+(c.company||'')).toLowerCase().includes(q.toLowerCase())):DB.customers;
+  if(!list.length){dd.innerHTML='<div class="cust-dd-item" style="color:var(--ink3)">No customers found</div>';return;}
+  dd.innerHTML=list.map(c=>`<div class="cust-dd-item" onmousedown="selectCust('${c.id}')"><strong>${c.name}</strong>${c.company?` <span style="color:var(--ink3);font-size:11px">· ${c.company}</span>`:''}</div>`).join('');
+}
+function filterCustDd(){document.getElementById('f-cust').value='';renderCustDdOptions(document.getElementById('f-cust-search').value);document.getElementById('f-cust-dd').style.display='block';}
+function showCustDd(){renderCustDdOptions(document.getElementById('f-cust-search').value);document.getElementById('f-cust-dd').style.display='block';}
+function hideCustDd(){setTimeout(()=>{document.getElementById('f-cust-dd').style.display='none';},150);}
+function selectCust(id){const c=DB.customers.find(x=>x.id===id);document.getElementById('f-cust').value=id;document.getElementById('f-cust-search').value=c?c.name+(c.company?' · '+c.company:''):'';document.getElementById('f-cust-dd').style.display='none';}
+
+// ── Customers ─────────────────────────────────────────────────────────
+let editCustId=null;
+function openCustModal(id){
+  editCustId=id||null;
+  document.getElementById('cust-modal-title').textContent=id?'Edit Customer':'Add Customer';
+  const c=id?DB.customers.find(x=>x.id===id):null;
+  document.getElementById('c-name').value=c?.name||'';
+  document.getElementById('c-co').value=c?.company||'';
+  document.getElementById('c-email').value=c?.email||'';
+  openOverlay('cust-modal');
+}
+function saveCust(thenAction){
+  const name=document.getElementById('c-name').value.trim();
+  if(!name){showToast('Name is required.');return null;}
+  let newId=null;
+  if(editCustId){
+    const c=DB.customers.find(x=>x.id===editCustId);
+    c.name=name;c.company=document.getElementById('c-co').value.trim();c.email=document.getElementById('c-email').value.trim();
+  }else{
+    newId='c'+Date.now();
+    DB.customers.push({id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8});
+  }
+  persist();closeOverlay('cust-modal');showToast(editCustId?'Customer updated.':'Customer added!');
+  renderCustomers();fillCustDd('');refreshFilters();
+  return newId;
+}
+// (#3) Save customer then open invoice/schedule for that customer
+function saveCustThen(action){
+  const id=saveCust();
+  if(!id)return;
+  if(action==='invoice'){openInvModal(null,false,id);}
+  else if(action==='recurring'){openInvModal(null,true,id);}
+}
+function deleteCust(id){
+  confirm2('Delete customer?','Their invoices and schedules will remain.','Delete',()=>{
+    DB.customers=DB.customers.filter(c=>c.id!==id);persist();renderCustomers();showToast('Deleted.');
+  });
+}
+function setCustSort(asc,desc,th){
+  const sel=document.getElementById('cust-sort');
+  const cur=sel.value;
+  sel.value=(cur===asc)?desc:asc;
+  renderCustomers();
+}
+function renderCustomers(){
+  const tb=document.getElementById('cust-tbody'),em=document.getElementById('cust-empty');
+  if(!DB.customers.length){tb.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  const sort=document.getElementById('cust-sort')?.value||'name-az';
+  let custs=[...DB.customers];
+  if(sort==='name-az')custs.sort((a,b)=>a.name.localeCompare(b.name));
+  else if(sort==='name-za')custs.sort((a,b)=>b.name.localeCompare(a.name));
+  else if(sort==='company-az')custs.sort((a,b)=>(a.company||'').localeCompare(b.company||''));
+  else if(sort==='total-desc'||sort==='total-asc'){
+    custs.sort((a,b)=>{const ta=DB.invoices.filter(i=>i.customerId===a.id).reduce((s,i)=>s+i.total,0);const tb2=DB.invoices.filter(i=>i.customerId===b.id).reduce((s,i)=>s+i.total,0);return sort==='total-desc'?tb2-ta:ta-tb2;});
+  }
+  tb.innerHTML=custs.map(c=>{
+    const invs=DB.invoices.filter(i=>i.customerId===c.id);
+    const tot=invs.reduce((s,i)=>s+i.total,0);
+    const sc=DB.schedules.filter(s=>s.customerId===c.id&&s.active).length;
+    return`<tr>
+      <td><span style="width:10px;height:10px;border-radius:50%;background:${COLS[c.ci||0]};display:inline-block"></span></td>
+      <td style="font-weight:600">${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
+      <td class="muted">${c.company||'—'}</td><td class="muted">${c.email||'—'}</td>
+      <td class="r">${invs.length}</td><td class="r">${tot?fmtGBP(tot):'—'}</td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-xs" onclick="openInvModal(null,false,'${c.id}')">+ Invoice</button>
+        <button class="btn btn-teal btn-xs" onclick="openInvModal(null,true,'${c.id}')">+ Schedule</button>
+        <button class="btn btn-ghost btn-xs" onclick="openCustModal('${c.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteCust('${c.id}')">Delete</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Recurring helpers ─────────────────────────────────────────────────
+function schedMonths(s){
+  // Generate all months the schedule covers up to current month
+  const months=[];
+  const now=new Date();
+  const nowKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  let cur=new Date(s.schedStart+'-01');
+  while(true){
+    const key=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
+    if(key>nowKey)break;
+    if(s.schedEnd&&key>s.schedEnd)break;
+    months.push(key);cur.setMonth(cur.getMonth()+1);
+  }
+  return months;
+}
+function existingForSched(id){return DB.invoices.filter(i=>i.scheduleId===id).map(i=>mk(i.date));}
+
+// (#5 & #6) Regenerate invoices for a schedule from scratch (respects past dates)
+function regenSchedule(s){
+  // Remove all generated invoices for this schedule then regenerate from schedStart
+  DB.invoices=DB.invoices.filter(i=>i.scheduleId!==s.id);
+  let seq=0;
+  schedMonths(s).forEach(mKey=>{
+    const[yr,mo]=mKey.split('-').map(Number);
+    const day=Math.min(s.dayOfMonth||1,28);
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const inv={
+      id:'ri'+Date.now()+'_'+(seq++),
+      scheduleId:s.id,customerId:s.customerId,
+      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+      currency:s.currency,
+      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
+      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
+      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
+      serviceType:s.serviceType||'',
+      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
+    };
+    inv.total=inv.subtotal+inv.vat;
+    DB.invoices.unshift(inv);DB.seq++;
+  });
+}
+
+// Keep existing invoices; only create invoices for months not yet covered
+function keepRegenSchedule(s){
+  const existing=new Set(existingForSched(s.id));
+  const months=schedMonths(s);
+  let seq=0;
+  months.forEach(mKey=>{
+    if(existing.has(mKey))return;
+    const[yr,mo]=mKey.split('-').map(Number);
+    const day=Math.min(s.dayOfMonth||1,28);
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const inv={
+      id:'ri'+Date.now()+'_'+(seq++),scheduleId:s.id,customerId:s.customerId,
+      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+      currency:s.currency,
+      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
+      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
+      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
+      serviceType:s.serviceType||'',
+      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
+    };
+    inv.total=inv.subtotal+inv.vat;
+    DB.invoices.unshift(inv);DB.seq++;
+  });
+}
+
+// Show the regen choice dialog; after() is called once user picks
+let _regenAfter=null,_regenSched=null;
+function showRegenChoice(s,after){
+  const n=DB.invoices.filter(i=>i.scheduleId===s.id).length;
+  _regenSched=s;_regenAfter=after;
+  document.getElementById('regen-msg').innerHTML=
+    `This template has <strong>${n}</strong> existing invoice${n!==1?'s':''} already generated. Choose how to handle them:`;
+  document.getElementById('regen-btn-update').onclick=()=>{
+    closeRegenConf();regenSchedule(_regenSched);if(_regenAfter)_regenAfter('updated');
+  };
+  document.getElementById('regen-btn-keep').onclick=()=>{
+    closeRegenConf();keepRegenSchedule(_regenSched);if(_regenAfter)_regenAfter('kept');
+  };
+  document.getElementById('regen-conf').classList.add('open');
+}
+function closeRegenConf(){document.getElementById('regen-conf').classList.remove('open');}
+
+function genRecurring(){
+  let changed=false;
+  DB.schedules.filter(s=>s.active).forEach(s=>{
+    const existing=existingForSched(s.id);
+    let seq=0;
+    schedMonths(s).filter(m=>!existing.includes(m)).forEach(mKey=>{
+      const[yr,mo]=mKey.split('-').map(Number);
+      const day=Math.min(s.dayOfMonth||1,28);
+      const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+      const inv={
+        id:'ri'+Date.now()+'_'+(seq++),
+        scheduleId:s.id,customerId:s.customerId,
+        date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+        currency:s.currency,
+        periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
+        periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
+        notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
+        serviceType:s.serviceType||'',
+        subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
+      };
+      inv.total=inv.subtotal+inv.vat;
+      DB.invoices.unshift(inv);DB.seq++;changed=true;
+    });
+  });
+  if(changed)persist();
+}
+
+// ── Invoices ──────────────────────────────────────────────────────────
+let editInvId=null,editSchedId=null,lines=[];
+// (#3) openInvModal accepts optional preselect customer id
+function openInvModal(id,forceRecur,presetCustId){
+  editInvId=id||null;editSchedId=null;
+  const inv=id?DB.invoices.find(x=>x.id===id):null;
+  const sched=inv?.scheduleId?DB.schedules.find(s=>s.id===inv.scheduleId):null;
+  document.getElementById('inv-modal-title').textContent=id?'Edit Invoice':'New Invoice';
+  document.getElementById('inv-modal-sub').textContent=id?'Update details':'Enter details and line items';
+  const custId=inv?.customerId||presetCustId||'';
+  fillCustDd(custId);
+  document.getElementById('f-service').value=inv?.serviceType||sched?.serviceType||'';
+  document.getElementById('f-date').value=inv?.date||today();
+  document.getElementById('f-cur').value=inv?.currency||'£';
+  document.getElementById('f-ps').value=inv?.periodStart||today();
+  document.getElementById('f-pe').value=inv?.periodEnd||'';
+  document.getElementById('f-notes').value=inv?.notes||'';
+  document.getElementById('vat-sel').value=String(inv?.vatRate??20);
+  recurOn=false;setRecur(!!(forceRecur||inv?.isRecurring));
+  // Save button updated by toggleRecur; ensure correct for non-recurring case
+  const _sb=document.getElementById('inv-modal-save-btn');if(_sb&&!(forceRecur||inv?.isRecurring))_sb.textContent='Save Invoice';
+  if(sched){
+    document.getElementById('f-rs').value=sched.schedStart||'';
+    document.getElementById('f-re').value=sched.schedEnd||'';
+    document.getElementById('f-rd').value=sched.dayOfMonth||1;
+    document.getElementById('f-rn').value=sched.name||'';
+    document.getElementById('f-pm').value=sched.paymentMethod||'';
+  }else{
+    document.getElementById('f-rs').value=today().slice(0,7)+'-01';
+    document.getElementById('f-re').value='';document.getElementById('f-rd').value=1;document.getElementById('f-rn').value='';document.getElementById('f-pm').value='';
+  }
+  lines=inv?inv.lines.map(l=>({...l})):[{desc:'',qty:1,price:0},{desc:'',qty:1,price:0}];
+  renderLines();openOverlay('inv-modal');
+}
+function openSchedModal(sid){
+  const s=DB.schedules.find(x=>x.id===sid);if(!s)return;
+  editInvId=null;editSchedId=sid;
+  fillCustDd(s.customerId);
+  document.getElementById('inv-modal-title').textContent='Edit Schedule';
+  document.getElementById('inv-modal-sub').textContent='Changes apply to past and future generated invoices';
+  document.getElementById('f-service').value=s.serviceType||'';
+  document.getElementById('f-date').value=s.schedStart?s.schedStart.slice(0,7)+'-01':today();
+  document.getElementById('f-cur').value=s.currency;
+  document.getElementById('f-ps').value='';document.getElementById('f-pe').value='';
+  document.getElementById('f-notes').value=s.notes||'';
+  document.getElementById('vat-sel').value=String(s.vatRate);
+  recurOn=false;setRecur(true);
+  document.getElementById('f-rs').value=s.schedStart;
+  document.getElementById('f-re').value=s.schedEnd||'';
+  document.getElementById('f-rd').value=s.dayOfMonth||1;
+  document.getElementById('f-rn').value=s.name||'';
+  document.getElementById('f-pm').value=s.paymentMethod||'';
+  lines=s.lines.map(l=>({...l}));renderLines();openOverlay('inv-modal');
+}
+function addLine(){lines.push({desc:'',qty:1,price:0});renderLines();}
+function rmLine(i){lines.splice(i,1);if(!lines.length)lines.push({desc:'',qty:1,price:0});renderLines();}
+function updLine(i,f,v){lines[i][f]=f==='desc'?v:(parseFloat(v)||0);recalc();}
+function renderLines(){
+  const sym=document.getElementById('f-cur').value;
+  document.getElementById('li-wrap').innerHTML=lines.map((l,i)=>`
+    <div class="li-row">
+      <input class="finp" style="padding:7px 10px;font-size:13px" placeholder="Description" value="${esc(l.desc)}" oninput="updLine(${i},'desc',this.value)">
+      <input class="finp" style="padding:7px 8px;font-size:13px;text-align:right" type="number" min="0" step="any" placeholder="Beds" value="${l.qty}" oninput="updLine(${i},'qty',this.value)">
+      <input class="finp" style="padding:7px 8px;font-size:13px;text-align:right" type="number" min="0" step="0.01" placeholder="0.00" value="${l.price}" oninput="updLine(${i},'price',this.value)">
+      <div class="li-tot" id="lt${i}">${sym}${f2(l.qty*l.price)}</div>
+      <button class="rmbtn" onclick="rmLine(${i})">×</button>
+    </div>`).join('');
+  recalc();
+}
+function recalc(){
+  const sym=document.getElementById('f-cur').value;
+  lines.forEach((_,i)=>{const e=document.getElementById('lt'+i);if(e)e.textContent=sym+f2(lines[i].qty*lines[i].price);});
+  const sub=lines.reduce((s,l)=>s+l.qty*l.price,0);
+  const vr=parseFloat(document.getElementById('vat-sel').value)||0;
+  const vat=sub*(vr/100);
+  document.getElementById('t-sub').textContent=sym+f2(sub);
+  document.getElementById('t-vat').textContent=sym+f2(vat);
+  document.getElementById('t-total').textContent=sym+f2(sub+vat);
+}
+
+function saveInv(){
+  const custId=document.getElementById('f-cust').value;
+  const date=document.getElementById('f-date').value;
+  const ps=document.getElementById('f-ps').value;
+  const serviceType=document.getElementById('f-service').value;
+  if(!custId){showToast('Please select a customer.');return;}
+  if(!lines.some(l=>String(l.desc||'').trim())){showToast('Add at least one line item.');return;}
+  const sub=lines.reduce((s,l)=>s+l.qty*l.price,0);
+  const vr=parseFloat(document.getElementById('vat-sel').value)||0;
+  const vat=sub*(vr/100);
+  const total=sub+vat;
+  const cur=document.getElementById('f-cur').value;
+  const notes=document.getElementById('f-notes').value.trim();
+
+  // Editing a schedule
+  if(editSchedId){
+    const s=DB.schedules.find(x=>x.id===editSchedId);
+    const rs=document.getElementById('f-rs').value;
+    if(!rs){showToast('Please set a schedule start date.');return;}
+    Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,
+      schedStart:rs.slice(0,7),schedEnd:document.getElementById('f-re').value?document.getElementById('f-re').value.slice(0,7):'',
+      dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim(),paymentMethod:document.getElementById('f-pm').value});
+    closeOverlay('inv-modal');
+    const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
+    if(existingCount>0){
+      showRegenChoice(s,(mode)=>{
+        persist();
+        const msg=mode==='updated'?'Schedule updated — invoices regenerated.':'Schedule updated — existing invoices kept.';
+        showToast(msg);renderRecurring();renderDash();renderInvoices();refreshFilters();
+      });
+    }else{
+      regenSchedule(s);persist();
+      showToast('Schedule updated — invoices regenerated.');
+      renderRecurring();renderDash();renderInvoices();refreshFilters();
+    }
+    return;
+  }
+
+  // Recurring
+  if(recurOn){
+    const rs=document.getElementById('f-rs').value;
+    if(!rs){showToast('Please set a schedule start date.');return;}
+    const schedStart=rs.slice(0,7);
+    const schedEnd=document.getElementById('f-re').value?document.getElementById('f-re').value.slice(0,7):'';
+    const dayOfMonth=parseInt(document.getElementById('f-rd').value)||1;
+    const name=document.getElementById('f-rn').value.trim();
+    if(editInvId){
+      const inv=DB.invoices.find(x=>x.id===editInvId);
+      if(inv?.scheduleId){
+        const s=DB.schedules.find(x=>x.id===inv.scheduleId);
+        if(s){
+          Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:document.getElementById('f-pm').value});
+          closeOverlay('inv-modal');
+          const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
+          if(existingCount>0){
+            showRegenChoice(s,(mode)=>{
+              persist();
+              const msg=mode==='updated'?'Schedule updated — invoices regenerated.':'Schedule updated — existing invoices kept.';
+              showToast(msg);renderRecurring();renderDash();renderInvoices();refreshFilters();
+            });
+          }else{
+            regenSchedule(s);persist();showToast('Schedule updated.');
+            renderRecurring();renderDash();renderInvoices();refreshFilters();
+          }
+          return;
+        }
+      }else{
+        const idx=DB.invoices.findIndex(x=>x.id===editInvId);
+        Object.assign(DB.invoices[idx],{customerId:custId,date:date||today(),currency:cur,periodStart:ps||'',periodEnd:document.getElementById('f-pe').value,notes,vatRate:vr,lines:lines.map(l=>({...l})),subtotal:sub,vat,total,isRecurring:true,serviceType});
+      }
+    }else{
+      const sid='s'+Date.now();
+      const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType,paymentMethod:document.getElementById('f-pm').value};
+      DB.schedules.push(sched);
+      regenSchedule(sched);
+    }
+    persist();
+    closeOverlay('inv-modal');showToast('Schedule saved!');
+    renderRecurring();renderDash();renderInvoices();refreshFilters();return;
+  }
+
+  // One-off
+  if(!date){showToast('Please set an invoice date.');return;}
+  if(!ps){showToast('Please set a period start date.');return;}
+  const payload={customerId:custId,date,currency:cur,periodStart:ps,periodEnd:document.getElementById('f-pe').value,notes,vatRate:vr,lines:lines.map(l=>({...l})),subtotal:sub,vat,total,isRecurring:false,serviceType};
+  if(editInvId){
+    const idx=DB.invoices.findIndex(x=>x.id===editInvId);
+    Object.assign(DB.invoices[idx],payload);
+  }else{
+    payload.id='i'+Date.now();DB.seq++;DB.invoices.unshift(payload);
+  }
+  persist();closeOverlay('inv-modal');showToast(editInvId?'Invoice updated!':'Invoice created!');
+  renderDash();renderInvoices();refreshFilters();
+}
+
+// (#5) Delete invoice — only removes this one instance, schedule untouched
+function deleteInv(id){
+  const inv=DB.invoices.find(x=>x.id===id);
+  confirm2('Delete this invoice?',
+    inv?.isRecurring
+      ? 'This removes only this invoice. The recurring schedule continues for future months.'
+      : 'This invoice will be permanently removed.',
+    'Delete',()=>{
+      DB.invoices=DB.invoices.filter(i=>i.id!==id);persist();renderInvoices();renderDash();showToast('Invoice deleted.');
+    });
+}
+
+// (#5) Delete schedule — stops future generation but keeps all existing invoices
+function deleteSchedWithOption(id){
+  const gen=DB.invoices.filter(i=>i.scheduleId===id).length;
+  confirm2('Delete schedule?',
+    `The schedule will be removed and will no longer generate new invoices. All ${gen} previously generated invoice${gen!==1?'s':''} will be kept.`,
+    'Delete schedule',()=>{
+      DB.schedules=DB.schedules.filter(s=>s.id!==id);
+      // Keep all generated invoices but unlink them from the deleted schedule
+      DB.invoices.filter(i=>i.scheduleId===id).forEach(i=>{i.scheduleId=null;});
+      persist();renderRecurring();renderCustomers();showToast('Schedule deleted. Past invoices kept.');
+    });
+}
+
+function viewInv(id){
+  const inv=DB.invoices.find(x=>x.id===id);if(!inv)return;
+  const cust=DB.customers.find(c=>c.id===inv.customerId);
+  const sched=inv.scheduleId?DB.schedules.find(s=>s.id===inv.scheduleId):null;
+  const sym=inv.currency;
+  document.getElementById('vm-title').textContent=cust?.name||'Invoice';
+  document.getElementById('vm-sub').textContent=fmtD(inv.date)+(inv.isRecurring?' · Recurring':'')+(inv.serviceType?' · '+inv.serviceType:'');
+  document.getElementById('vm-edit').style.display='';
+  document.getElementById('vm-edit').textContent='Edit';
+  document.getElementById('vm-edit').onclick=()=>{closeOverlay('view-modal');openInvModal(id);};
+  const per=inv.periodEnd?fmtD(inv.periodStart)+' → '+fmtD(inv.periodEnd):fmtD(inv.periodStart)+' onwards';
+  document.getElementById('vm-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Customer</div>
+        <div style="font-weight:600;font-size:15px">${cust?.name||'?'}</div>
+        ${cust?.company?`<div style="color:var(--ink3);font-size:12px">${cust.company}</div>`:''}
+        ${inv.serviceType?`<div style="margin-top:4px"><span class="badge b-period">${inv.serviceType}</span></div>`:''}
+        ${inv.isRecurring?`<div style="margin-top:6px"><span class="badge b-recur">↻ recurring${sched?.name?' · '+sched.name:''}</span></div>`:''}
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Period</div>
+        <span class="badge b-period">${per}</span>
+        <div style="font-size:11px;color:var(--ink3);margin-top:8px">Issued: ${fmtD(inv.date)}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px">
+      <thead><tr style="background:var(--bg)">
+        <th style="text-align:left;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Description</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Beds</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Price/bed</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Total</th>
+      </tr></thead>
+      <tbody>${inv.lines.map(l=>`<tr>
+        <td style="padding:10px;border-bottom:1px solid var(--border)">${l.desc||'—'}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono)">${l.qty}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono)">${sym}${f2(l.price)}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);font-weight:600">${sym}${f2(l.qty*l.price)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="totbox">
+      <div class="trow"><span>Subtotal</span><span class="tv">${fmtGBP(inv.subtotal)}</span></div>
+      <div class="trow"><span>VAT (${inv.vatRate}%)</span><span class="tv">${fmtGBP(inv.vat)}</span></div>
+      <div class="trow grand"><span>Total</span><span class="tv">${fmtGBP(inv.total)}</span></div>
+    </div>
+    ${inv.notes?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:7px;font-size:12px;color:var(--ink3)">${inv.notes}</div>`:''}`;
+  openOverlay('view-modal');
+}
+
+// ── Dashboard drilldown views ─────────────────────────────────────────
+let _dashCompanies=[];
+function viewCompanyInvs(idx){
+  const co=_dashCompanies[idx];if(!co)return;
+  const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
+  const invs=DB.invoices.filter(i=>{const c=DB.customers.find(x=>x.id===i.customerId);return(c?.company||c?.name||'Unknown')===co&&mk(i.date)===key;});
+  const total=invs.reduce((s,i)=>s+i.total,0);
+  const monthLabel=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  document.getElementById('vm-title').textContent=co;
+  document.getElementById('vm-sub').textContent=invs.length+' invoice'+(invs.length!==1?'s':'')+' · '+monthLabel;
+  const vmEdit=document.getElementById('vm-edit');vmEdit.style.display='none';
+  document.getElementById('vm-body').innerHTML=invs.map(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    const sym=inv.currency;
+    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);cursor:pointer" onclick="closeOverlay('view-modal');viewInv('${inv.id}')">
+        <div><div style="font-weight:600;font-size:13px">${c?.name||'?'}${inv.serviceType?' · '+inv.serviceType:''}</div>
+        <div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${fmtD(inv.date)}${inv.isRecurring?' · ↻ recurring':''}</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">${fmtGBP(inv.total)}</span><span style="font-size:10px;color:var(--ink3)">→</span></div>
+      </div>
+      <div style="padding:6px 14px 10px">
+        ${inv.lines.map(l=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--ink2)">${l.desc||'—'}</span><span style="font-family:var(--mono);color:var(--ink3)">${l.qty} × ${sym}${f2(l.price)} = <strong>${sym}${f2(l.qty*l.price)}</strong></span></div>`).join('')}
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 0 2px;color:var(--ink3)"><span>VAT (${inv.vatRate}%)</span><span style="font-family:var(--mono)">${fmtGBP(inv.vat)}</span></div>
+      </div>
+    </div>`;
+  }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-weight:600">Total</span><span style="font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtGBP(total)}</span></div>`;
+  openOverlay('view-modal');
+}
+function viewSchedPreview(sid){
+  const s=DB.schedules.find(x=>x.id===sid);if(!s)return;
+  const c=DB.customers.find(x=>x.id===s.customerId);
+  const sym=s.currency||'£';
+  const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+  const vat=sub*s.vatRate/100;
+  const total=sub+vat;
+  document.getElementById('vm-title').textContent=s.name||c?.name||'Schedule';
+  document.getElementById('vm-sub').textContent=(c?.name||'?')+' · Recurring template';
+  const vmEdit=document.getElementById('vm-edit');
+  vmEdit.style.display='';vmEdit.textContent='Edit schedule';
+  vmEdit.onclick=()=>{closeOverlay('view-modal');openSchedModal(sid);};
+  document.getElementById('vm-body').innerHTML=`
+    <div style="display:flex;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div><div style="font-size:11px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Customer</div>
+        <div style="font-weight:600;font-size:15px">${c?.name||'?'}</div>
+        ${c?.company?`<div style="color:var(--ink3);font-size:12px">${c.company}</div>`:''}
+        ${s.serviceType?`<div style="margin-top:4px"><span class="badge b-period">${s.serviceType}</span></div>`:''}
+      </div>
+      <div style="text-align:right"><div style="font-size:11px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;margin-bottom:4px">Schedule</div>
+        <div style="font-size:12px;font-family:var(--mono)">${s.schedStart||'?'}${s.schedEnd?' → '+s.schedEnd:' onwards'}</div>
+        <div style="font-size:11px;color:var(--ink3);margin-top:4px">Day ${s.dayOfMonth||1} of month</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13px">
+      <thead><tr style="background:var(--bg)">
+        <th style="text-align:left;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Description</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Qty</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Unit Price</th>
+        <th style="text-align:right;padding:8px 10px;font-size:10px;color:var(--ink3);text-transform:uppercase;font-family:var(--mono);border-bottom:1px solid var(--border)">Line Total</th>
+      </tr></thead>
+      <tbody>${s.lines.map(l=>`<tr>
+        <td style="padding:10px;border-bottom:1px solid var(--border)">${l.desc||'—'}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono)">${l.qty}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono)">${sym}${f2(l.price)}</td>
+        <td style="padding:10px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--mono);font-weight:600">${sym}${f2(l.qty*l.price)}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <div class="totbox">
+      <div class="trow"><span>Subtotal</span><span class="tv">${fmtGBP(sub)}</span></div>
+      <div class="trow"><span>VAT (${s.vatRate}%)</span><span class="tv">${fmtGBP(vat)}</span></div>
+      <div class="trow grand"><span>Monthly Total</span><span class="tv">${fmtGBP(total)}</span></div>
+    </div>
+    ${s.notes?`<div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:7px;font-size:12px;color:var(--ink3)">${s.notes}</div>`:''}`;
+  openOverlay('view-modal');
+}
+
+// ── Invoices table with sorting (#10) ─────────────────────────────────
+let invSort={col:'date',dir:-1};
+function sortTable(tbl,col,th){
+  if(tbl==='inv'){invSort.dir=(invSort.col===col)?-invSort.dir:-1;invSort.col=col;document.querySelectorAll('#inv-table th').forEach(t=>t.classList.remove('sorted'));if(th)th.classList.add('sorted');renderInvoices();}
+}
+function refreshFilters(){
+  const cs=document.getElementById('inv-cf'),cm=document.getElementById('inv-mf');
+  if(!cs||!cm)return;
+  const cv=cs.value,mv=cm.value;
+  const companies=[...new Set(DB.customers.map(c=>c.company).filter(Boolean))].sort();
+  let opts='<option value="">All</option>';
+  const solo=DB.customers.filter(c=>!c.company);
+  if(solo.length){opts+='<optgroup label="Customers">'+solo.map(c=>`<option value="c:${c.id}">${c.name}</option>`).join('')+'</optgroup>';}
+  companies.forEach(co=>{
+    const members=DB.customers.filter(c=>c.company===co);
+    opts+=`<optgroup label="${co}"><option value="co:${co}">${co} (all)</option>${members.map(c=>`<option value="c:${c.id}">&nbsp;&nbsp;${c.name}</option>`).join('')}</optgroup>`;
+  });
+  cs.innerHTML=opts;cs.value=cv;
+  const months=[...new Set(DB.invoices.map(i=>mk(i.date)))].sort().reverse();
+  cm.innerHTML='<option value="">All months</option>'+months.map(m=>`<option value="${m}">${new Date(m+'-15').toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</option>`).join('');cm.value=mv;
+}
+function renderInvoices(){
+  const q=(document.getElementById('inv-search')?.value||'').toLowerCase();
+  const cf=document.getElementById('inv-cf')?.value||'';
+  const mf=document.getElementById('inv-mf')?.value||'';
+  const rf=document.getElementById('inv-rf')?.value||'';
+  let invs=[...DB.invoices];
+  if(cf.startsWith('c:')){const id=cf.slice(2);invs=invs.filter(i=>i.customerId===id);}
+  else if(cf.startsWith('co:')){const co=cf.slice(3);invs=invs.filter(i=>{const c=DB.customers.find(x=>x.id===i.customerId);return c?.company===co;});}
+  if(mf)invs=invs.filter(i=>mk(i.date)===mf);
+  if(rf==='r')invs=invs.filter(i=>i.isRecurring);
+  if(rf==='o')invs=invs.filter(i=>!i.isRecurring);
+  if(q)invs=invs.filter(i=>{const c=DB.customers.find(x=>x.id===i.customerId);return(c?.name||'').toLowerCase().includes(q)||(c?.company||'').toLowerCase().includes(q);});
+  // Sort
+  invs.sort((a,b)=>{
+    const c1=DB.customers.find(x=>x.id===a.customerId),c2=DB.customers.find(x=>x.id===b.customerId);
+    if(invSort.col==='cust')return invSort.dir*(c1?.name||'').localeCompare(c2?.name||'');
+    if(invSort.col==='date')return invSort.dir*a.date.localeCompare(b.date);
+    if(invSort.col==='subtotal')return invSort.dir*(a.subtotal-b.subtotal);
+    if(invSort.col==='total')return invSort.dir*(a.total-b.total);
+    return 0;
+  });
+  const tb=document.getElementById('inv-tbody'),em=document.getElementById('inv-empty');
+  if(!invs.length){tb.innerHTML='';em.style.display='block';return;}
+  em.style.display='none';
+  tb.innerHTML=invs.map(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    const sym=inv.currency;
+    const per=inv.periodEnd?fmtD(inv.periodStart)+' – '+fmtD(inv.periodEnd):fmtD(inv.periodStart)+' onwards';
+    const dot=c?`<span style="width:8px;height:8px;border-radius:50%;background:${COLS[c.ci||0]};display:inline-block;margin-right:6px"></span>`:'';
+    const rb=inv.isRecurring?`<span class="badge b-recur" style="margin-left:5px">↻</span>`:'';
+    return`<tr>
+      <td>${dot}<strong>${c?.name||'?'}</strong>${c?.company?` <span class="muted" style="font-size:11px">· ${c.company}</span>`:''}${rb}</td>
+      <td class="muted" style="font-size:12px">${fmtD(inv.date)}</td>
+      <td class="muted" style="font-size:12px;white-space:nowrap">${per}</td>
+      <td class="r">${fmtGBP(inv.subtotal)}</td>
+      <td class="r muted">${inv.vatRate>0?fmtGBP(inv.vat):'—'}</td>
+      <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(inv.total)}</td>
+      <td><div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-xs" onclick="viewInv('${inv.id}')">View</button>
+        <button class="btn btn-ghost btn-xs" onclick="openInvModal('${inv.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteInv('${inv.id}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Recurring view ────────────────────────────────────────────────────
+let recurStatusFilter='all';
+function setRecurFilter(val){
+  recurStatusFilter=val;
+  document.querySelectorAll('#recur-status-filter .seg-btn').forEach(b=>b.classList.toggle('active',b.dataset.val===val));
+  renderRecurring();
+}
+function renderRecurring(){
+  const el=document.getElementById('recur-list');
+  const q=(document.getElementById('recur-search')?.value||'').toLowerCase();
+  const nowKey=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  let scheds=DB.schedules;
+  if(recurStatusFilter==='active'){scheds=scheds.filter(s=>s.active&&!(s.schedEnd&&s.schedEnd<nowKey));}
+  else if(recurStatusFilter==='paused'){scheds=scheds.filter(s=>!s.active);}
+  if(q){scheds=scheds.filter(s=>{const c=DB.customers.find(x=>x.id===s.customerId);return(s.name||'').toLowerCase().includes(q)||(c?.name||'').toLowerCase().includes(q)||(c?.company||'').toLowerCase().includes(q)||(s.serviceType||'').toLowerCase().includes(q);});}
+  if(!scheds.length){el.innerHTML=q||recurStatusFilter!=='all'?`<div class="empty"><div class="empty-text">No ${recurStatusFilter==='paused'?'paused':recurStatusFilter==='active'?'active':''} schedules${q?` matching "${q}"`:''} found.</div></div>`:`<div class="empty"><div class="empty-icon">↻</div><div class="empty-text">No recurring schedules yet.</div><button class="btn btn-primary btn-sm" onclick="openInvModal(null,true)">Create first schedule</button></div>`;return;}
+  el.innerHTML=scheds.map(s=>{
+    const c=DB.customers.find(x=>x.id===s.customerId);
+    const col=c?COLS[c.ci||0]:'#888';
+    const total=s.lines.reduce((t,l)=>t+l.qty*l.price,0)*(1+s.vatRate/100);
+    const isEnded=s.schedEnd&&s.schedEnd<nowKey;
+    const gen=DB.invoices.filter(i=>i.scheduleId===s.id).length;
+    const startLbl=new Date(s.schedStart+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    const endLbl=s.schedEnd?'Ends '+new Date(s.schedEnd+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'No end date';
+    const badge=isEnded?`<span class="badge b-ended">Ended</span>`:`<span class="badge b-active">Active</span>`;
+    return`<div class="rc">
+      <div class="rc-left"><div class="rc-dot" style="background:${col}"></div>
+        <div class="rc-info">
+          <div class="rc-name">${s.name||c?.name||'Unnamed'} ${badge}${s.serviceType?` <span class="badge b-period">${s.serviceType}</span>`:''}</div>
+          <div class="rc-meta">${c?.name||'?'} · from ${startLbl} · ${endLbl} · ${gen} invoice${gen!==1?'s':''} · day ${s.dayOfMonth||1}${s.paymentMethod?` · <span style="color:var(--teal);font-weight:600">${s.paymentMethod}</span>`:''}</div>
+        </div>
+      </div>
+      <div class="rc-right">
+        <div><div class="rc-amt">${fmtGBP(total)}</div><div class="rc-freq">per month · VAT ${s.vatRate}%</div></div>
+        <div style="display:flex;gap:6px;flex-direction:column">
+          <button class="btn btn-ghost btn-xs" onclick="openSchedModal('${s.id}')">Edit</button>
+          ${s.active&&!isEnded?`<button class="btn btn-teal btn-xs" onclick="pauseSched('${s.id}')">Pause</button>`:''}
+          ${!s.active?`<button class="btn btn-teal btn-xs" onclick="resumeSched('${s.id}')">Resume</button>`:''}
+          <button class="btn btn-danger btn-xs" onclick="deleteSchedWithOption('${s.id}')">Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function pauseSched(id){const s=DB.schedules.find(x=>x.id===id);if(!s)return;s.active=false;persist();renderRecurring();showToast('Schedule paused.');}
+function resumeSched(id){const s=DB.schedules.find(x=>x.id===id);if(!s)return;s.active=true;persist();genRecurring();renderRecurring();renderDash();showToast('Schedule resumed.');}
+
+// ── Forecast ──────────────────────────────────────────────────────────
+function buildForecast(n,startKey,endKey){
+  const months=[];
+  let cur;
+  if(startKey&&endKey){
+    cur=new Date(startKey+'-01');
+    const end=new Date(endKey+'-01');
+    while(cur<=end){const key=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;months.push({year:cur.getFullYear(),month:cur.getMonth(),key,label:cur.toLocaleString('en-GB',{month:'long',year:'numeric'}),short:cur.toLocaleString('en-GB',{month:'short',year:'2-digit'})});cur.setMonth(cur.getMonth()+1);}
+  }else{
+    const now=new Date();
+    for(let i=1;i<=n;i++){const d=new Date(now.getFullYear(),now.getMonth()+i,1);months.push({year:d.getFullYear(),month:d.getMonth(),key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,label:d.toLocaleString('en-GB',{month:'long',year:'numeric'}),short:d.toLocaleString('en-GB',{month:'short',year:'2-digit'})});}
+  }
+  const active=DB.schedules.filter(s=>s.active);
+  return months.map(m=>{
+    const items=active.filter(s=>{if(m.key<s.schedStart)return false;if(s.schedEnd&&m.key>s.schedEnd)return false;return true;}).map(s=>{
+      const c=DB.customers.find(x=>x.id===s.customerId);
+      const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);const vat=sub*(s.vatRate/100);
+      return{schedId:s.id,custName:c?.name||'?',custId:s.customerId,name:s.name||c?.name||'',sub,vat,total:sub+vat,vatRate:s.vatRate};
+    });
+    const recurSub=items.reduce((s,r)=>s+r.sub,0);
+    const recurVat=items.reduce((s,r)=>s+r.vat,0);
+    const recurTotal=items.reduce((s,r)=>s+r.total,0);
+    return{...m,recurSub,recurVat,recurTotal,items};
+  });
+}
+function renderForecast(){
+  const n=parseInt(document.getElementById('fc-months').value)||6;
+  const data=buildForecast(n);
+  const totSub=data.reduce((s,m)=>s+m.recurSub,0);
+  const totVat=data.reduce((s,m)=>s+m.recurVat,0);
+  const totTotal=data.reduce((s,m)=>s+m.recurTotal,0);
+  const activeScheds=DB.schedules.filter(s=>s.active).length;
+  document.getElementById('fc-stats').innerHTML=`
+    <div class="stat"><div class="stat-bar"></div><div class="stat-lbl">Confirmed total</div><div class="stat-val">${fmtShort(totTotal)}</div><div class="stat-sub">over ${n} months</div></div>
+    <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Confirmed subtotal</div><div class="stat-val">${fmtShort(totSub)}</div><div class="stat-sub">excl. VAT</div></div>
+    <div class="stat"><div class="stat-bar slate"></div><div class="stat-lbl">Confirmed VAT</div><div class="stat-val">${fmtShort(totVat)}</div><div class="stat-sub">from recurring</div></div>
+    <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Avg per month</div><div class="stat-val">${fmtShort(totTotal/n)}</div><div class="stat-sub">${activeScheds} active schedule${activeScheds!==1?'s':''}</div></div>`;
+  document.getElementById('fc-basis').textContent=`${activeScheds} active schedule${activeScheds!==1?'s':''}`;
+  document.getElementById('fc-tbody').innerHTML=data.map(m=>`<tr>
+    <td style="font-weight:500">${m.label}</td>
+    <td class="r" style="color:var(--accent)">${fmtGBP(m.recurSub)}</td>
+    <td class="r muted">${fmtGBP(m.recurVat)}</td>
+    <td class="r" style="font-weight:600">${fmtGBP(m.recurTotal)}</td>
+  </tr>`).join('');
+  const custTots={};data.forEach(m=>m.items.forEach(r=>{if(!custTots[r.custId])custTots[r.custId]={name:r.custName,total:0};custTots[r.custId].total+=r.total;}));
+  const sortedC=Object.entries(custTots).sort((a,b)=>b[1].total-a[1].total);
+  const maxC=sortedC.length?sortedC[0][1].total:1;
+  const cb=document.getElementById('fc-cust-bars');
+  if(!sortedC.length){cb.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No active recurring schedules.</div>';}
+  else{cb.innerHTML=sortedC.map(([cid,{name,total}])=>{const c=DB.customers.find(x=>x.id===cid);const col=c?COLS[c.ci||0]:'#888';const pct=Math.max(Math.round(total/maxC*100),2);return`<div class="bar-row"><div class="bar-name">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${col}"><span>${pct>18?fmtShort(total):''}</span></div></div><div class="bar-val">${fmtShort(total)}</div></div>`;}).join('');}
+  const sl=document.getElementById('fc-scheds');
+  const active=DB.schedules.filter(s=>s.active);
+  if(!active.length){sl.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No active schedules.</div>';}
+  else{sl.innerHTML=active.map((s,idx)=>{const c=DB.customers.find(x=>x.id===s.customerId);const col=c?COLS[c.ci||0]:'#888';const total=s.lines.reduce((t,l)=>t+l.qty*l.price,0)*(1+s.vatRate/100);const endNote=s.schedEnd?'Ends '+new Date(s.schedEnd+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'No end date';const border=idx<active.length-1?'border-bottom:1px solid var(--border)':'';return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;${border}"><div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span><div style="min-width:0"><div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.name||c?.name||'Unnamed'}</div><div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${c?.name||'?'} · ${endNote}</div></div></div><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);flex-shrink:0;margin-left:12px">${fmtGBP(total)}/mo</div></div>`;}).join('');}
+}
+function openFcExport(){document.getElementById('fcexp-months').value=document.getElementById('fc-months').value;openOverlay('fcexp-modal');}
+
+// ── Dashboard ─────────────────────────────────────────────────────────
+let dashY=new Date().getFullYear(),dashM=new Date().getMonth();
+function shiftMonth(d){dashM+=d;if(dashM>11){dashM=0;dashY++;}if(dashM<0){dashM=11;dashY--;}renderDash();}
+
+
+
+function renderDash(){
+  // Initialise period pickers on first load
+  const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
+  document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  const invs=DB.invoices.filter(i=>mk(i.date)===key);
+  const total=invs.reduce((s,i)=>s+i.total,0);
+  const recurInvs=invs.filter(i=>i.isRecurring);
+  const maxInv=invs.length?invs.reduce((a,b)=>b.total>a.total?b:a):null;
+  const maxC=maxInv?DB.customers.find(c=>c.id===maxInv.customerId):null;
+
+  // Next month forecast from recurring
+  const now=new Date();
+  const nextM=new Date(dashY,dashM+1,1);
+  const nextKey=`${nextM.getFullYear()}-${String(nextM.getMonth()+1).padStart(2,'0')}`;
+  const nextFc=buildForecast(0,nextKey,nextKey);
+  const nextTotal=nextFc.length?nextFc[0].recurTotal:0;
+  const nextCount=nextFc.length?nextFc[0].items.length:0;
+
+  const totalEx=invs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+  const nextTotalEx=nextFc.length?nextFc[0].recurSub:0;
+  const recurTotal=recurInvs.reduce((s,i)=>s+i.total,0);
+  const recurEx=recurInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+  // ex VAT = big number, inc VAT = small sub
+  document.getElementById('ds-total').textContent=fmtPound(totalEx)+' ex. VAT';
+  document.getElementById('ds-total-ex').textContent=fmtPound(total)+' inc. VAT';
+  document.getElementById('ds-count').textContent=invs.length+' invoice'+(invs.length!==1?'s':'');
+  document.getElementById('ds-next').textContent=fmtPound(nextTotalEx)+' ex. VAT';
+  document.getElementById('ds-next-ex').textContent=fmtPound(nextTotal)+' inc. VAT';
+  document.getElementById('ds-next-sub').textContent=nextCount+' recurring schedule'+(nextCount!==1?'s':'');
+  document.getElementById('ds-recur').textContent=fmtPound(recurEx)+' ex. VAT';
+  document.getElementById('ds-recur-ex').textContent=fmtPound(recurTotal)+' inc. VAT';
+  document.getElementById('ds-recur-sub').textContent=recurInvs.length+' recurring invoice'+(recurInvs.length!==1?'s':'');
+  const maxEx=maxInv?fmtPound(maxInv.sub||maxInv.total/(1+(maxInv.vatRate||20)/100)):'—';
+  document.getElementById('ds-max').textContent=maxInv?(maxEx+' ex. VAT'):'—';
+  document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
+  document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
+
+  // (#4) Monthly trend: 6 past months + current + next month forecast
+  const bars=[];
+  for(let i=5;i>=0;i--){
+    const d=new Date(dashY,dashM-i,1);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const t=DB.invoices.filter(x=>mk(x.date)===k).reduce((s,x)=>s+x.total,0);
+    bars.push({k,t,type:k===key?'current':'past',lbl:d.toLocaleString('en-GB',{month:'short'})});
+  }
+  // Add next month forecast bar
+  bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
+  const maxT=Math.max(...bars.map(b=>b.t),1);
+  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap"><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*95,2)}px" title="${fmtShort(b.t)}"></div></div>`).join('');
+  document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}</div>`).join('');
+
+  // (#7) Revenue by company (not customer)
+  const revByComp={};
+  invs.forEach(i=>{
+    const c=DB.customers.find(x=>x.id===i.customerId);
+    const co=c?.company||c?.name||'Unknown';
+    if(!revByComp[co])revByComp[co]={sub:0,total:0};
+    revByComp[co].sub+=(i.sub||i.total/(1+(i.vatRate||20)/100));
+    revByComp[co].total+=i.total;
+  });
+  const sortedComp=Object.entries(revByComp).sort((a,b)=>b[1].total-a[1].total);
+  const maxComp=sortedComp.length?sortedComp[0][1].total:1;
+  _dashCompanies=sortedComp.map(([co])=>co);
+  const rb=document.getElementById('rev-bars');
+  const compGrossSub=sortedComp.reduce((s,[,v])=>s+v.sub,0);
+  const compGrossTotal=sortedComp.reduce((s,[,v])=>s+v.total,0);
+  setCardTotal('rev-bars',fmtGBP(compGrossSub),'inc. VAT '+fmtGBP(compGrossTotal));
+  if(!sortedComp.length){rb.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No data.</div>';}
+  else{rb.innerHTML=sortedComp.map(([co,rv],idx)=>{const pct=Math.max(Math.round(rv.total/maxComp*100),2);return`<div class="bar-row" style="cursor:pointer" title="Click to see invoices" onclick="viewCompanyInvs(${idx})"><div class="bar-name">${co}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${COLS[idx%COLS.length]}"><span>${pct>18?fmtShort(rv.total):''}</span></div></div><div class="bar-val" style="line-height:1.3"><div style="font-size:12px;font-weight:600">${fmtGBP(rv.sub)}</div><div style="font-size:10px;opacity:0.7">inc. ${fmtShort(rv.total)}</div></div></div>`;}).join('');}
+
+  // (#9) Next month forecast breakdown
+  const fcEl=document.getElementById('dash-fc-list');
+  const nextTotalEx2=nextFc.length?nextFc[0].recurSub:0;
+  setCardTotal('dash-fc-list',fmtGBP(nextTotalEx2),'inc. VAT '+fmtGBP(nextTotal));
+  if(!nextFc.length||!nextFc[0].items.length){
+    fcEl.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No recurring schedules active next month.</div>';
+  }else{
+    const fcItems=nextFc[0].items;
+    fcEl.innerHTML=fcItems.map((r,idx)=>{
+      const c=DB.customers.find(x=>x.id===r.custId);const col=c?COLS[c.ci||0]:'#888';
+      const border=idx<fcItems.length-1?'border-bottom:1px solid var(--border)':'';
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;${border};cursor:pointer" title="Click to see line items" onclick="viewSchedPreview('${r.schedId}')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span>
+          <div><div style="font-weight:500;font-size:13px">${r.custName}</div><div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${r.name}</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px"><div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;font-weight:600;color:var(--teal)">${fmtGBP(r.sub||r.total/(1+(r.vatRate||20)/100))} ex.</div><div style="font-family:var(--mono);font-size:10px;color:var(--ink3)">inc. ${fmtGBP(r.total)}</div></div><span style="font-size:10px;color:var(--ink3);margin-left:4px">→</span></div>
+      </div>`;
+    }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-size:12px;font-weight:600">Total forecast</span><div style="text-align:right"><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal)">${fmtGBP(nextFc[0].recurSub)} ex. VAT</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">inc. VAT ${fmtGBP(nextTotal)}</div></div></div>`;
+  }
+
+  // All customers this month
+  const cl=document.getElementById('cust-month-list');
+  const custGross=DB.customers.reduce((s,c)=>s+invs.filter(i=>i.customerId===c.id).reduce((t,i)=>t+i.total,0),0);
+  const custGrossSub=DB.customers.reduce((s,c)=>s+invs.filter(i=>i.customerId===c.id).reduce((t,i)=>t+(i.sub||i.total/(1+(i.vatRate||20)/100)),0),0);
+  setCardTotal('cust-month-list',fmtGBP(custGrossSub),'inc. VAT '+fmtGBP(custGross));
+  if(!DB.customers.length){cl.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:12px">No customers.</div>';return;}
+  cl.innerHTML=DB.customers.map((c,idx)=>{
+    const ci=invs.filter(i=>i.customerId===c.id);
+    const col=COLS[c.ci||0];
+    const custScheds=DB.schedules.filter(s=>s.customerId===c.id&&s.active);
+    const hasR=custScheds.length>0;
+    const border=idx<DB.customers.length-1?'border-bottom:1px solid var(--border)':'';
+    const recurClick=hasR?(custScheds.length===1?`viewSchedPreview('${custScheds[0].id}')`:`viewCustScheds('${c.id}')`):'' ;
+    const invClick=ci.length?`viewCustMonthInvs('${c.id}')`:'' ;
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;${border}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;flex-shrink:0"></span>
+        <span style="font-weight:500;font-size:13px">${c.name}</span>
+        ${hasR?`<span class="badge b-recur" style="cursor:pointer" onclick="${recurClick}" title="View recurring templates">↻</span>`:''}
+        ${c.company?`<span style="color:var(--ink3);font-size:11px">${c.company}</span>`:''}
+      </div>
+      <div>${ci.length?`<div style="text-align:right"><div style="font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:600;cursor:pointer" onclick="${invClick}" title="View invoices this month">${fmtGBP(ci.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0))} ex.</div><div style="font-family:var(--mono);font-size:10px;color:var(--ink3);cursor:pointer" onclick="${invClick}">${fmtGBP(ci.reduce((s,i)=>s+i.total,0))} inc.</div></div>`:'<span style="font-size:11px;color:var(--ink3)">no invoice</span>'}</div>
+    </div>`;
+  }).join('');
+
+  // Payment method breakdown (next month forecast by payment method)
+  const pmCard=document.getElementById('pay-method-list');
+  const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
+  const pmData={};
+  PM_LABELS.forEach(pm=>{pmData[pm]={sub:0,total:0,count:0};});
+  pmData['Unspecified']={sub:0,total:0,count:0};
+  DB.schedules.forEach(s=>{
+    if(!s.active)return;
+    if(nextKey<s.schedStart)return;
+    if(s.schedEnd&&nextKey>s.schedEnd)return;
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const vat=sub*(s.vatRate/100);
+    const tot=sub+vat;
+    const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
+    pmData[pm].sub+=sub;pmData[pm].total+=tot;pmData[pm].count++;
+  });
+  const pmEntries=Object.entries(pmData).filter(([,v])=>v.count>0);
+  const pmGrandSub=pmEntries.reduce((s,[,v])=>s+v.sub,0);
+  const pmGrandTotal=pmEntries.reduce((s,[,v])=>s+v.total,0);
+  setCardTotal('pay-method-list',fmtGBP(pmGrandSub),'inc. VAT '+fmtGBP(pmGrandTotal));
+  const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
+  const PM_COLORS={'Direct Debit':'var(--teal)','Standing Order':'var(--gold)','Upon Invoice':'var(--accent)','Unspecified':'var(--ink3)'};
+  if(pmCard){
+    if(!pmEntries.length){
+      pmCard.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No recurring schedules active next month.</div>';
+    }else{
+      pmCard.innerHTML=pmEntries.map(([pm,v],idx)=>{
+        const pct=pmGrandTotal?Math.round(v.total/pmGrandTotal*100):0;
+        const border=idx<pmEntries.length-1?'border-bottom:1px solid var(--border)':'';
+        return`<div style="padding:10px 0;${border}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">${PM_ICONS[pm]||'💳'}</span>
+              <span style="font-weight:600;font-size:13px;color:${PM_COLORS[pm]||'var(--ink)'}">${pm}</span>
+              <span style="font-size:11px;color:var(--ink3)">${v.count} schedule${v.count!==1?'s':''}</span>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--mono);font-size:12px;font-weight:600">${fmtGBP(v.sub)} ex.</div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--ink3)">inc. ${fmtGBP(v.total)}</div>
+            </div>
+          </div>
+          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:${PM_COLORS[pm]||'var(--ink3)'};border-radius:4px;transition:width .3s"></div>
+          </div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:3px;text-align:right;font-family:var(--mono)">${pct}% of next month forecast</div>
+        </div>`;
+      }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-size:12px;font-weight:600">Total</span><div style="text-align:right"><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal)">${fmtGBP(pmGrandSub)} ex. VAT</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">inc. VAT ${fmtGBP(pmGrandTotal)}</div></div></div>`;
+    }
+  }
+}
+
+// ── Collapsible card toggle ────────────────────────────────────────────
+const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false,'pay-method-list':false};
+function applyCardState(bodyId){
+  const open=cardStates[bodyId];
+  const body=document.getElementById(bodyId);
+  const arrow=document.getElementById(bodyId+'-arrow');
+  const pill=document.getElementById(bodyId+'-total');
+  if(body) body.style.display=open?'':'none';
+  if(arrow) arrow.classList.toggle('collapsed',!open);
+  if(pill)  pill.classList.toggle('visible',!open);
+}
+function toggleCard(bodyId){
+  cardStates[bodyId]=!cardStates[bodyId];
+  applyCardState(bodyId);
+  // Lazy-render the changes card only when first expanded
+}
+function setCardTotal(bodyId,text,subText){
+  const pill=document.getElementById(bodyId+'-total');
+  if(pill){
+    if(subText){pill.innerHTML=text+'<span style="font-size:10px;opacity:0.72;display:block;line-height:1.3;font-family:var(--mono)">'+subText+'</span>';}
+    else{pill.textContent=text;}
+  }
+  applyCardState(bodyId);
+}
+
+// ── Dashboard customer list helpers ───────────────────────────────────
+function viewCustMonthInvs(custId){
+  const c=DB.customers.find(x=>x.id===custId);if(!c)return;
+  const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
+  const monthLabel=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  const invs=DB.invoices.filter(i=>i.customerId===custId&&mk(i.date)===key);
+  const total=invs.reduce((s,i)=>s+i.total,0);
+  document.getElementById('vm-title').textContent=c.name+(c.company?' — '+c.company:'');
+  document.getElementById('vm-sub').textContent=invs.length+' invoice'+(invs.length!==1?'s':'')+' · '+monthLabel;
+  const vmEdit=document.getElementById('vm-edit');vmEdit.style.display='none';
+  document.getElementById('vm-body').innerHTML=invs.map(inv=>{
+    const sym=inv.currency||'£';
+    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);cursor:pointer" onclick="closeOverlay('view-modal');viewInv('${inv.id}')">
+        <div><div style="font-weight:600;font-size:13px">${inv.serviceType||inv.id}</div>
+        <div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${fmtD(inv.date)}${inv.isRecurring?' · ↻ recurring':''}</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">${fmtGBP(inv.total)}</span><span style="font-size:10px;color:var(--ink3)">→</span></div>
+      </div>
+      <div style="padding:6px 14px 10px">
+        ${inv.lines.map(l=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="color:var(--ink2)">${l.desc||'—'}</span><span style="font-family:var(--mono);color:var(--ink3)">${l.qty} × ${sym}${f2(l.price)} = <strong>${sym}${f2(l.qty*l.price)}</strong></span></div>`).join('')}
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:5px 0 2px;color:var(--ink3)"><span>VAT (${inv.vatRate}%)</span><span style="font-family:var(--mono)">${fmtGBP(inv.vat)}</span></div>
+      </div>
+    </div>`;
+  }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-weight:600">Total</span><span style="font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtGBP(total)}</span></div>`;
+  openOverlay('view-modal');
+}
+function viewCustScheds(custId){
+  const c=DB.customers.find(x=>x.id===custId);if(!c)return;
+  const scheds=DB.schedules.filter(s=>s.customerId===custId&&s.active);
+  document.getElementById('vm-title').textContent=c.name+(c.company?' — '+c.company:'');
+  document.getElementById('vm-sub').textContent=scheds.length+' active recurring template'+(scheds.length!==1?'s':'');
+  const vmEdit=document.getElementById('vm-edit');vmEdit.style.display='none';
+  document.getElementById('vm-body').innerHTML=scheds.map(s=>{
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const vat=sub*s.vatRate/100;
+    const total=sub+vat;
+    return`<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg2);cursor:pointer" onclick="closeOverlay('view-modal');viewSchedPreview('${s.id}')">
+        <div><div style="font-weight:600;font-size:13px">${s.name||c.name}${s.serviceType?' · '+s.serviceType:''}</div>
+        <div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${s.schedStart||'?'}${s.schedEnd?' → '+s.schedEnd:' onwards'} · Day ${s.dayOfMonth||1}</div></div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent)">${fmtGBP(total)}/mo</span><span style="font-size:10px;color:var(--ink3)">→</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  openOverlay('view-modal');
+}
+
+// ── Excel export ──────────────────────────────────────────────────────
+function getExpInvs(){
+  const f=document.getElementById('exp-from').value,t=document.getElementById('exp-to').value;
+  if(!f||!t)return[];
+  let invs=DB.invoices.filter(i=>i.date>=f&&i.date<=t).sort((a,b)=>a.date.localeCompare(b.date));
+  const cf=document.getElementById('exp-cf')?.value||'';
+  if(cf.startsWith('c:')){const id=cf.slice(2);invs=invs.filter(i=>i.customerId===id);}
+  else if(cf.startsWith('co:')){const co=cf.slice(3);invs=invs.filter(i=>{const c=DB.customers.find(x=>x.id===i.customerId);return c?.company===co;});}
+  const rf=document.getElementById('exp-rf')?.value||'';
+  if(rf==='r')invs=invs.filter(i=>i.isRecurring);
+  if(rf==='o')invs=invs.filter(i=>!i.isRecurring);
+  return invs;
+}
+function openExport(){
+  const now=new Date();
+  document.getElementById('exp-from').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  document.getElementById('exp-to').value=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  document.getElementById('exp-rf').value='';
+  const cf=document.getElementById('exp-cf');
+  const companies=[...new Set(DB.customers.map(c=>c.company).filter(Boolean))].sort();
+  let opts='<option value="">All</option>';
+  const solo=DB.customers.filter(c=>!c.company);
+  if(solo.length){opts+='<optgroup label="Customers">'+solo.map(c=>`<option value="c:${c.id}">${c.name}</option>`).join('')+'</optgroup>';}
+  companies.forEach(co=>{const members=DB.customers.filter(c=>c.company===co);opts+=`<optgroup label="${co}"><option value="co:${co}">${co} (all)</option>${members.map(c=>`<option value="c:${c.id}">&nbsp;&nbsp;${c.name}</option>`).join('')}</optgroup>`;});
+  cf.innerHTML=opts;
+  updateExpPreview();openOverlay('exp-modal');
+}
+function setExpRange(p){
+  const now=new Date();const y=now.getFullYear(),m=now.getMonth();
+  let f,t;
+  if(p==='tm'){f=`${y}-${String(m+1).padStart(2,'0')}-01`;t=new Date(y,m+1,0).toISOString().split('T')[0];}
+  else if(p==='lm'){const lm=m===0?11:m-1,ly=m===0?y-1:y;f=`${ly}-${String(lm+1).padStart(2,'0')}-01`;t=new Date(ly,lm+1,0).toISOString().split('T')[0];}
+  else if(p==='ty'){f=`${y}-01-01`;t=`${y}-12-31`;}
+  else if(p==='ly'){f=`${y-1}-01-01`;t=`${y-1}-12-31`;}
+  else{const ds=DB.invoices.map(i=>i.date).filter(Boolean).sort();f=ds[0]||'';t=ds[ds.length-1]||'';}
+  document.getElementById('exp-from').value=f;document.getElementById('exp-to').value=t;updateExpPreview();
+}
+function updateExpPreview(){
+  const invs=getExpInvs(),el=document.getElementById('exp-prev');
+  if(!invs.length){el.innerHTML='<span style="color:var(--accent2)">No invoices match this selection.</span>';return;}
+  const total=invs.reduce((s,i)=>s+i.total,0);
+  const custs=[...new Set(invs.map(i=>i.customerId))];
+  const mode=document.getElementById('exp-lines').value;
+  const rows=mode==='detail'?invs.reduce((s,i)=>s+i.lines.length,0):invs.length;
+  const grp=document.getElementById('exp-grp').value;
+  const grpNote=grp==='all-cust'?'all customers on one sheet':grp==='per-cust'?'one sheet per customer + summary':grp==='month'?'grouped by month':'flat list';
+  el.innerHTML=`<strong>${invs.length}</strong> invoice${invs.length!==1?'s':''} · <strong>${custs.length}</strong> customer${custs.length!==1?'s':''} · <strong>${fmtGBP(total)}</strong> total<br><span style="color:var(--ink3)">${rows} rows · ${grpNote}</span>`;
+}
+function buildInvRows(invList,mode){
+  const rows=[];
+  if(mode==='summary'){
+    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',inv.lines.map(l=>l.desc).filter(Boolean).join('; '),f2(inv.subtotal),inv.vatRate,f2(inv.vat),f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});
+    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Subtotal ex VAT','VAT Rate %','VAT Amount','Total inc VAT','Recurring','Notes'],...rows];
+  }else{
+    invList.forEach(inv=>{const c=DB.customers.find(x=>x.id===inv.customerId);inv.lines.forEach(l=>{rows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',l.desc||'',l.qty,f2(l.price),f2(l.qty*l.price),f2(inv.subtotal),inv.vatRate,f2(inv.vat),f2(inv.total),inv.isRecurring?'Yes':'No',inv.notes||'']);});});
+    return[['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Line Description','Qty','Unit Price','Line Total','Invoice Subtotal ex VAT','VAT Rate %','VAT Amount','Invoice Total inc VAT','Recurring','Notes'],...rows];
+  }
+}
+function doExport(){
+  const invs=getExpInvs();
+  if(!invs.length){showToast('No invoices in this date range.');return;}
+  const from=document.getElementById('exp-from').value,to=document.getElementById('exp-to').value;
+  const grp=document.getElementById('exp-grp').value,mode=document.getElementById('exp-lines').value;
+  const sheets=[];
+  if(grp==='none'){
+    sheets.push({name:'Invoices',rows:buildInvRows(invs,mode)});
+  }else if(grp==='all-cust'){
+    const hdr=['Customer','Company','Invoice Date','Period Start','Period End','Service Type','Description','Qty','Unit Price','Subtotal ex VAT','VAT Rate %','VAT Amount','Total inc VAT','Recurring','Notes'];
+    const allRows=[hdr];let gSub=0,gVat=0,gTot=0;
+    const byCust={};invs.forEach(inv=>{if(!byCust[inv.customerId])byCust[inv.customerId]=[];byCust[inv.customerId].push(inv);});
+    Object.entries(byCust).forEach(([cid,cinvs])=>{
+      cinvs.forEach(inv=>{
+        const c=DB.customers.find(x=>x.id===inv.customerId);
+        const descs=inv.lines.map(l=>l.desc||'').filter(Boolean).join(', ');
+        const totalBeds=parseFloat(inv.lines[0]?.qty)||0;
+        const pricePerBed=inv.lines.reduce((s,l)=>s+(parseFloat(l.price)||0),0);
+        const subtotal=totalBeds*pricePerBed;
+        const vat=subtotal*(inv.vatRate/100);
+        const total=subtotal+vat;
+        allRows.push([c?.name||'?',c?.company||'',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',inv.serviceType||'',descs,totalBeds,f2(pricePerBed),f2(subtotal),inv.vatRate,f2(vat),f2(total),inv.isRecurring?'Yes':'No',inv.notes||'']);
+      });
+      gSub+=cinvs.reduce((s,i)=>s+i.subtotal,0);gVat+=cinvs.reduce((s,i)=>s+i.vat,0);gTot+=cinvs.reduce((s,i)=>s+i.total,0);
+    });
+    const grand=hdr.map(()=>'');grand[0]='GRAND TOTAL';grand[9]=f2(gSub);grand[11]=f2(gVat);grand[12]=f2(gTot);
+    allRows.push(grand);sheets.push({name:'All Invoices',rows:allRows});
+  }else if(grp==='per-cust'){
+    const byCust={};invs.forEach(inv=>{if(!byCust[inv.customerId])byCust[inv.customerId]=[];byCust[inv.customerId].push(inv);});
+    Object.entries(byCust).forEach(([cid,cinvs])=>{const c=DB.customers.find(x=>x.id===cid);const name=(c?.name||'?').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,28)||'Customer';sheets.push({name,rows:buildInvRows(cinvs,mode)});});
+    const sumRows=DB.customers.map(c=>{const ci=invs.filter(i=>i.customerId===c.id);if(!ci.length)return null;return[c.name,c.company||'',ci.length,f2(ci.reduce((s,i)=>s+i.subtotal,0)),f2(ci.reduce((s,i)=>s+i.vat,0)),f2(ci.reduce((s,i)=>s+i.total,0))];}).filter(Boolean);
+    sheets.push({name:'Summary',rows:[['Customer','Company','Invoice Count','Subtotal ex VAT','VAT','Total inc VAT'],...sumRows]});
+  }else{
+    const byM={};invs.forEach(inv=>{const m=mk(inv.date);if(!byM[m])byM[m]=[];byM[m].push(inv);});
+    Object.entries(byM).sort().forEach(([m,mi])=>{const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}).replace(' ','_');sheets.push({name:lbl,rows:buildInvRows(mi,mode)});});
+  }
+  dlXlsx(sheets,`invoices_${from}_to_${to}.xlsx`);closeOverlay('exp-modal');showToast('Excel downloaded!');
+}
+
+// Forecast export
+function toggleFcExpRange(){const isCustom=document.getElementById('fcexp-range-type').value==='custom';document.getElementById('fcexp-months-wrap').style.display=isCustom?'none':'';document.getElementById('fcexp-from-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-to-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-presets').style.display=isCustom?'flex':'none';}
+function setFcExpPreset(p){const now=new Date();let from,to;if(p==='q1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+3,1);}else if(p==='h1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+6,1);}else if(p==='y1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+12,1);}else if(p==='y2'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+24,1);}document.getElementById('fcexp-from').value=from.toISOString().split('T')[0];document.getElementById('fcexp-to').value=to.toISOString().split('T')[0];}
+function openFcExport(){document.getElementById('fcexp-months').value=document.getElementById('fc-months').value;document.getElementById('fcexp-range-type').value='months';const now=new Date();const from=new Date(now.getFullYear(),now.getMonth()+1,1);const to=new Date(now.getFullYear(),now.getMonth()+6,1);document.getElementById('fcexp-from').value=from.toISOString().split('T')[0];document.getElementById('fcexp-to').value=to.toISOString().split('T')[0];toggleFcExpRange();openOverlay('fcexp-modal');}
+function doFcExport(){
+  const isCustom=document.getElementById('fcexp-range-type').value==='custom';
+  const detail=document.getElementById('fcexp-detail').value;
+  let data,fromLabel,toLabel;
+  if(isCustom){const fromVal=document.getElementById('fcexp-from').value,toVal=document.getElementById('fcexp-to').value;if(!fromVal||!toVal){showToast('Please set dates.');return;}const sk=fromVal.slice(0,7),ek=toVal.slice(0,7);if(sk>ek){showToast('From must be before to.');return;}data=buildForecast(0,sk,ek);fromLabel=new Date(fromVal+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');toLabel=new Date(toVal+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');}
+  else{const n=parseInt(document.getElementById('fcexp-months').value)||6;data=buildForecast(n);const now=new Date();fromLabel=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');toLabel=new Date(now.getFullYear(),now.getMonth()+n,1).toLocaleDateString('en-GB',{month:'short',year:'numeric'}).replace(' ','_');}
+  if(!data.length){showToast('No months in range.');return;}
+  const sheets=[];
+  if(detail==='summary'){const hdr=['Month','Subtotal ex VAT','VAT','Total inc VAT'];const rows=data.map(m=>[m.label,f2(m.recurSub),f2(m.recurVat),f2(m.recurTotal)]);rows.push(['TOTAL',f2(data.reduce((s,m)=>s+m.recurSub,0)),f2(data.reduce((s,m)=>s+m.recurVat,0)),f2(data.reduce((s,m)=>s+m.recurTotal,0))]);sheets.push({name:'Forecast Summary',rows:[hdr,...rows]});}
+  else{const hdr=['Month','Customer','Schedule','Subtotal ex VAT','VAT','Total inc VAT'];const rows=[];data.forEach(m=>{m.items.forEach(r=>rows.push([m.label,r.custName,r.name,f2(r.sub),f2(r.vat),f2(r.total)]));rows.push([m.label,'','MONTH TOTAL',f2(m.recurSub),f2(m.recurVat),f2(m.recurTotal)]);rows.push(hdr.map(()=>''));});sheets.push({name:'Forecast Detail',rows:[hdr,...rows]});}
+  dlXlsx(sheets,`forecast_${fromLabel}_to_${toLabel}.xlsx`);closeOverlay('fcexp-modal');showToast('Forecast exported!');
+}
+
+// ── xlsx / zip ────────────────────────────────────────────────────────
+function dlXlsx(sheets,filename){const bytes=buildXlsx(sheets);const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),5000);}
+function buildXlsx(sheets){
+  const sst=[],sstIdx={};
+  function si(v){const k=String(v==null?'':v);if(sstIdx[k]===undefined){sstIdx[k]=sst.length;sst.push(k);}return sstIdx[k];}
+  const xe=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function cl(n){let s='';n++;while(n>0){s=String.fromCharCode(64+(n%26||26))+s;n=Math.floor((n-1)/26);}return s;}
+  function wsXml(rows){let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData>';rows.forEach((row,ri)=>{x+=`<row r="${ri+1}">`;row.forEach((cell,ci)=>{const ref=cl(ci)+(ri+1);const safeCell=(typeof cell==='number'&&!isNaN(cell))?cell:(typeof cell==='number'?0:cell);if(typeof safeCell==='number'){x+=`<c r="${ref}" t="n"><v>${safeCell}</v></c>`;}else{x+=`<c r="${ref}" t="s"><v>${si(cell)}</v></c>`;}});x+='</row>';});return x+'</sheetData></worksheet>';}
+  const wsXmls=sheets.map(s=>wsXml(s.rows));
+  const sstXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="'+sst.length+'" uniqueCount="'+sst.length+'">'+sst.map(v=>`<si><t xml:space="preserve">${xe(v)}</t></si>`).join('')+'</sst>';
+  const wbXml='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+sheets.map((s,i)=>`<sheet name="${xe(s.name)}" sheetId="${i+1}" r:id="rId${i+2}"/>`).join('')+'</sheets></workbook>';
+  const wbRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'+sheets.map((_,i)=>`<Relationship Id="rId${i+2}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')+'</Relationships>';
+  const ctypes='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'+sheets.map((_,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>';
+  const topRels='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  const files={'[Content_Types].xml':ctypes,'_rels/.rels':topRels,'xl/workbook.xml':wbXml,'xl/_rels/workbook.xml.rels':wbRels,'xl/sharedStrings.xml':sstXml};
+  wsXmls.forEach((xml,i)=>{files[`xl/worksheets/sheet${i+1}.xml`]=xml;});
+  return buildZip(files);
+}
+function buildZip(files){
+  const enc=new TextEncoder();const entries=[],cd=[];let off=0;
+  function crc32(b){const t=new Int32Array(256);for(let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=c&1?(0xEDB88320^(c>>>1)):c>>>1;t[i]=c;}let c=-1;for(let i=0;i<b.length;i++)c=t[(c^b[i])&0xFF]^(c>>>8);return(c^-1)>>>0;}
+  function u16(n){const b=new Uint8Array(2);new DataView(b.buffer).setUint16(0,n,true);return b;}
+  function u32(n){const b=new Uint8Array(4);new DataView(b.buffer).setUint32(0,n,true);return b;}
+  function cat(...a){const len=a.reduce((s,x)=>s+x.length,0);const o=new Uint8Array(len);let p=0;a.forEach(x=>{o.set(x,p);p+=x.length;});return o;}
+  for(const[name,content]of Object.entries(files)){const nb=enc.encode(name),db=enc.encode(content),crc=crc32(db),sz=db.length;const local=cat(new Uint8Array([0x50,0x4B,0x03,0x04]),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(sz),u32(sz),u16(nb.length),u16(0),nb,db);entries.push(local);cd.push(cat(new Uint8Array([0x50,0x4B,0x01,0x02]),u16(20),u16(20),u16(0),u16(0),u16(0),u16(0),u32(crc),u32(sz),u32(sz),u16(nb.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off),nb));off+=local.length;}
+  const cdBytes=cat(...cd);const eocd=cat(new Uint8Array([0x50,0x4B,0x05,0x06]),u16(0),u16(0),u16(cd.length),u16(cd.length),u32(cdBytes.length),u32(off),u16(0));
+  return cat(...entries,cdBytes,eocd);
+}
+
+
+// ── Invoice Changes Export ─────────────────────────────────────────
+function showInvoiceChangesModal(){
+  // Default: Period A = prev month, Period B = current month
+  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const prevStart=new Date(dashY,dashM-1,1);
+  const prevEnd=new Date(dashY,dashM,0);
+  const curStart=new Date(dashY,dashM,1);
+  const curEnd=new Date(dashY,dashM+1,0);
+  document.getElementById('ica-from').value=fmt(prevStart);
+  document.getElementById('ica-to').value=fmt(prevEnd);
+  document.getElementById('icb-from').value=fmt(curStart);
+  document.getElementById('icb-to').value=fmt(curEnd);
+  showOverlay('inv-chg-modal');
+}
+
+function exportInvoiceChanges(){try{
+  const aFrom=document.getElementById('ica-from').value;
+  const aTo=document.getElementById('ica-to').value;
+  const bFrom=document.getElementById('icb-from').value;
+  const bTo=document.getElementById('icb-to').value;
+  if(!aFrom||!aTo||!bFrom||!bTo){showToast('Please fill in all four dates');return;}
+
+  const inRange=(date,from,to)=>date>=from&&date<=to;
+  const r2=v=>{const n=Number(v);return isNaN(n)?0:Math.round(n*100)/100;};
+
+  const fmtPeriod=(f,t)=>{
+    const fd=new Date(f+'T00:00:00'),td=new Date(t+'T00:00:00');
+    if(f===t) return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    if(fd.getFullYear()===td.getFullYear()&&fd.getMonth()===td.getMonth())
+      return fd.toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    return fd.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' – '+td.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  };
+  const lblA=fmtPeriod(aFrom,aTo);
+  const lblB=fmtPeriod(bFrom,bTo);
+
+  // ── Group invoices by customer ──────────────────────────────────
+  const pA={}, pB={};
+  DB.invoices.filter(i=>inRange(i.date,aFrom,aTo)).forEach(i=>{
+    if(!pA[i.customerId]) pA[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pA[i.customerId].total+=i.total;
+    pA[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pA[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pA[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+  DB.invoices.filter(i=>inRange(i.date,bFrom,bTo)).forEach(i=>{
+    if(!pB[i.customerId]) pB[i.customerId]={total:0,sub:0,lines:[],invoices:[]};
+    pB[i.customerId].total+=i.total;
+    pB[i.customerId].sub+=(i.subtotal||i.total/(1+(i.vatRate||20)/100));
+    pB[i.customerId].invoices.push(i);
+    (i.lines||[]).forEach(l=>pB[i.customerId].lines.push({...l,_inv:i.id}));
+  });
+
+  const custIds=[...new Set([...Object.keys(pA),...Object.keys(pB)])];
+  const changes=[];
+  custIds.forEach(cid=>{
+    const c=DB.customers.find(x=>x.id===cid);
+    if(!c) return;
+    const hasA=!!pA[cid], hasB=!!pB[cid];
+    const totA=hasA?pA[cid].total:0, totB=hasB?pB[cid].total:0;
+    const subA=hasA?pA[cid].sub:0, subB=hasB?pB[cid].sub:0;
+    const diff=totB-totA;
+
+    // Detect line item changes
+    const lineChanges=[];
+    const mapA={}, mapB={};
+    if(hasA) pA[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapA[k]) mapA[k]={qty:0,price:l.price,unit:l.unit||''}; mapA[k].qty+=Number(l.qty)||0; });
+    if(hasB) pB[cid].lines.forEach(l=>{ const k=(l.desc||'').trim(); if(!mapB[k]) mapB[k]={qty:0,price:l.price,unit:l.unit||''}; mapB[k].qty+=Number(l.qty)||0; });
+
+    if(hasA&&hasB){
+      Object.keys(mapB).forEach(k=>{ if(!mapA[k]) lineChanges.push({type:'added',desc:k||'Unnamed',qty:mapB[k].qty,price:mapB[k].price,impact:r2(mapB[k].qty*mapB[k].price)}); });
+      Object.keys(mapA).forEach(k=>{ if(!mapB[k]) lineChanges.push({type:'removed',desc:k||'Unnamed',qty:mapA[k].qty,price:mapA[k].price,impact:-r2(mapA[k].qty*mapA[k].price)}); });
+      Object.keys(mapB).forEach(k=>{
+        if(!mapA[k]) return;
+        const qd=mapB[k].qty-mapA[k].qty;
+        const pd=mapB[k].price-mapA[k].price;
+        if(Math.abs(qd)>0.001) lineChanges.push({type:'qty',desc:k||'Unnamed',fromQty:mapA[k].qty,toQty:mapB[k].qty,price:mapB[k].price,impact:r2(qd*mapB[k].price)});
+        if(Math.abs(pd)>0.001) lineChanges.push({type:'price',desc:k||'Unnamed',qty:mapB[k].qty,fromPrice:mapA[k].price,toPrice:mapB[k].price,impact:r2(pd*mapB[k].qty)});
+      });
+    }
+
+    // Include all customers with any difference or line changes
+    const status=!hasA&&hasB?'NEW':hasA&&!hasB?'REMOVED':diff>0.01?'UP':diff<-0.01?'DOWN':'UNCHANGED';
+    if(status==='UNCHANGED'&&lineChanges.length===0) return;
+    changes.push({c,diff,totA,totB,subA,subB,lineChanges,status,mapA,mapB,hasA,hasB});
+  });
+
+  changes.sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff));
+
+  // ── Apply filters from modal ─────────────────────────────────────
+  const custFilter=(document.getElementById('ichg-cust-filter')||{value:''}).value.trim().toLowerCase();
+  const typeFilter=(document.getElementById('ichg-type-filter')||{value:'ALL'}).value;
+  const minChg=parseFloat((document.getElementById('ichg-min-chg')||{value:'0'}).value)||0;
+  const filteredChanges=changes.filter(({c,status,diff})=>{
+    if(custFilter&&!(c.name||'').toLowerCase().includes(custFilter)&&!(c.company||'').toLowerCase().includes(custFilter)) return false;
+    if(typeFilter!=='ALL'&&status!==typeFilter) return false;
+    if(minChg>0&&Math.abs(diff)<minChg) return false;
+    return true;
+  });
+
+  // ── Sheet 1: Summary ────────────────────────────────────────────
+  const sumRows=[
+    [`Invoice Changes: ${lblA}  →  ${lblB}`],
+    [],
+    ['Customer','Company','Email','Service Type',
+     `${lblA} — Ex VAT (£)`,`${lblA} — Inc VAT (£)`,
+     `${lblB} — Ex VAT (£)`,`${lblB} — Inc VAT (£)`,
+     'Change (Ex VAT £)','Change %','Status','What Changed']
+  ];
+  let totSubA=0,totSubB=0,totTotA=0,totTotB=0;
+  filteredChanges.forEach(({c,diff,totA,totB,subA,subB,lineChanges,status})=>{
+    const pct=subA?r2(((subB-subA)/subA)*100):0;
+    const whatChanged=lineChanges.map(lc=>{
+      if(lc.type==='added') return `+ ${lc.desc}`;
+      if(lc.type==='removed') return `− ${lc.desc}`;
+      if(lc.type==='qty') return `${lc.desc}: qty ${lc.fromQty}→${lc.toQty}`;
+      if(lc.type==='price') return `${lc.desc}: price £${r2(lc.fromPrice)}→£${r2(lc.toPrice)}`;
+      return '';
+    }).join(' | ');
+    sumRows.push([
+      c.name||'', c.company||'', c.email||'', c.serviceType||'',
+      r2(subA), r2(totA), r2(subB), r2(totB),
+      r2(subB-subA), pct||'', status, whatChanged
+    ]);
+    totSubA+=subA; totSubB+=subB; totTotA+=totA; totTotB+=totB;
+  });
+  sumRows.push([]);
+  sumRows.push(['TOTAL','','','',r2(totSubA),r2(totTotA),r2(totSubB),r2(totTotB),r2(totSubB-totSubA),totSubA?r2(((totSubB-totSubA)/totSubA)*100):0,'','']);
+
+  // ── Sheet 2: Detail ─────────────────────────────────────────────
+  const detRows=[
+    [`Invoice Changes Detail: ${lblA}  →  ${lblB}`],
+    [],
+    ['Customer','Company','Email','Line Item','Change Type',
+     `${lblA} Qty`,`${lblA} Unit Price (£)`,`${lblA} Line Total (£)`,
+     `${lblB} Qty`,`${lblB} Unit Price (£)`,`${lblB} Line Total (£)`,
+     'Impact (£)','Notes']
+  ];
+
+  filteredChanges.forEach(({c,lineChanges,mapA,mapB,hasA,hasB,totA,totB,subA,subB,status})=>{
+    // All line items for this customer
+    const allKeys=[...new Set([...Object.keys(mapA),...Object.keys(mapB)])];
+    allKeys.forEach(k=>{
+      const a=mapA[k]||{qty:0,price:0};
+      const b=mapB[k]||{qty:0,price:0};
+      const lineDiff=r2((b.qty*b.price)-(a.qty*a.price));
+      let changeType='UNCHANGED';
+      if(!mapA[k]) changeType='ADDED';
+      else if(!mapB[k]) changeType='REMOVED';
+      else if(Math.abs(a.qty-b.qty)>0.001&&Math.abs(a.price-b.price)>0.001) changeType='QTY + PRICE CHANGED';
+      else if(Math.abs(a.qty-b.qty)>0.001) changeType='QTY CHANGED';
+      else if(Math.abs(a.price-b.price)>0.001) changeType='PRICE CHANGED';
+      detRows.push([
+        c.name||'', c.company||'', c.email||'', k, changeType,
+        mapA[k]?r2(a.qty):'—', mapA[k]?r2(a.price):'—', mapA[k]?r2(a.qty*a.price):'—',
+        mapB[k]?r2(b.qty):'—', mapB[k]?r2(b.price):'—', mapB[k]?r2(b.qty*b.price):'—',
+        changeType==='UNCHANGED'?0:lineDiff,
+        changeType==='ADDED'?'New line item this period':changeType==='REMOVED'?'Line item not present this period':''
+      ]);
+    });
+    // Customer subtotal row
+    detRows.push([c.name,'','','— CUSTOMER TOTAL —','',
+      '','',r2(Object.values(mapA).reduce((s,l)=>s+l.qty*l.price,0)),
+      '','',r2(Object.values(mapB).reduce((s,l)=>s+l.qty*l.price,0)),
+      r2(subB-subA),'Ex VAT']);
+    detRows.push([]);
+  });
+
+  dlXlsx([
+    {name:'Summary',rows:sumRows},
+    {name:'Line Item Detail',rows:detRows}
+  ], `invoice_changes_${aFrom}_${bFrom}.xlsx`);
+  closeOverlay('inv-chg-modal');
+  showToast('Invoice Changes exported!');
+}catch(err){console.error('exportInvoiceChanges error:',err);showToast('Export error: '+err.message);}}
+
+// ── Variance Report Export ────────────────────────────────────────────
+function exportVarianceReport(){
+  const curKey=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
+  const curLabel=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  const nextDate=new Date(dashY,dashM+1,1);
+  const nextY=nextDate.getFullYear(),nextM=nextDate.getMonth();
+  const nextKey=`${nextY}-${String(nextM+1).padStart(2,'0')}`;
+  const nextLabel=nextDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
+
+  const curInvs=DB.invoices.filter(i=>mk(i.date)===curKey);
+  const fcData=buildForecast(1,nextKey,nextKey);
+  const nextItems=fcData.length?fcData[0].items:[];
+
+  // ── Sheet 1: Variance Summary ──────────────────────────────────────
+  const custMap={};
+  curInvs.forEach(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    const cid=inv.customerId||'_unknown';
+    if(!custMap[cid])custMap[cid]={name:c?.name||'Unknown',company:c?.company||'',current:0,forecast:0};
+    custMap[cid].current+=inv.total;
+  });
+  nextItems.forEach(item=>{
+    const c=DB.customers.find(x=>x.id===item.custId);
+    const cid=item.custId||'_unknown';
+    if(!custMap[cid])custMap[cid]={name:c?.name||item.custName||'Unknown',company:c?.company||'',current:0,forecast:0};
+    custMap[cid].forecast+=item.total;
+  });
+
+  const r2=v=>Math.round(v*100)/100;
+  const summaryRows=[['Customer','Company',curLabel+' — Actual (£)',nextLabel+' — Forecast (£)','Variance (£)','Variance (%)','Notes']];
+  let totCur=0,totFc=0;
+  Object.values(custMap).sort((a,b)=>b.current-a.current||b.forecast-a.forecast).forEach(row=>{
+    const var_=row.forecast-row.current;
+    const varPct=row.current?r2((var_/row.current)*100):'';
+    const notes=row.current===0?'New in forecast':row.forecast===0?'Not in next month forecast':'';
+    summaryRows.push([row.name,row.company,r2(row.current),r2(row.forecast),r2(var_),varPct,notes]);
+    totCur+=row.current;totFc+=row.forecast;
+  });
+  summaryRows.push(['','','','','','','']);
+  const totVar=totFc-totCur;
+  summaryRows.push(['TOTAL','',r2(totCur),r2(totFc),r2(totVar),totCur?r2((totVar/totCur)*100):'','']);
+
+  // ── Sheet 2: Current Month Invoice Detail ──────────────────────────
+  const curRows=[['Invoice Ref','Customer','Company','Date','Period Start','Period End','Service Type','Description','Qty','Unit Price (£)','Line Total (£)','VAT %','Subtotal (£)','VAT (£)','Total (£)','Recurring?']];
+  if(!curInvs.length){curRows.push(['No invoices for this month','','','','','','','','','','','','','','','']);}
+  else{curInvs.forEach(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    inv.lines.forEach((line,idx)=>{
+      const lt=r2(line.qty*line.price);
+      curRows.push([
+        inv.id,c?.name||'Unknown',c?.company||'',inv.date,
+        inv.periodStart||'',inv.periodEnd||'',inv.serviceType||'',
+        line.desc,line.qty,r2(line.price),lt,
+        idx===0?inv.vatRate:'',
+        idx===0?r2(inv.subtotal):'',
+        idx===0?r2(inv.vat):'',
+        idx===0?r2(inv.total):'',
+        inv.isRecurring?'Yes':'No'
+      ]);
+    });
+  });}
+
+  // ── Sheet 3: Next Month Forecast Detail ────────────────────────────
+  const fcRows=[['Schedule Name','Customer','Company','Service Type','Description','Qty','Unit Price (£)','Line Total (£)','VAT %','Subtotal (£)','VAT (£)','Monthly Total (£)']];
+  if(!nextItems.length){fcRows.push(['No active recurring schedules for next month','','','','','','','','','','','']);}
+  else{nextItems.forEach(item=>{
+    const s=DB.schedules.find(x=>x.id===item.schedId);
+    const c=DB.customers.find(x=>x.id===item.custId);
+    if(!s)return;
+    s.lines.forEach((line,idx)=>{
+      const lt=r2(line.qty*line.price);
+      fcRows.push([
+        s.name||c?.name||'',c?.name||item.custName||'Unknown',c?.company||'',s.serviceType||'',
+        line.desc,line.qty,r2(line.price),lt,
+        idx===0?s.vatRate:'',
+        idx===0?r2(item.sub):'',
+        idx===0?r2(item.vat):'',
+        idx===0?r2(item.total):''
+      ]);
+    });
+  });}
+
+  const sheetNameSafe=s=>s.replace(/[:\\/?*\[\]]/g,'').substring(0,31);
+  const sheets=[
+    {name:'Variance Summary',rows:summaryRows},
+    {name:sheetNameSafe(curLabel+' Actuals'),rows:curRows},
+    {name:sheetNameSafe(nextLabel+' Forecast'),rows:fcRows}
+  ];
+  dlXlsx(sheets,`variance_report_${curKey}_vs_${nextKey}.xlsx`);
+  showToast('Variance report downloaded!');
+}
+
+// ── Salespeople ───────────────────────────────────────────────────────
+let editSpId=null;
+function openSpModal(id){
+  editSpId=id||null;
+  document.getElementById('sp-modal-title').textContent=id?'Edit Salesperson':'Add Salesperson';
+  const sp=id?DB.salespeople.find(x=>x.id===id):null;
+  document.getElementById('sp-name').value=sp?.name||'';
+  openOverlay('sp-modal');
+}
+function saveSp(){
+  const name=document.getElementById('sp-name').value.trim();
+  if(!name){showToast('Name is required.');return;}
+  if(editSpId){
+    const sp=DB.salespeople.find(x=>x.id===editSpId);
+    if(sp)sp.name=name;
+  }else{
+    DB.salespeople.push({id:'sp'+Date.now(),name});
+  }
+  persist();closeOverlay('sp-modal');renderCommission();showToast(editSpId?'Salesperson updated.':'Salesperson added!');
+}
+function deleteSp(id){
+  const sp=DB.salespeople.find(x=>x.id===id);if(!sp)return;
+  const inUse=DB.commissions.some(c=>c.salespersonEntries.some(e=>e.spId===id));
+  confirm2('Delete salesperson?',inUse?'This salesperson has commission records. They will remain but the name may show as removed.':'This will remove the salesperson from the team.','Delete',()=>{
+    DB.salespeople=DB.salespeople.filter(s=>s.id!==id);
+    persist();renderCommission();showToast('Removed.');
+  });
+}
+function renderSpList(){
+  const el=document.getElementById('sp-list');
+  if(!DB.salespeople.length){
+    el.innerHTML='<div style="color:var(--ink3);font-size:13px;text-align:center;padding:8px 0">No salespeople added yet. Add your first team member above.</div>';
+    return;
+  }
+  el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:8px">${DB.salespeople.map(sp=>`<div style="display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px"><span style="font-weight:500;font-size:13px">${sp.name}</span><button class="btn btn-ghost btn-xs" onclick="openSpModal('${sp.id}')">Edit</button><button class="btn btn-danger btn-xs" onclick="deleteSp('${sp.id}')">Remove</button></div>`).join('')}</div>`;
+}
+
+// ── Commission modal helpers ───────────────────────────────────────────
+let editCommId=null;
+let _commSpRows=1; // current number of sp rows shown
+
+function toggleCommType(){
+  const linked=document.getElementById('comm-type-linked').checked;
+  document.getElementById('comm-linked-section').style.display=linked?'':'none';
+  if(linked) populateCommInvSel();
+}
+function populateCommInvSel(){
+  const sel=document.getElementById('comm-inv-sel');
+  const sorted=[...DB.invoices].sort((a,b)=>b.date.localeCompare(a.date));
+  sel.innerHTML='<option value="">— Select invoice —</option>'+sorted.map(inv=>{
+    const c=DB.customers.find(x=>x.id===inv.customerId);
+    const label=`${c?.name||'?'} — ${fmtD(inv.date)} — ${fmtGBP(inv.subtotal)} ex VAT`;
+    return`<option value="${inv.id}">${label}</option>`;
+  }).join('');
+}
+function onCommInvSelect(){
+  const id=document.getElementById('comm-inv-sel').value;
+  const inv=DB.invoices.find(x=>x.id===id);
+  if(!inv)return;
+  const c=DB.customers.find(x=>x.id===inv.customerId);
+  document.getElementById('comm-customer').value=c?.name||'';
+  document.getElementById('comm-inv-total').value=f2(inv.subtotal);
+  if(!document.getElementById('comm-desc').value){
+    document.getElementById('comm-desc').value=(c?.name||'')+(inv.serviceType?' — '+inv.serviceType:'');
+  }
+  if(!document.getElementById('comm-start').value){
+    document.getElementById('comm-start').value=inv.date;
+  }
+  recalcComm();
+}
+function buildCommSpRows(entries){
+  // entries = [{spId, pct}] or null for fresh
+  const container=document.getElementById('comm-sp-rows');
+  const addBtn=document.getElementById('comm-add-sp-btn');
+  const warn=document.getElementById('comm-sp-warning');
+  if(!DB.salespeople.length){
+    container.innerHTML='';
+    warn.style.display='';
+    addBtn.style.display='none';
+    return;
+  }
+  warn.style.display='none';
+  const opts=DB.salespeople.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('');
+  const count=entries?entries.length:1;
+  _commSpRows=count;
+  const rows=[];
+  for(let i=0;i<count;i++){
+    const e=entries?entries[i]:null;
+    rows.push(`<div class="fgrid" id="comm-sp-row-${i}" style="border:1px solid var(--border);border-radius:8px;padding:12px;background:var(--bg)">
+      <div class="fg"><label class="flbl">Salesperson ${count>1?i+1:''}</label>
+        <select class="fsel" id="comm-sp-sel-${i}" onchange="recalcComm()">
+          <option value="">— Select —</option>${opts}
+        </select>
+      </div>
+      <div class="fg"><label class="flbl">Commission % *</label>
+        <input type="number" class="finp" id="comm-sp-pct-${i}" min="0" max="100" step="0.01" placeholder="e.g. 10" value="${e?e.pct:''}" oninput="recalcComm()">
+      </div>
+      ${i>0?`<div class="fg" style="justify-content:flex-end;align-items:flex-end"><button class="btn btn-danger btn-sm" onclick="removeCommSpRow(${i})">Remove</button></div>`:''}
+    </div>`);
+    }
+  container.innerHTML=rows.join('');
+  if(entries){
+    entries.forEach((e,i)=>{
+      const sel=document.getElementById(`comm-sp-sel-${i}`);
+      if(sel)sel.value=e.spId||'';
+    });
+  }
+  addBtn.style.display=count<2?'':'none';
+  recalcComm();
+}
+function addCommSpRow(){
+  if(_commSpRows>=2)return;
+  const existing=[];
+  for(let i=0;i<_commSpRows;i++){
+    existing.push({spId:document.getElementById(`comm-sp-sel-${i}`)?.value||'',pct:parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0});
+  }
+  existing.push({spId:'',pct:0});
+  buildCommSpRows(existing);
+}
+function removeCommSpRow(idx){
+  const existing=[];
+  for(let i=0;i<_commSpRows;i++){
+    if(i===idx)continue;
+    existing.push({spId:document.getElementById(`comm-sp-sel-${i}`)?.value||'',pct:parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0});
+  }
+  buildCommSpRows(existing);
+}
+function recalcComm(){
+  const base=parseFloat(document.getElementById('comm-inv-total')?.value)||0;
+  document.getElementById('comm-preview-base').textContent=fmtGBP(base);
+  let totalComm=0;
+  for(let i=0;i<_commSpRows;i++){
+    const spId=document.getElementById(`comm-sp-sel-${i}`)?.value||'';
+    const pct=parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0;
+    const sp=DB.salespeople.find(x=>x.id===spId);
+    const amt=base*(pct/100);
+    totalComm+=amt;
+    const row=document.getElementById(`comm-preview-sp${i+1}-row`);
+    const lbl=document.getElementById(`comm-preview-sp${i+1}-lbl`);
+    const amtEl=document.getElementById(`comm-preview-sp${i+1}-amt`);
+    if(row&&lbl&&amtEl){
+      row.style.display=spId||pct?'':'none';
+      lbl.textContent=(sp?.name||`Salesperson ${i+1}`)+` (${pct}%)`;
+      amtEl.textContent=fmtGBP(amt);
+    }
+  }
+  // hide unused preview rows
+  for(let i=_commSpRows;i<2;i++){
+    const row=document.getElementById(`comm-preview-sp${i+1}-row`);
+    if(row)row.style.display='none';
+  }
+  document.getElementById('comm-preview-total').textContent=fmtGBP(totalComm);
+}
+
+function openCommModal(id){
+  editCommId=id||null;
+  const c=id?DB.commissions.find(x=>x.id===id):null;
+  document.getElementById('comm-modal-title').textContent=id?'Edit Commission':'Add Commission';
+  // Entry type
+  const linked=c?c.entryType==='linked':false;
+  document.getElementById('comm-type-linked').checked=linked;
+  document.getElementById('comm-type-standalone').checked=!linked;
+  document.getElementById('comm-linked-section').style.display=linked?'':'none';
+  if(linked){populateCommInvSel();document.getElementById('comm-inv-sel').value=c?.invoiceId||'';}
+  // Details
+  document.getElementById('comm-desc').value=c?.description||'';
+  document.getElementById('comm-customer').value=c?.customer||'';
+  document.getElementById('comm-inv-total').value=c?f2(c.invoiceTotalExVat):'';
+  document.getElementById('comm-type-sel').value=c?.commissionType||'recurring';
+  document.getElementById('comm-start').value=c?.startDate||today();
+  document.getElementById('comm-end').value=c?.endDate||'';
+  document.getElementById('comm-notes').value=c?.notes||'';
+  // Salespeople rows
+  buildCommSpRows(c?c.salespersonEntries.map(e=>({spId:e.spId,pct:e.pct})):null);
+  openOverlay('comm-modal');
+}
+
+function saveComm(){
+  const desc=document.getElementById('comm-desc').value.trim();
+  const customer=document.getElementById('comm-customer').value.trim();
+  const invTotal=parseFloat(document.getElementById('comm-inv-total').value)||0;
+  const startDate=document.getElementById('comm-start').value;
+  if(!desc){showToast('Please enter a description.');return;}
+  if(!startDate){showToast('Please set a start date.');return;}
+  if(!invTotal){showToast('Please enter the invoice total (ex VAT).');return;}
+  const entryType=document.getElementById('comm-type-linked').checked?'linked':'standalone';
+  const invoiceId=entryType==='linked'?document.getElementById('comm-inv-sel').value:'';
+  // Collect sp entries
+  const spEntries=[];
+  for(let i=0;i<_commSpRows;i++){
+    const spId=document.getElementById(`comm-sp-sel-${i}`)?.value||'';
+    const pct=parseFloat(document.getElementById(`comm-sp-pct-${i}`)?.value)||0;
+    if(!spId){showToast('Please select a salesperson for each row.');return;}
+    if(!pct){showToast('Please enter a commission % for each salesperson.');return;}
+    const sp=DB.salespeople.find(x=>x.id===spId);
+    spEntries.push({spId,spName:sp?.name||'',pct,amount:invTotal*(pct/100)});
+  }
+  if(!spEntries.length){showToast('Please add at least one salesperson.');return;}
+  const totalCommission=spEntries.reduce((s,e)=>s+e.amount,0);
+  const payload={
+    entryType,invoiceId,description:desc,customer,invoiceTotalExVat:invTotal,
+    salespersonEntries:spEntries,totalCommission,
+    startDate,endDate:document.getElementById('comm-end').value,
+    commissionType:document.getElementById('comm-type-sel').value,
+    notes:document.getElementById('comm-notes').value.trim(),
+    createdAt:new Date().toISOString()
+  };
+  if(editCommId){
+    const idx=DB.commissions.findIndex(x=>x.id===editCommId);
+    Object.assign(DB.commissions[idx],payload);
+  }else{
+    payload.id='comm'+Date.now();
+    DB.commissions.unshift(payload);
+  }
+  persist();closeOverlay('comm-modal');showToast(editCommId?'Commission updated!':'Commission saved!');renderCommission();
+}
+
+function deleteComm(id){
+  confirm2('Delete commission record?','This cannot be undone.','Delete',()=>{
+    DB.commissions=DB.commissions.filter(c=>c.id!==id);
+    persist();renderCommission();showToast('Deleted.');
+  });
+}
+
+// ── Expand recurring commissions into one row per month ───────────────
+function expandCommToMonths(c){
+  if(c.commissionType!=='recurring'||!c.endDate){
+    return[{...c,_monthLabel:null,_monthDate:c.startDate}];
+  }
+  const rows=[];
+  const start=new Date(c.startDate+'T00:00:00');
+  const end=new Date(c.endDate+'T00:00:00');
+  let yr=start.getFullYear(),mo=start.getMonth();
+  const endYr=end.getFullYear(),endMo=end.getMonth();
+  while(yr<endYr||(yr===endYr&&mo<=endMo)){
+    const d=new Date(yr,mo,1);
+    const monthDate=`${yr}-${String(mo+1).padStart(2,'0')}-01`;
+    const monthLabel=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    rows.push({...c,_monthLabel:monthLabel,_monthDate:monthDate});
+    mo++;if(mo>11){mo=0;yr++;}
+  }
+  return rows;
+}
+
+// ── Render commission view ─────────────────────────────────────────────
+function renderCommission(){
+  renderSpList();
+  // Update salesperson filter dropdown
+  const spFilter=document.getElementById('comm-sp-filter');
+  if(spFilter){
+    const cur=spFilter.value;
+    spFilter.innerHTML='<option value="">All salespeople</option>'+DB.salespeople.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('');
+    spFilter.value=cur;
+  }
+  const spId=document.getElementById('comm-sp-filter')?.value||'';
+  const fromDate=document.getElementById('comm-from')?.value||'';
+  const toDate=document.getElementById('comm-to')?.value||'';
+  // Filter by salesperson
+  let comms=[...DB.commissions];
+  if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
+  // Filter by date range using OVERLAP logic:
+  // Recurring: show if commission period overlaps with filter range
+  // One-off: show if startDate falls within filter range
+  if(fromDate||toDate){
+    comms=comms.filter(c=>{
+      if(c.commissionType==='recurring'){
+        const cEnd=c.endDate||'9999-12-31';
+        const rangeEnd=toDate||'9999-12-31';
+        const rangeStart=fromDate||'0000-01-01';
+        return c.startDate<=rangeEnd && cEnd>=rangeStart;
+      }else{
+        // one-off: startDate within range
+        if(fromDate&&c.startDate<fromDate)return false;
+        if(toDate&&c.startDate>toDate)return false;
+        return true;
+      }
+    });
+  }
+  const tb=document.getElementById('comm-tbody');
+  const em=document.getElementById('comm-empty');
+  const footer=document.getElementById('comm-footer');
+  if(!comms.length){
+    if(tb)tb.innerHTML='';
+    if(em)em.style.display='block';
+    if(footer)footer.style.display='none';
+    return;
+  }
+  if(em)em.style.display='none';
+  if(tb)tb.innerHTML=comms.map(r=>{
+    const spNames=r.salespersonEntries.map(e=>`<div style="font-size:12px">${e.spName}: ${e.pct}% → ${fmtGBP(e.amount)}</div>`).join('');
+    const spPcts=r.salespersonEntries.map(e=>e.pct+'%').join(' / ');
+    const typeBadge=r.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
+    const linkedBadge=r.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
+    // For recurring show period label, for one-off just show start date
+    const periodLabel=r.commissionType==='recurring'&&r.endDate
+      ?`<div style="font-size:11px;color:var(--ink3)">${fmtD(r.startDate)} – ${fmtD(r.endDate)}</div>`
+      :``;
+    return`<tr>
+      <td><div style="font-weight:500">${r.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${r.customer||'—'}</div></td>
+      <td>${spNames}</td>
+      <td class="r">${fmtGBP(r.invoiceTotalExVat)}</td>
+      <td class="r" style="font-family:var(--mono);font-size:12px">${spPcts}</td>
+      <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(r.totalCommission)}</td>
+      <td>${typeBadge}</td>
+      <td class="muted" style="font-size:12px"><div>${fmtD(r.startDate)}</div>${periodLabel}</td>
+      <td class="muted" style="font-size:12px">${r.endDate&&r.commissionType!=='recurring'?fmtD(r.endDate):'—'}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-xs" onclick="openCommModal('${r.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteComm('${r.id}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  // Footer totals — expand recurring to monthly rows then apply same date filter as export
+  let expForFooter=[];
+  comms.forEach(c=>expandCommToMonths(c).forEach(r=>expForFooter.push(r)));
+  if(fromDate)expForFooter=expForFooter.filter(r=>r._monthDate>=fromDate);
+  if(toDate)expForFooter=expForFooter.filter(r=>r._monthDate<=toDate);
+  const totalInv=comms.reduce((s,r)=>s+r.invoiceTotalExVat,0);
+  const totalComm=spId
+    ? expForFooter.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===spId)?.amount||0),0)
+    : expForFooter.reduce((s,r)=>s+r.totalCommission,0);
+  if(footer){
+    footer.style.display='flex';
+    footer.innerHTML=`<span>${comms.length} entr${comms.length!==1?'ies':'y'}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
+  }
+}
+
+// ── Commission Excel export ────────────────────────────────────────────
+function exportCommission(){
+  const spId=document.getElementById('comm-sp-filter')?.value||'';
+  const fromDate=document.getElementById('comm-from')?.value||'';
+  const toDate=document.getElementById('comm-to')?.value||'';
+  let comms=[...DB.commissions];
+  if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
+  // Expand recurring to monthly rows
+  let expRows=[];
+  comms.forEach(c=>expandCommToMonths(c).forEach(r=>expRows.push(r)));
+  if(fromDate)expRows=expRows.filter(r=>r._monthDate>=fromDate);
+  if(toDate)expRows=expRows.filter(r=>r._monthDate<=toDate);
+  if(!expRows.length){showToast('No commission records to export.');return;}
+  // Build rows — one row per salesperson per (expanded) entry, filtered to selected SP if set
+  const hdr=['Description','Customer','Invoice Total (ex VAT)','Salesperson','Commission %','Commission Amount','Type','Month','Start Date','End Date','Linked Invoice','Notes'];
+  const rows=[hdr];
+  expRows.forEach(c=>{
+    const entries=spId?c.salespersonEntries.filter(e=>e.spId===spId):c.salespersonEntries;
+    entries.forEach(e=>{
+      rows.push([
+        c.description||'',
+        c.customer||'',
+        c.invoiceTotalExVat,
+        e.spName,
+        e.pct,
+        e.amount,
+        c.commissionType==='recurring'?'Recurring (monthly)':'One-off',
+        c._monthLabel||'—',
+        c.startDate||'',
+        c.endDate||'',
+        c.entryType==='linked'&&c.invoiceId?c.invoiceId:'',
+        c.notes||''
+      ]);
+    });
+  });
+  // Summary by salesperson (filtered to selected SP if set)
+  const spTotals={};
+  expRows.forEach(c=>{
+    const entries=spId?c.salespersonEntries.filter(e=>e.spId===spId):c.salespersonEntries;
+    entries.forEach(e=>{
+      if(!spTotals[e.spName])spTotals[e.spName]={name:e.spName,invTotal:0,commTotal:0,count:0};
+      spTotals[e.spName].invTotal+=c.invoiceTotalExVat;
+      spTotals[e.spName].commTotal+=e.amount;
+      spTotals[e.spName].count++;
+    });
+  });
+  const sumHdr=['Salesperson','Commission Records','Invoice Total (ex VAT)','Total Commission'];
+  const sumRows=[sumHdr,...Object.values(spTotals).sort((a,b)=>b.commTotal-a.commTotal).map(s=>[s.name,s.count,s.invTotal,s.commTotal])];
+  const rangeLabel=(fromDate||'all')+'_to_'+(toDate||'all');
+  const spLabel=spId?(DB.salespeople.find(x=>x.id===spId)?.name||'unknown').replace(/\s+/g,'_'):'all';
+  dlXlsx([
+    {name:'Commission Detail',rows},
+    {name:'Summary by Salesperson',rows:sumRows}
+  ],`commission_${spLabel}_${rangeLabel}.xlsx`);
+  showToast('Commission exported!');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+(async()=>{
+  try{
+    const{data,error}=await _supa.from('app_state').select('data').eq('id',1).single();
+    if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];if(!DB.salespeople)DB.salespeople=[];if(!DB.commissions)DB.commissions=[];}
+  }catch(e){console.warn('Supabase load failed, starting empty.',e);}
+  document.getElementById('loading-overlay').style.display='none';
+  genRecurring();
+  renderDash();
+  fillCustDd('');
+  refreshFilters();
+  // Subscribe to realtime updates from other users
+  _supa.channel('app-sync')
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'app_state'},payload=>{
+      if(payload.new.last_session!==SESSION_ID){
+        DB=payload.new.data;
+        if(!DB.schedules)DB.schedules=[];
+        if(!DB.salespeople)DB.salespeople=[];
+        if(!DB.commissions)DB.commissions=[];
+        genRecurring();
+        renderDash();
+        fillCustDd('');
+        refreshFilters();
+        showToast('📡 Updated by another user');
+      }
+    })
+    .subscribe();
+})();
+</script>
+
+  <!-- Invoice Changes Export Modal -->
+  <div class="overlay" id="inv-chg-modal">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-hdr">
+        <div>
+          <div class="modal-title">Invoice Changes Export</div>
+          <div class="modal-sub">Compare invoices across two periods and export to Excel</div>
+        </div>
+        <button class="xbtn" onclick="closeOverlay('inv-chg-modal')">✕</button>
+      </div>
+      <div style="padding:20px 24px 24px">
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Date Ranges</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period A — From</div>
+            <input type="date" id="ica-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period A — To</div>
+            <input type="date" id="ica-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period B — From</div>
+            <input type="date" id="icb-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period B — To</div>
+            <input type="date" id="icb-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Filters</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px">Customer / Company</div>
+            <input type="text" id="ichg-cust-filter" placeholder="Search by name…" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px">Change Type</div>
+            <select id="ichg-type-filter" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1);background:#fff">
+              <option value="ALL">All changes</option>
+              <option value="NEW">New customers only</option>
+              <option value="REMOVED">Removed customers only</option>
+              <option value="UP">Revenue up only</option>
+              <option value="DOWN">Revenue down only</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:20px">
+          <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:6px">Minimum change amount (ex VAT £)</div>
+          <input type="number" id="ichg-min-chg" min="0" step="1" placeholder="0 — show all" style="width:180px;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+        </div>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">
+          Two sheets exported: <strong>Summary</strong> (one row per customer) and <strong>Detail</strong> (every changed line item with before/after values).
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="closeOverlay('inv-chg-modal')">Cancel</button>
+          <button class="btn btn-primary" onclick="exportInvoiceChanges()">↓ Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
