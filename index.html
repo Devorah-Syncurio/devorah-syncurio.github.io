@@ -1120,8 +1120,8 @@ function openInvModal(id,forceRecur,presetCustId){
   // Save button updated by toggleRecur; ensure correct for non-recurring case
   const _sb=document.getElementById('inv-modal-save-btn');if(_sb&&!(forceRecur||inv?.isRecurring))_sb.textContent='Save Invoice';
   if(sched){
-    document.getElementById('f-rs').value=sched.schedStart||'';
-    document.getElementById('f-re').value=sched.schedEnd||'';
+    document.getElementById('f-rs').value=sched.schedStart?sched.schedStart+'-01':'';
+    document.getElementById('f-re').value=sched.schedEnd?sched.schedEnd+'-01':'';
     document.getElementById('f-rd').value=sched.dayOfMonth||1;
     document.getElementById('f-rn').value=sched.name||'';
     document.getElementById('f-pm').value=sched.paymentMethod||'';
