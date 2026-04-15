@@ -1145,7 +1145,7 @@ function openSchedModal(sid){
   document.getElementById('f-notes').value=s.notes||'';
   document.getElementById('vat-sel').value=String(s.vatRate);
   recurOn=false;setRecur(true);
-  document.getElementById('f-rs').value=s.schedStart;
+  document.getElementById('f-rs').value=s.schedStart?s.schedStart+'-01':'';
   document.getElementById('f-re').value=s.schedEnd||'';
   document.getElementById('f-rd').value=s.dayOfMonth||1;
   document.getElementById('f-rn').value=s.name||'';
@@ -1716,53 +1716,111 @@ function renderDash(){
   }).join('');
 
   // Payment method breakdown (next month forecast by payment method)
+  // ── Payment method card: this month (actuals) + next month (forecast) ──
   const pmCard=document.getElementById('pay-method-list');
   const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
-  const pmData={};
-  PM_LABELS.forEach(pm=>{pmData[pm]={sub:0,total:0,count:0};});
-  pmData['Unspecified']={sub:0,total:0,count:0};
+  // Solid hex colours so they work inside SVG (CSS vars don't apply there)
+  const PM_HEX={'Direct Debit':'#2B5C3F','Standing Order':'#C9A227','Upon Invoice':'#F07830','Unspecified':'#9BA8B3'};
+  const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
+
+  // This month actuals — look up each recurring invoice's schedule paymentMethod
+  const thisPM={};
+  PM_LABELS.forEach(p=>{thisPM[p]={sub:0,total:0};});
+  thisPM['Unspecified']={sub:0,total:0};
+  invs.forEach(inv=>{
+    let pm='Unspecified';
+    if(inv.isRecurring&&inv.scheduleId){
+      const sc=DB.schedules.find(x=>x.id===inv.scheduleId);
+      if(sc&&PM_LABELS.includes(sc.paymentMethod))pm=sc.paymentMethod;
+    }
+    const sub=inv.sub||inv.total/(1+(inv.vatRate||20)/100);
+    thisPM[pm].sub+=sub;thisPM[pm].total+=inv.total;
+  });
+
+  // Next month forecast — from active schedules
+  const nextPM={};
+  PM_LABELS.forEach(p=>{nextPM[p]={sub:0,total:0};});
+  nextPM['Unspecified']={sub:0,total:0};
   DB.schedules.forEach(s=>{
     if(!s.active)return;
     if(nextKey<s.schedStart)return;
     if(s.schedEnd&&nextKey>s.schedEnd)return;
     const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
     const vat=sub*(s.vatRate/100);
-    const tot=sub+vat;
     const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
-    pmData[pm].sub+=sub;pmData[pm].total+=tot;pmData[pm].count++;
+    nextPM[pm].sub+=sub;nextPM[pm].total+=sub+vat;
   });
-  const pmEntries=Object.entries(pmData).filter(([,v])=>v.count>0);
-  const pmGrandSub=pmEntries.reduce((s,[,v])=>s+v.sub,0);
-  const pmGrandTotal=pmEntries.reduce((s,[,v])=>s+v.total,0);
-  setCardTotal('pay-method-list',fmtGBP(pmGrandSub),'inc. VAT '+fmtGBP(pmGrandTotal));
-  const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
-  const PM_COLORS={'Direct Debit':'var(--teal)','Standing Order':'var(--gold)','Upon Invoice':'var(--accent)','Unspecified':'var(--ink3)'};
+
+  const thisGrandSub=Object.values(thisPM).reduce((s,v)=>s+v.sub,0);
+  const thisGrandTotal=Object.values(thisPM).reduce((s,v)=>s+v.total,0);
+  const nextGrandSub=Object.values(nextPM).reduce((s,v)=>s+v.sub,0);
+  const nextGrandTotal=Object.values(nextPM).reduce((s,v)=>s+v.total,0);
+  setCardTotal('pay-method-list',fmtGBP(nextGrandSub),'inc. VAT '+fmtGBP(nextGrandTotal));
+
+  // SVG donut helper
+  function pmDonut(dataObj,grandTotal,label){
+    const r=42,cx=60,cy=60,sw=16,circ=2*Math.PI*r;
+    let offsetAngle=0;
+    const allPMs=[...PM_LABELS,'Unspecified'];
+    const segs=allPMs.map(pm=>{
+      const v=dataObj[pm]||{sub:0,total:0};
+      if(!v.sub)return'';
+      const pct=grandTotal?v.sub/grandTotal:0;
+      const dash=pct*circ;
+      const gap=circ-dash;
+      const seg=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offsetAngle).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt"/>`;
+      offsetAngle+=dash;
+      return seg;
+    }).join('');
+    const centerAmt=grandTotal?fmtShort(grandTotal):'—';
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
+      <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.5px;font-family:var(--mono)">${label}</div>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
+        ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
+        <text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="9" fill="#9BA8B3" font-family="monospace">ex. VAT</text>
+        <text x="${cx}" y="${cy+9}" text-anchor="middle" font-size="12" font-weight="bold" fill="#1C2B3A" font-family="monospace">${centerAmt}</text>
+      </svg>
+    </div>`;
+  }
+
+  const allPMKeys=[...PM_LABELS,'Unspecified'];
+  const legendRows=allPMKeys.filter(pm=>(thisPM[pm]?.sub||0)+(nextPM[pm]?.sub||0)>0).map(pm=>{
+    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <div style="width:10px;height:10px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
+      <div style="font-size:12px;font-weight:600;flex:1">${PM_ICONS[pm]} ${pm}</div>
+      <div style="text-align:right;min-width:90px">
+        <div style="font-size:11px;font-family:var(--mono);font-weight:600">${fmtGBP(thisPM[pm]?.sub||0)}</div>
+        <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(thisPM[pm]?.total||0)}</div>
+      </div>
+      <div style="text-align:right;min-width:90px">
+        <div style="font-size:11px;font-family:var(--mono);font-weight:600">${fmtGBP(nextPM[pm]?.sub||0)}</div>
+        <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(nextPM[pm]?.total||0)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
   if(pmCard){
-    if(!pmEntries.length){
-      pmCard.innerHTML='<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No recurring schedules active next month.</div>';
-    }else{
-      pmCard.innerHTML=pmEntries.map(([pm,v],idx)=>{
-        const pct=pmGrandTotal?Math.round(v.total/pmGrandTotal*100):0;
-        const border=idx<pmEntries.length-1?'border-bottom:1px solid var(--border)':'';
-        return`<div style="padding:10px 0;${border}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:16px">${PM_ICONS[pm]||'💳'}</span>
-              <span style="font-weight:600;font-size:13px;color:${PM_COLORS[pm]||'var(--ink)'}">${pm}</span>
-              <span style="font-size:11px;color:var(--ink3)">${v.count} schedule${v.count!==1?'s':''}</span>
-            </div>
-            <div style="text-align:right">
-              <div style="font-family:var(--mono);font-size:12px;font-weight:600">${fmtGBP(v.sub)} ex.</div>
-              <div style="font-family:var(--mono);font-size:10px;color:var(--ink3)">inc. ${fmtGBP(v.total)}</div>
-            </div>
-          </div>
-          <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${PM_COLORS[pm]||'var(--ink3)'};border-radius:4px;transition:width .3s"></div>
-          </div>
-          <div style="font-size:10px;color:var(--ink3);margin-top:3px;text-align:right;font-family:var(--mono)">${pct}% of next month forecast</div>
-        </div>`;
-      }).join('')+`<div style="display:flex;justify-content:space-between;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px"><span style="font-size:12px;font-weight:600">Total</span><div style="text-align:right"><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--teal)">${fmtGBP(pmGrandSub)} ex. VAT</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink3)">inc. VAT ${fmtGBP(pmGrandTotal)}</div></div></div>`;
-    }
+    pmCard.innerHTML=`
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:8px">
+        ${pmDonut(thisPM,thisGrandSub,'This month')}
+        ${pmDonut(nextPM,nextGrandSub,'Next month')}
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 0 5px;border-bottom:2px solid var(--border)">
+          <div style="width:10px;flex-shrink:0"></div>
+          <div style="font-size:10px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">Method</div>
+          <div style="min-width:90px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">This month</div>
+          <div style="min-width:90px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">Next month</div>
+        </div>
+        ${legendRows||'<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No payment method data yet.</div>'}
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 0 0;margin-top:2px">
+          <div style="width:10px;flex-shrink:0"></div>
+          <div style="font-size:12px;font-weight:700;flex:1">Total</div>
+          <div style="text-align:right;min-width:90px"><div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(thisGrandSub)}</div><div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div></div>
+          <div style="text-align:right;min-width:90px"><div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(nextGrandSub)}</div><div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(nextGrandTotal)}</div></div>
+        </div>
+      </div>`;
   }
 }
 
