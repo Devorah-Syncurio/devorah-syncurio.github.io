@@ -118,7 +118,7 @@ tbody tr:hover{background:var(--bg)}
 .bar-fill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;transition:width 0.4s}
 .bar-fill span{font-size:10px;font-family:var(--mono);color:#fff;white-space:nowrap}
 .bar-val{font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:600;min-width:68px;text-align:right}
-.mbars{display:flex;align-items:flex-end;gap:4px;height:130px;margin-top:8px}
+.mbars{display:flex;align-items:flex-end;gap:4px;height:120px;margin-top:8px}
 .mbar-wrap{flex:1;display:flex;flex-direction:column;align-items:center}
 .mbar{width:100%;border-radius:3px 3px 0 0;min-height:2px;transition:height 0.3s}
 .mbar.past{background:var(--accent)}
@@ -1655,12 +1655,7 @@ function renderDash(){
   // Add next month forecast bar
   bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
   const maxT=Math.max(...bars.map(b=>b.t),1);
-  document.getElementById('trend-bars').innerHTML=bars.map(b=>{
-    const h=Math.max(b.t/maxT*110,2);
-    const col=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)';
-    const lbl=b.t>0?fmtShort(b.t):'';
-    return`<div class="mbar-wrap"><div style="font-size:9px;font-family:var(--mono);color:${col};font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;line-height:1.2;margin-bottom:2px">${lbl}</div><div class="mbar ${b.type}" style="height:${h}px" title="${fmtShort(b.t)}"></div></div>`;
-  }).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtShort(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${fmtShort(b.t)}"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}</div>`).join('');
 
   // (#7) Revenue by company (not customer)
@@ -1844,12 +1839,12 @@ function renderDash(){
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2)">
             <div style="width:12px;flex-shrink:0"></div>
             <div style="font-size:12px;font-weight:700;flex:1;color:var(--ink)">Total</div>
-            <div style="text-align:right;min-width:110px;cursor:pointer" title="Click to see all invoices this month" onclick="showPMBreakdown('ALL','this')">
+            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','this')" title="View all this month">
               <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtGBP(thisGrandSub)}</div>
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div>
               <div style="font-size:9px;color:var(--accent);font-family:var(--mono);margin-top:1px">View all â†—</div>
             </div>
-            <div style="text-align:right;min-width:110px;cursor:pointer" title="Click to see all next month forecast" onclick="showPMBreakdown('ALL','next')">
+            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','next')" title="View all next month">
               <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(nextGrandSub)}</div>
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(nextGrandTotal)}</div>
               <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">View all â†—</div>
@@ -1977,7 +1972,7 @@ function updateExpPreview(){
   const mode=document.getElementById('exp-lines').value;
   const rows=mode==='detail'?invs.reduce((s,i)=>s+i.lines.length,0):invs.length;
   const grp=document.getElementById('exp-grp').value;
-  const grpNote=grp==='all-cust'?'all customers on one sheet':grp==='per-cust'?'one sheet per customer + summary':grp==='month'?'grouped by month':grp==='matrix'?'month Ã— customer cross-tab matrix':'flat list';
+  const grpNote=grp==='all-cust'?'all customers on one sheet':grp==='per-cust'?'one sheet per customer + summary':grp==='month'?'grouped by month':'flat list';
   el.innerHTML=`<strong>${invs.length}</strong> invoice${invs.length!==1?'s':''} Â· <strong>${custs.length}</strong> customer${custs.length!==1?'s':''} Â· <strong>${fmtGBP(total)}</strong> total<br><span style="color:var(--ink3)">${rows} rows Â· ${grpNote}</span>`;
 }
 function buildInvRows(invList,mode){
@@ -2022,41 +2017,38 @@ function doExport(){
     Object.entries(byCust).forEach(([cid,cinvs])=>{const c=DB.customers.find(x=>x.id===cid);const name=(c?.name||'?').replace(/[\\\/\?\*\[\]:]/g,'').slice(0,28)||'Customer';sheets.push({name,rows:buildInvRows(cinvs,mode)});});
     const sumRows=DB.customers.map(c=>{const ci=invs.filter(i=>i.customerId===c.id);if(!ci.length)return null;return[c.name,c.company||'',ci.length,f2(ci.reduce((s,i)=>s+i.subtotal,0)),f2(ci.reduce((s,i)=>s+i.vat,0)),f2(ci.reduce((s,i)=>s+i.total,0))];}).filter(Boolean);
     sheets.push({name:'Summary',rows:[['Customer','Company','Invoice Count','Subtotal ex VAT','VAT','Total inc VAT'],...sumRows]});
-  }else if(grp==='matrix'){
-    // Month Ã— Customer cross-tab matrix
-    const byM={};const custIds=new Set();
-    invs.forEach(inv=>{
-      const m=mk(inv.date);
-      if(!byM[m])byM[m]={};
-      if(!byM[m][inv.customerId])byM[m][inv.customerId]={sub:0,total:0};
-      const sub=inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100));
-      byM[m][inv.customerId].sub+=sub;
-      byM[m][inv.customerId].total+=inv.total;
-      custIds.add(inv.customerId);
-    });
-    const custArr=[...custIds].sort((a,b)=>{const ca=DB.customers.find(x=>x.id===a);const cb=DB.customers.find(x=>x.id===b);return(ca?.name||'').localeCompare(cb?.name||'');});
-    const months=Object.keys(byM).sort();
-    const hdr=['Month'];
-    custArr.forEach(cid=>{const c=DB.customers.find(x=>x.id===cid);const n=(c?.name||'Unknown')+(c?.company?' ('+c.company+')':'');hdr.push(n+' â€” Ex VAT',n+' â€” Inc VAT');});
-    hdr.push('Month Total Ex VAT','Month Total Inc VAT');
-    const matRows=[hdr];
-    const grandSubArr=custArr.map(()=>0);const grandTotalArr=custArr.map(()=>0);
-    let grandSub=0,grandTotal=0;
-    months.forEach(m=>{
-      const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
-      const row=[lbl];let mSub=0,mTotal=0;
-      custArr.forEach((cid,i)=>{const v=byM[m][cid]||{sub:0,total:0};row.push(f2(v.sub),f2(v.total));grandSubArr[i]+=v.sub;grandTotalArr[i]+=v.total;mSub+=v.sub;mTotal+=v.total;});
-      row.push(f2(mSub),f2(mTotal));grandSub+=mSub;grandTotal+=mTotal;
-      matRows.push(row);
-    });
-    const totalRow=['GRAND TOTAL'];
-    custArr.forEach((_,i)=>totalRow.push(f2(grandSubArr[i]),f2(grandTotalArr[i])));
-    totalRow.push(f2(grandSub),f2(grandTotal));
-    matRows.push(totalRow);
-    sheets.push({name:'Month Ã— Customer',rows:matRows});
-  }else{
+  }else if(grp==='month'){
     const byM={};invs.forEach(inv=>{const m=mk(inv.date);if(!byM[m])byM[m]=[];byM[m].push(inv);});
     Object.entries(byM).sort().forEach(([m,mi])=>{const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}).replace(' ','_');sheets.push({name:lbl,rows:buildInvRows(mi,mode)});});
+  }else{
+    // Month Ã— Customer matrix
+    const months=[...new Set(invs.map(i=>mk(i.date)))].sort();
+    const custs=[...new Set(invs.map(i=>i.customerId))].map(id=>DB.customers.find(x=>x.id===id)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+    const hdr=['Month',...custs.flatMap(c=>[c.name+' Ex VAT',c.name+' Inc VAT']),'Total Ex VAT','Total Inc VAT'];
+    const matRows=[hdr];
+    let mxGrandSub=0,mxGrandTotal=0;
+    const custGrandSub=Object.fromEntries(custs.map(c=>[c.id,0]));
+    const custGrandTotal=Object.fromEntries(custs.map(c=>[c.id,0]));
+    months.forEach(m=>{
+      const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+      const mInvs=invs.filter(i=>mk(i.date)===m);
+      let rowSub=0,rowTotal=0;
+      const row=[lbl];
+      custs.forEach(c=>{
+        const ci=mInvs.filter(i=>i.customerId===c.id);
+        const sub=ci.reduce((s,i)=>s+i.subtotal,0);
+        const tot=ci.reduce((s,i)=>s+i.total,0);
+        row.push(f2(sub),f2(tot));
+        rowSub+=sub;rowTotal+=tot;
+        custGrandSub[c.id]+=sub;custGrandTotal[c.id]+=tot;
+      });
+      row.push(f2(rowSub),f2(rowTotal));
+      mxGrandSub+=rowSub;mxGrandTotal+=rowTotal;
+      matRows.push(row);
+    });
+    const grandRow=['TOTAL',...custs.flatMap(c=>[f2(custGrandSub[c.id]),f2(custGrandTotal[c.id])]),f2(mxGrandSub),f2(mxGrandTotal)];
+    matRows.push(grandRow);
+    sheets.push({name:'Month Ã— Customer',rows:matRows});
   }
   dlXlsx(sheets,`invoices_${from}_to_${to}.xlsx`);closeOverlay('exp-modal');showToast('Excel downloaded!');
 }
@@ -2792,34 +2784,82 @@ function exportCommission(){
 window._pmBreakdownContext={pm:null,which:null};
 
 function showPMBreakdown(pm,which){
+  // Handle grand total 'ALL' â€” gather all methods
+  if(pm==='ALL'){
+    window._pmBreakdownContext={pm,which};
+    const d=window._pmData;
+    if(!d)return;
+    const whichLabel=which==='this'?'This month':'Next month';
+    document.getElementById('pm-breakdown-title').textContent='í ½í³Š All Methods â€” '+whichLabel;
+    const allPMKeys=[...window._pmData.thisPM?Object.keys(window._pmData.thisPM):[],'Unspecified'].filter((v,i,a)=>a.indexOf(v)===i);
+    let rows='',totalSub=0,totalVAT=0;
+    if(which==='this'){
+      const allInvs=allPMKeys.flatMap(p=>(d.thisPM[p]?.invoices||[]).map(inv=>({...inv,_pm:p})));
+      document.getElementById('pm-breakdown-sub').textContent=allInvs.length+' invoice'+(allInvs.length!==1?'s':'');
+      if(!allInvs.length){rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No invoices this month.</div>';}
+      else{
+        rows=`<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg)">`
+          +['Customer','Method','Date','Ex VAT','Inc VAT'].map(h=>`<th style="padding:8px 12px;text-align:${h==='Ex VAT'||h==='Inc VAT'?'right':'left'};font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">${h}</th>`).join('')
+          +'</tr></thead><tbody>';
+        allInvs.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(inv=>{
+          const c=DB.customers.find(x=>x.id===inv.customerId);
+          const sub=inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100));
+          totalSub+=sub;totalVAT+=inv.total;
+          rows+=`<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">`
+            +`<td style="padding:8px 12px;font-size:13px;font-weight:600">${c?.name||'Unknown'}</td>`
+            +`<td style="padding:8px 12px;font-size:12px;color:var(--ink2)">${inv._pm}</td>`
+            +`<td style="padding:8px 12px;font-size:12px;font-family:var(--mono)">${inv.date||'â€”'}</td>`
+            +`<td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);font-weight:600">${fmtGBP(sub)}</td>`
+            +`<td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--ink3)">${fmtGBP(inv.total)}</td></tr>`;
+        });
+        rows+='</tbody></table>';
+      }
+    } else {
+      const allScheds=allPMKeys.flatMap(p=>(d.nextPM[p]?.schedules||[]).map(s=>({...s,_pm:p})));
+      document.getElementById('pm-breakdown-sub').textContent=allScheds.length+' schedule'+(allScheds.length!==1?'s':'');
+      if(!allScheds.length){rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No forecast schedules next month.</div>';}
+      else{
+        rows=`<table style="width:100%;border-collapse:collapse"><thead><tr style="background:var(--bg)">`
+          +['Customer','Method','Schedule','Ex VAT','Inc VAT (est.)'].map(h=>`<th style="padding:8px 12px;text-align:${h==='Ex VAT'||h==='Inc VAT (est.)'?'right':'left'};font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">${h}</th>`).join('')
+          +'</tr></thead><tbody>';
+        allScheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
+          const c=DB.customers.find(x=>x.id===s.customerId);
+          const sub=s.amount||0;const total=sub*(1+(s.vatRate||20)/100);
+          totalSub+=sub;totalVAT+=total;
+          rows+=`<tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">`
+            +`<td style="padding:8px 12px;font-size:13px;font-weight:600">${c?.name||s.custName||'Unknown'}</td>`
+            +`<td style="padding:8px 12px;font-size:12px;color:var(--ink2)">${s._pm}</td>`
+            +`<td style="padding:8px 12px;font-size:12px;color:var(--ink2)">${s.description||'â€”'}</td>`
+            +`<td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);font-weight:600">${fmtGBP(sub)}</td>`
+            +`<td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--ink3)">${fmtGBP(total)}</td></tr>`;
+        });
+        rows+='</tbody></table>';
+      }
+    }
+    const footer=`<div style="display:flex;justify-content:flex-end;gap:24px;padding:12px 16px;background:var(--bg);border-top:2px solid var(--border);border-radius:0 0 12px 12px;font-family:var(--mono)"><span style="font-size:12px;color:var(--ink3)">Total ex. VAT <strong style="color:var(--ink)">${fmtGBP(totalSub)}</strong></span><span style="font-size:12px;color:var(--ink3)">Total inc. VAT <strong style="color:var(--ink)">${fmtGBP(totalVAT)}</strong></span></div>`;
+    document.getElementById('pm-breakdown-body').innerHTML=rows+footer;
+    showOverlay('pm-breakdown-modal');
+    return;
+  }
   window._pmBreakdownContext={pm,which};
   const d=window._pmData;
   if(!d)return;
-  const PM_LABELS_ALL=['Direct Debit','Standing Order','Upon Invoice','Unspecified'];
-  const icon={'Direct Debit':'ðŸ¦','Standing Order':'ðŸ“…','Upon Invoice':'ðŸ“„','Unspecified':'â“','ALL':'ðŸ“Š'}[pm]||'';
+  const icon={'Direct Debit':'í ¼í¿¦','Standing Order':'í ½í³…','Upon Invoice':'í ½í³„','Unspecified':'â“'}[pm]||'';
   const whichLabel=which==='this'?'This month':'Next month';
-  const pmLabel=pm==='ALL'?'All methods':pm;
-  document.getElementById('pm-breakdown-title').textContent=icon+' '+pmLabel+' â€” '+whichLabel;
+  document.getElementById('pm-breakdown-title').textContent=icon+' '+pm+' â€” '+whichLabel;
 
   let rows='',totalSub=0,totalVAT=0;
 
   if(which==='this'){
-    // Gather invoices: ALL = every invoice, otherwise filter by method
-    let invs;
-    if(pm==='ALL'){
-      invs=Object.values(d.thisPM).flatMap(v=>v.invoices||[]);
-    }else{
-      invs=(d.thisPM[pm]?.invoices)||[];
-    }
+    const invs=(d.thisPM[pm]?.invoices)||[];
     document.getElementById('pm-breakdown-sub').textContent=invs.length+' invoice'+(invs.length!==1?'s':'');
     if(!invs.length){
-      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No invoices for this month.</div>';
+      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No invoices for this payment method this month.</div>';
     } else {
       rows=`<table style="width:100%;border-collapse:collapse">
         <thead><tr style="background:var(--bg)">
           <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Customer</th>
           <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Date</th>
-          ${pm==='ALL'?'<th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Method</th>':''}
           <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Ex VAT</th>
           <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Inc VAT</th>
         </tr></thead><tbody>`;
@@ -2827,12 +2867,9 @@ function showPMBreakdown(pm,which){
         const c=DB.customers.find(x=>x.id===inv.customerId);
         const sub=inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100));
         totalSub+=sub; totalVAT+=inv.total;
-        let invMethod='Unspecified';
-        if(pm==='ALL'){const sc=DB.schedules.find(s=>s.id===inv.scheduleId);if(sc&&['Direct Debit','Standing Order','Upon Invoice'].includes(sc.paymentMethod))invMethod=sc.paymentMethod;}
         rows+=`<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
           <td style="padding:8px 12px;font-size:13px;font-weight:600">${c?.name||'Unknown'}<br><span style="font-size:11px;color:var(--ink3)">${c?.company||''}</span></td>
           <td style="padding:8px 12px;font-size:12px;color:var(--ink2);font-family:var(--mono)">${inv.date||'â€”'}</td>
-          ${pm==='ALL'?`<td style="padding:8px 12px;font-size:11px;color:var(--ink3)">${invMethod}</td>`:''}
           <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);font-weight:600">${fmtGBP(sub)}</td>
           <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--ink3)">${fmtGBP(inv.total)}</td>
         </tr>`;
@@ -2840,16 +2877,10 @@ function showPMBreakdown(pm,which){
       rows+='</tbody></table>';
     }
   } else {
-    // Next month: gather schedules
-    let scheds;
-    if(pm==='ALL'){
-      scheds=Object.values(d.nextPM).flatMap(v=>v.schedules||[]);
-    }else{
-      scheds=(d.nextPM[pm]?.schedules)||[];
-    }
+    const scheds=(d.nextPM[pm]?.schedules)||[];
     document.getElementById('pm-breakdown-sub').textContent=scheds.length+' schedule'+(scheds.length!==1?'s':'');
     if(!scheds.length){
-      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No forecast schedules for next month.</div>';
+      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No forecast schedules for this payment method next month.</div>';
     } else {
       rows=`<table style="width:100%;border-collapse:collapse">
         <thead><tr style="background:var(--bg)">
@@ -2886,53 +2917,33 @@ function exportPMBreakdown(){
   if(!d||!pm)return;
   const r2=v=>Math.round(v*100)/100;
   const whichLabel=which==='this'?'This Month':'Next Month';
-  const pmLabel=pm==='ALL'?'All Methods':pm;
-  const rows=[[pmLabel+' â€” '+whichLabel,'','','']];
+  const rows=[[pm+' â€” '+whichLabel,'','','']];
   if(which==='this'){
-    const isAll=pm==='ALL';
-    const hdr=['Customer','Company','Date'];
-    if(isAll)hdr.push('Payment Method');
-    hdr.push('Ex VAT','Inc VAT');
-    rows.push(hdr);
-    let invs;
-    if(isAll){invs=Object.values(d.thisPM).flatMap(v=>v.invoices||[]);}else{invs=(d.thisPM[pm]?.invoices)||[];}
+    rows.push(['Customer','Company','Date','Ex VAT','Inc VAT']);
+    const invs=(d.thisPM[pm]?.invoices)||[];
     let totSub=0,totTotal=0;
     invs.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(inv=>{
       const c=DB.customers.find(x=>x.id===inv.customerId);
       const sub=r2(inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100)));
       totSub+=sub; totTotal+=r2(inv.total);
-      const row=[c?.name||'Unknown',c?.company||'',inv.date||''];
-      if(isAll){const sc=DB.schedules.find(s=>s.id===inv.scheduleId);row.push(sc?.paymentMethod||'Unspecified');}
-      row.push(sub,r2(inv.total));
-      rows.push(row);
+      rows.push([c?.name||'Unknown',c?.company||'',inv.date||'',sub,r2(inv.total)]);
     });
-    const totRow=['','',''];if(isAll)totRow.push('');totRow.push('Total',r2(totSub),r2(totTotal));
-    rows.push(totRow);
+    rows.push(['','','Total',r2(totSub),r2(totTotal)]);
   } else {
-    const isAll=pm==='ALL';
-    const hdr=['Customer','Company','Description','Period'];
-    if(isAll)hdr.push('Payment Method');
-    hdr.push('Ex VAT','Inc VAT (est.)');
-    rows.push(hdr);
-    let scheds;
-    if(isAll){scheds=Object.values(d.nextPM).flatMap(v=>v.schedules||[]);}else{scheds=(d.nextPM[pm]?.schedules)||[];}
+    rows.push(['Customer','Company','Description','Period','Ex VAT','Inc VAT (est.)']);
+    const scheds=(d.nextPM[pm]?.schedules)||[];
     let totSub=0,totTotal=0;
     scheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
       const c=DB.customers.find(x=>x.id===s.customerId);
       const sub=r2(s.amount||0);
       const total=r2(sub*(1+(s.vatRate||20)/100));
       totSub+=sub; totTotal+=total;
-      const row=[c?.name||s.custName||'Unknown',c?.company||'',s.description||'',(s.schedStart||'')+' â€“ '+(s.schedEnd||'ongoing')];
-      if(isAll){const sc=DB.schedules.find(x=>x.id===s.schedId);row.push(sc?.paymentMethod||'Unspecified');}
-      row.push(sub,total);
-      rows.push(row);
+      rows.push([c?.name||s.custName||'Unknown',c?.company||'',s.description||'',(s.schedStart||'')+' â€“ '+(s.schedEnd||'ongoing'),sub,total]);
     });
-    const totRow=['','','',''];if(isAll)totRow.push('');totRow.push('Total',r2(totSub),r2(totTotal));
-    rows.push(totRow);
+    rows.push(['','','','Total',r2(totSub),r2(totTotal)]);
   }
   const sheetName=(pm==='ALL'?'All Methods':pm).slice(0,31);
-  dlXlsx([{name:sheetName,rows}],`payment-method-${pmLabel.replace(/\s+/g,'-').toLowerCase()}-${whichLabel.toLowerCase().replace(/\s+/g,'-')}.xlsx`);
-  showToast('Exported!');
+  dlXlsx([{name:sheetName,rows}],`payment-method-${(pm==='ALL'?'all':pm.replace(/\s+/g,'-').toLowerCase())}-${whichLabel.toLowerCase().replace(/\s+/g,'-')}.xlsx`);
 }
 
 </script>
