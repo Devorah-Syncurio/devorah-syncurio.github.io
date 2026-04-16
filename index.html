@@ -296,6 +296,17 @@ tbody tr:hover{background:var(--bg)}
                   <label style="font-size:12px;color:var(--ink3);white-space:nowrap">From</label>
                   <select class="fltsel" id="trend-from" onchange="renderDash()" style="font-size:12px;padding:3px 8px"></select>
                 </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Show</label>
+                  <select class="fltsel" id="trend-count" onchange="renderDash()" style="font-size:12px;padding:3px 8px">
+                    <option value="3">3 months</option>
+                    <option value="6" selected>6 months</option>
+                    <option value="9">9 months</option>
+                    <option value="12">12 months</option>
+                    <option value="18">18 months</option>
+                    <option value="24">24 months</option>
+                  </select>
+                </div>
                 <div class="trend-legend">
                   <span><i style="background:var(--accent)"></i> Actual</span>
                   <span><i style="background:var(--gold)"></i> Current</span>
@@ -306,6 +317,7 @@ tbody tr:hover{background:var(--bg)}
             <div class="card-body">
               <div class="mbars" id="trend-bars"></div>
               <div style="display:flex;gap:4px;margin-top:6px" id="trend-labels"></div>
+              <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
             </div>
           </div>
         </div>
@@ -323,7 +335,7 @@ tbody tr:hover{background:var(--bg)}
       <!-- Payment method card — below monthly trend and other tabs -->
       <div class="card" style="margin-top:20px" id="pay-method-face-card">
         <div class="card-hdr" style="background:var(--bg)">
-          <span class="card-title">Payment methods — this &amp; next month</span>
+          <span class="card-title">Payment methods — actuals &amp; projected</span>
           <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a method to see breakdown</span>
         </div>
         <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
@@ -1654,7 +1666,8 @@ function renderDash(){
   document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
-  // (#4) Monthly trend: configurable start month → current + next forecast
+  // (#4) Monthly trend: configurable start+count, future months = recurring forecast
+  let trendFutureKeys=[];
   {
     // Populate "From" selector
     const fromEl=document.getElementById('trend-from');
@@ -1676,22 +1689,27 @@ function renderDash(){
       }
     }
     const trendStart=fromEl?.value||key;
-    // Build bars from trendStart through current month, then forecast
+    const trendN=parseInt(document.getElementById('trend-count')?.value)||6;
+    // Build exactly trendN bars; past/current = actuals, future = recurring forecast
     window._trendBars=window._trendBars||[];
     const bars=[];
     let td=new Date(trendStart+'-01');
-    const curEnd=new Date(dashY,dashM,1);
-    while(td<=curEnd){
+    for(let i=0;i<trendN;i++){
       const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
-      const t=DB.invoices.filter(x=>mk(x.date)===k).reduce((s,x)=>s+x.total,0);
-      bars.push({k,t,type:k===key?'current':'past',lbl:td.toLocaleString('en-GB',{month:'short'})});
+      const isFuture=k>key;
+      if(isFuture){trendFutureKeys.push(k);}
+      const t=isFuture
+        ?(()=>{const fc=buildForecast(0,k,k);return fc.length?fc[0].recurTotal:0;})()
+        :DB.invoices.filter(x=>mk(x.date)===k).reduce((s,x)=>s+x.total,0);
+      bars.push({k,t,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),isFuture});
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
     }
-    // Add next month forecast bar
-    bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
   const maxT=Math.max(...bars.map(b=>b.t),1);
-  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${fmtGBP(b.t)}"></div></div>`).join('');
-  document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}</div>`).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${b.isFuture?'Projected: ':''}${fmtGBP(b.t)}"></div></div>`).join('');
+  document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
+  const projN=trendFutureKeys.length;
+  const noteEl=document.getElementById('trend-proj-note');
+  if(noteEl)noteEl.textContent=projN>0?`* Projected ${projN} month${projN!==1?'s':''} from recurring schedules`:'';
   } // end trend block
 
   // (#7) Revenue by company (not customer)
@@ -1782,24 +1800,30 @@ function renderDash(){
     thisPM[pm].invoices.push(inv);
   });
 
-  // Build next-month forecast by payment method
+  // Build projected forecast by payment method (all future months in trend window)
   const nextDate2=new Date(dashY,dashM+1,1);
   const nextY2=nextDate2.getFullYear(),nextM2=nextDate2.getMonth();
   const nextKey2=`${nextY2}-${String(nextM2+1).padStart(2,'0')}`;
   const nextPM={};
   PM_LABELS.forEach(p=>{nextPM[p]={sub:0,total:0,schedules:[]};});
   nextPM['Unspecified']={sub:0,total:0,schedules:[]};
-  DB.schedules.filter(s=>s.active!==false).forEach(s=>{
-    const start=s.schedStart,end=s.schedEnd||'9999-12';
-    if(start<=nextKey2&&nextKey2<=end){
-      const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
-      const sub=(s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
-      const total=sub*(1+(s.vatRate||20)/100);
-      if(!nextPM[pm])nextPM[pm]={sub:0,total:0,schedules:[]};
-      nextPM[pm].sub+=sub;
-      nextPM[pm].total+=total;
-      nextPM[pm].schedules.push(s);
-    }
+  // Use all future months from the trend window (populated above), else fall back to next month
+  const projKeys=trendFutureKeys.length?trendFutureKeys:[nextKey2];
+  const projMonthCount=projKeys.length;
+  projKeys.forEach(projKey=>{
+    DB.schedules.filter(s=>s.active!==false).forEach(s=>{
+      const start=s.schedStart,end=s.schedEnd||'9999-12';
+      if(start<=projKey&&projKey<=end){
+        const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
+        const sub=(s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
+        const total=sub*(1+(s.vatRate||20)/100);
+        if(!nextPM[pm])nextPM[pm]={sub:0,total:0,schedules:[]};
+        nextPM[pm].sub+=sub;
+        nextPM[pm].total+=total;
+        // avoid duplicating schedule entries (same schedule appears in multiple months)
+        if(!nextPM[pm].schedules.find(x=>x.id===s.id))nextPM[pm].schedules.push(s);
+      }
+    });
   });
 
   const thisGrandSub=Object.values(thisPM).reduce((s,v)=>s+v.sub,0);
@@ -1835,6 +1859,7 @@ function renderDash(){
         <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
       <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. VAT ${fmtGBP(Object.values(dataObj).reduce((s,v)=>s+v.total,0))}</div>
+      ${which==='next'?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:2px">* Projected from recurring</div>`:''}
     </div>`;
   }
 
@@ -1851,7 +1876,7 @@ function renderDash(){
       <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('${pm}','next')">
         <div style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--ink)">${fmtGBP(nextPM[pm]?.sub||0)}</div>
         <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(nextPM[pm]?.total||0)}</div>
-        <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">Next month ↗</div>
+        <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">${projMonthCount===1?'Next month':'Projected'} ↗</div>
       </div>
     </div>`;
   }).join('');
@@ -1862,14 +1887,14 @@ function renderDash(){
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
         <div style="display:flex;gap:24px;align-items:center;justify-content:center;flex-shrink:0">
           ${pmDonut(thisPM,thisGrandSub,'This month','this')}
-          ${pmDonut(nextPM,nextGrandSub,'Next month','next')}
+          ${pmDonut(nextPM,nextGrandSub,projMonthCount===1?'Next month':`Projected (${projMonthCount}m)`,'next')}
         </div>
         <div style="flex:1;min-width:260px">
           <div style="display:flex;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid var(--border)">
             <div style="width:12px;flex-shrink:0"></div>
             <div style="font-size:10px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">Method</div>
             <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">This month</div>
-            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">Next month</div>
+            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--teal);font-family:var(--mono)">${projMonthCount===1?'Next month':`Projected (${projMonthCount}m)`}</div>
           </div>
           ${legendRows||'<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No payment method data yet.</div>'}
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2)">
@@ -1880,7 +1905,7 @@ function renderDash(){
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div>
               <div style="font-size:9px;color:var(--accent);font-family:var(--mono);margin-top:1px">View all ↗</div>
             </div>
-            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','next')" title="View all next month">
+            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','next')" title="${projMonthCount===1?'View all next month':'View all projected months'}">
               <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(nextGrandSub)}</div>
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(nextGrandTotal)}</div>
               <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">View all ↗</div>
