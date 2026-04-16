@@ -291,10 +291,16 @@ tbody tr:hover{background:var(--bg)}
           <!-- Monthly trend with 6 past + forecast -->
           <div class="card" style="flex:1">
             <div class="card-hdr"><span class="card-title">Monthly trend</span>
-              <div class="trend-legend">
-                <span><i style="background:var(--accent)"></i> Actual</span>
-                <span><i style="background:var(--gold)"></i> Current</span>
-                <span><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">From</label>
+                  <select class="fltsel" id="trend-from" onchange="renderDash()" style="font-size:12px;padding:3px 8px"></select>
+                </div>
+                <div class="trend-legend">
+                  <span><i style="background:var(--accent)"></i> Actual</span>
+                  <span><i style="background:var(--gold)"></i> Current</span>
+                  <span><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
+                </div>
               </div>
             </div>
             <div class="card-body">
@@ -326,8 +332,8 @@ tbody tr:hover{background:var(--bg)}
 
     <!-- INVOICES -->
     <div class="view" id="view-invoices">
-      <div class="card">
-        <div class="card-hdr">
+      <div class="card" style="overflow:visible">
+        <div class="card-hdr" style="position:sticky;top:57px;z-index:50;background:var(--surface);border-radius:12px 12px 0 0">
           <span class="card-title">All Invoices</span>
           <div class="filters">
             <input class="sinp" id="inv-search" placeholder="Search…" oninput="renderInvoices()">
@@ -358,7 +364,7 @@ tbody tr:hover{background:var(--bg)}
 
     <!-- RECURRING -->
     <div class="view" id="view-recurring">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;position:sticky;top:57px;z-index:50;background:var(--bg);padding-top:8px;padding-bottom:12px">
         <p style="color:var(--ink2);font-size:13px">Recurring invoices generate automatically each month.</p>
         <div style="display:flex;gap:10px;align-items:center">
           <input class="sinp" id="recur-search" placeholder="Search schedules…" oninput="renderRecurring()" style="width:200px">
@@ -399,10 +405,11 @@ tbody tr:hover{background:var(--bg)}
 
     <!-- CUSTOMERS -->
     <div class="view" id="view-customers">
-      <div class="card">
-        <div class="card-hdr">
+      <div class="card" style="overflow:visible">
+        <div class="card-hdr" style="position:sticky;top:57px;z-index:50;background:var(--surface);border-radius:12px 12px 0 0">
           <span class="card-title">Customers</span>
           <div style="display:flex;gap:8px;align-items:center">
+            <input class="sinp" id="cust-search" placeholder="Search customers…" oninput="renderCustomers()" style="width:180px">
             <select class="fltsel" id="cust-sort" onchange="renderCustomers()">
               <option value="name-az">Name A–Z</option>
               <option value="name-za">Name Z–A</option>
@@ -970,7 +977,9 @@ function renderCustomers(){
   if(!DB.customers.length){tb.innerHTML='';em.style.display='block';return;}
   em.style.display='none';
   const sort=document.getElementById('cust-sort')?.value||'name-az';
+  const sq=(document.getElementById('cust-search')?.value||'').toLowerCase().trim();
   let custs=[...DB.customers];
+  if(sq)custs=custs.filter(c=>(c.name||'').toLowerCase().includes(sq)||(c.company||'').toLowerCase().includes(sq)||(c.email||'').toLowerCase().includes(sq));
   if(sort==='name-az')custs.sort((a,b)=>a.name.localeCompare(b.name));
   else if(sort==='name-za')custs.sort((a,b)=>b.name.localeCompare(a.name));
   else if(sort==='company-az')custs.sort((a,b)=>(a.company||'').localeCompare(b.company||''));
@@ -1645,19 +1654,45 @@ function renderDash(){
   document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
-  // (#4) Monthly trend: 6 past months + current + next month forecast
-  const bars=[];
-  for(let i=5;i>=0;i--){
-    const d=new Date(dashY,dashM-i,1);
-    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    const t=DB.invoices.filter(x=>mk(x.date)===k).reduce((s,x)=>s+x.total,0);
-    bars.push({k,t,type:k===key?'current':'past',lbl:d.toLocaleString('en-GB',{month:'short'})});
-  }
-  // Add next month forecast bar
-  bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
+  // (#4) Monthly trend: configurable start month → current + next forecast
+  {
+    // Populate "From" selector
+    const fromEl=document.getElementById('trend-from');
+    if(fromEl){
+      const allMK=[...new Set(DB.invoices.map(i=>mk(i.date)))].filter(Boolean).sort();
+      const earliest=allMK.length?allMK[0]:key;
+      const opts=[];
+      for(let i=23;i>=0;i--){
+        const d=new Date(dashY,dashM-i,1);
+        const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if(k>=earliest)opts.push({k,lbl:d.toLocaleString('en-GB',{month:'short',year:'numeric'})});
+      }
+      const prev=fromEl.value;
+      fromEl.innerHTML=opts.map(o=>`<option value="${o.k}"${o.k===prev?'selected':''}>${o.lbl}</option>`).join('');
+      // Default: 6 months back (or earliest if less data)
+      if(!fromEl.value||!opts.find(o=>o.k===fromEl.value)){
+        const def=opts.length>6?opts[opts.length-7]:opts[0];
+        if(def)fromEl.value=def.k;
+      }
+    }
+    const trendStart=fromEl?.value||key;
+    // Build bars from trendStart through current month, then forecast
+    window._trendBars=window._trendBars||[];
+    const bars=[];
+    let td=new Date(trendStart+'-01');
+    const curEnd=new Date(dashY,dashM,1);
+    while(td<=curEnd){
+      const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
+      const t=DB.invoices.filter(x=>mk(x.date)===k).reduce((s,x)=>s+x.total,0);
+      bars.push({k,t,type:k===key?'current':'past',lbl:td.toLocaleString('en-GB',{month:'short'})});
+      td=new Date(td.getFullYear(),td.getMonth()+1,1);
+    }
+    // Add next month forecast bar
+    bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
   const maxT=Math.max(...bars.map(b=>b.t),1);
   document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${fmtGBP(b.t)}"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}</div>`).join('');
+  } // end trend block
 
   // (#7) Revenue by company (not customer)
   const revByComp={};
