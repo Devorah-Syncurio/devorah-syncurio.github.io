@@ -1757,7 +1757,7 @@ function renderDash(){
     const start=s.schedStart,end=s.schedEnd||'9999-12';
     if(start<=nextKey2&&nextKey2<=end){
       const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
-      const sub=s.amount||0;
+      const sub=(s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
       const total=sub*(1+(s.vatRate||20)/100);
       if(!nextPM[pm])nextPM[pm]={sub:0,total:0,schedules:[]};
       nextPM[pm].sub+=sub;
