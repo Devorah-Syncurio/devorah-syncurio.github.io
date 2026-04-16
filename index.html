@@ -1655,7 +1655,7 @@ function renderDash(){
   // Add next month forecast bar
   bars.push({k:nextKey,t:nextTotal,type:'forecast',lbl:nextM.toLocaleString('en-GB',{month:'short'})});
   const maxT=Math.max(...bars.map(b=>b.t),1);
-  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtShort(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${fmtShort(b.t)}"></div></div>`).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${fmtGBP(b.t)}"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}</div>`).join('');
 
   // (#7) Revenue by company (not customer)
