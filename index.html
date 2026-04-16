@@ -286,14 +286,6 @@ tbody tr:hover{background:var(--bg)}
         <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
         <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
-      <!-- Payment method card — always visible on dashboard face -->
-      <div class="card" style="margin-bottom:20px" id="pay-method-face-card">
-        <div class="card-hdr" style="background:var(--bg)">
-          <span class="card-title">Payment methods — this &amp; next month</span>
-          <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a method to see breakdown</span>
-        </div>
-        <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
-      </div>
       <div class="dgrid">
         <div style="display:flex;flex-direction:column;height:100%">
           <!-- Monthly trend with 6 past + forecast -->
@@ -322,6 +314,14 @@ tbody tr:hover{background:var(--bg)}
         </div>
 
     </div>
+      <!-- Payment method card — below monthly trend and other tabs -->
+      <div class="card" style="margin-top:20px" id="pay-method-face-card">
+        <div class="card-hdr" style="background:var(--bg)">
+          <span class="card-title">Payment methods — this &amp; next month</span>
+          <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a method to see breakdown</span>
+        </div>
+        <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
+      </div>
     </div>
 
     <!-- INVOICES -->
@@ -2021,34 +2021,47 @@ function doExport(){
     const byM={};invs.forEach(inv=>{const m=mk(inv.date);if(!byM[m])byM[m]=[];byM[m].push(inv);});
     Object.entries(byM).sort().forEach(([m,mi])=>{const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}).replace(' ','_');sheets.push({name:lbl,rows:buildInvRows(mi,mode)});});
   }else{
-    // Month × Customer matrix
+    // Customer × Month matrix (customers as rows, months as columns)
     const months=[...new Set(invs.map(i=>mk(i.date)))].sort();
     const custs=[...new Set(invs.map(i=>i.customerId))].map(id=>DB.customers.find(x=>x.id===id)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
-    const hdr=['Month',...custs.flatMap(c=>[c.name+' Ex VAT',c.name+' Inc VAT']),'Total Ex VAT','Total Inc VAT'];
+    const monthLabels=months.map(m=>new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}));
+    const hdr=['Customer',...months.flatMap((_,mi)=>[monthLabels[mi]+' Ex VAT',monthLabels[mi]+' Inc VAT']),'Total Ex VAT','Total Inc VAT'];
     const matRows=[hdr];
+    const monthGrandSub=Object.fromEntries(months.map(m=>[m,0]));
+    const monthGrandTotal=Object.fromEntries(months.map(m=>[m,0]));
     let mxGrandSub=0,mxGrandTotal=0;
-    const custGrandSub=Object.fromEntries(custs.map(c=>[c.id,0]));
-    const custGrandTotal=Object.fromEntries(custs.map(c=>[c.id,0]));
-    months.forEach(m=>{
-      const lbl=new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-      const mInvs=invs.filter(i=>mk(i.date)===m);
-      let rowSub=0,rowTotal=0;
-      const row=[lbl];
-      custs.forEach(c=>{
-        const ci=mInvs.filter(i=>i.customerId===c.id);
+    custs.forEach(c=>{
+      const row=[c.name];
+      let custSub=0,custTotal=0;
+      months.forEach(m=>{
+        const ci=invs.filter(i=>i.customerId===c.id&&mk(i.date)===m);
         const sub=ci.reduce((s,i)=>s+i.subtotal,0);
         const tot=ci.reduce((s,i)=>s+i.total,0);
         row.push(f2(sub),f2(tot));
-        rowSub+=sub;rowTotal+=tot;
-        custGrandSub[c.id]+=sub;custGrandTotal[c.id]+=tot;
+        custSub+=sub;custTotal+=tot;
+        monthGrandSub[m]+=sub;monthGrandTotal[m]+=tot;
       });
-      row.push(f2(rowSub),f2(rowTotal));
-      mxGrandSub+=rowSub;mxGrandTotal+=rowTotal;
+      row.push(f2(custSub),f2(custTotal));
+      mxGrandSub+=custSub;mxGrandTotal+=custTotal;
       matRows.push(row);
     });
-    const grandRow=['TOTAL',...custs.flatMap(c=>[f2(custGrandSub[c.id]),f2(custGrandTotal[c.id])]),f2(mxGrandSub),f2(mxGrandTotal)];
+    const grandRow=['TOTAL',...months.flatMap(m=>[f2(monthGrandSub[m]),f2(monthGrandTotal[m])]),f2(mxGrandSub),f2(mxGrandTotal)];
     matRows.push(grandRow);
-    sheets.push({name:'Month × Customer',rows:matRows});
+    sheets.push({name:'Customer × Month',rows:matRows});
+    // One detailed tab per month
+    months.forEach((m,mi)=>{
+      const mInvs=invs.filter(i=>mk(i.date)===m);
+      const detHdr=['Customer','Invoice Date','Period Start','Period End','Description','Beds / Qty','Unit Price (£)','Line Total (£)','Subtotal ex VAT (£)','VAT %','VAT Amount (£)','Total inc VAT (£)','Notes'];
+      const detRows=[detHdr];
+      mInvs.sort((a,b)=>(DB.customers.find(x=>x.id===a.customerId)?.name||'').localeCompare(DB.customers.find(x=>x.id===b.customerId)?.name||'')).forEach(inv=>{
+        const c=DB.customers.find(x=>x.id===inv.customerId);
+        inv.lines.forEach(l=>{
+          detRows.push([c?.name||'?',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',l.desc||'',l.qty,f2(l.price),f2((l.qty||0)*(l.price||0)),f2(inv.subtotal),inv.vatRate,f2(inv.vat),f2(inv.total),inv.notes||'']);
+        });
+      });
+      const sheetLbl=monthLabels[mi].replace(/[:\\/\?*\[\]]/g,'').slice(0,31);
+      sheets.push({name:sheetLbl,rows:detRows});
+    });
   }
   dlXlsx(sheets,`invoices_${from}_to_${to}.xlsx`);closeOverlay('exp-modal');showToast('Excel downloaded!');
 }
