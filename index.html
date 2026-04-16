@@ -286,6 +286,14 @@ tbody tr:hover{background:var(--bg)}
         <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
         <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
+      <!-- Payment method card — always visible on dashboard face -->
+      <div class="card" style="margin-bottom:20px" id="pay-method-face-card">
+        <div class="card-hdr" style="background:var(--bg)">
+          <span class="card-title">Payment methods — this &amp; next month</span>
+          <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a method to see breakdown</span>
+        </div>
+        <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
+      </div>
       <div class="dgrid">
         <div style="display:flex;flex-direction:column;height:100%">
           <!-- Monthly trend with 6 past + forecast -->
@@ -310,8 +318,7 @@ tbody tr:hover{background:var(--bg)}
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
           <!-- Revenue by company -->
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
-          <!-- Payment method breakdown -->
-          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('pay-method-list')"><span class="card-title">Forecast by payment method</span><span class="card-total-pill" id="pay-method-list-total"></span><button class="card-toggle" id="pay-method-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="pay-method-list"></div></div>
+
         </div>
 
     </div>
@@ -1719,113 +1726,134 @@ function renderDash(){
   // ── Payment method card: this month (actuals) + next month (forecast) ──
   const pmCard=document.getElementById('pay-method-list');
   const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
-  // Solid hex colours so they work inside SVG (CSS vars don't apply there)
-  const PM_HEX={'Direct Debit':'#2B5C3F','Standing Order':'#C9A227','Upon Invoice':'#F07830','Unspecified':'#9BA8B3'};
+  const PM_HEX={'Direct Debit':'#0e6e72','Standing Order':'#2E86AB','Upon Invoice':'#F07830','Unspecified':'#9BA8B3'};
   const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
 
-  // This month actuals — look up each recurring invoice's schedule paymentMethod
+  // Build this-month actuals by payment method
   const thisPM={};
-  PM_LABELS.forEach(p=>{thisPM[p]={sub:0,total:0};});
-  thisPM['Unspecified']={sub:0,total:0};
-  invs.forEach(inv=>{
+  PM_LABELS.forEach(p=>{thisPM[p]={sub:0,total:0,invoices:[]};});
+  thisPM['Unspecified']={sub:0,total:0,invoices:[]};
+  DB.invoices.filter(i=>mk(i.date)===thisKey).forEach(inv=>{
+    const sc=DB.schedules.find(s=>s.id===inv.scheduleId);
     let pm='Unspecified';
-    if(inv.isRecurring&&inv.scheduleId){
-      const sc=DB.schedules.find(x=>x.id===inv.scheduleId);
-      if(sc&&PM_LABELS.includes(sc.paymentMethod))pm=sc.paymentMethod;
-    }
-    const sub=inv.sub||inv.total/(1+(inv.vatRate||20)/100);
-    thisPM[pm].sub+=sub;thisPM[pm].total+=inv.total;
+    if(sc&&PM_LABELS.includes(sc.paymentMethod))pm=sc.paymentMethod;
+    else if(inv.paymentMethod&&PM_LABELS.includes(inv.paymentMethod))pm=inv.paymentMethod;
+    if(!thisPM[pm])thisPM[pm]={sub:0,total:0,invoices:[]};
+    const sub=inv.subtotal||inv.total/(1+(inv.vatRate||20)/100);
+    thisPM[pm].sub+=sub;
+    thisPM[pm].total+=inv.total;
+    thisPM[pm].invoices.push(inv);
   });
 
-  // Next month forecast — from active schedules
+  // Build next-month forecast by payment method
+  const nextDate2=new Date(dashY,dashM+1,1);
+  const nextY2=nextDate2.getFullYear(),nextM2=nextDate2.getMonth();
+  const nextKey2=`${nextY2}-${String(nextM2+1).padStart(2,'0')}`;
   const nextPM={};
-  PM_LABELS.forEach(p=>{nextPM[p]={sub:0,total:0};});
-  nextPM['Unspecified']={sub:0,total:0};
-  DB.schedules.forEach(s=>{
-    if(!s.active)return;
-    if(nextKey<s.schedStart)return;
-    if(s.schedEnd&&nextKey>s.schedEnd)return;
-    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
-    const vat=sub*(s.vatRate/100);
-    const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
-    nextPM[pm].sub+=sub;nextPM[pm].total+=sub+vat;
+  PM_LABELS.forEach(p=>{nextPM[p]={sub:0,total:0,schedules:[]};});
+  nextPM['Unspecified']={sub:0,total:0,schedules:[]};
+  DB.schedules.filter(s=>s.active!==false).forEach(s=>{
+    const start=s.schedStart,end=s.schedEnd||'9999-12';
+    if(start<=nextKey2&&nextKey2<=end){
+      const pm=PM_LABELS.includes(s.paymentMethod)?s.paymentMethod:'Unspecified';
+      const sub=s.amount||0;
+      const total=sub*(1+(s.vatRate||20)/100);
+      if(!nextPM[pm])nextPM[pm]={sub:0,total:0,schedules:[]};
+      nextPM[pm].sub+=sub;
+      nextPM[pm].total+=total;
+      nextPM[pm].schedules.push(s);
+    }
   });
 
   const thisGrandSub=Object.values(thisPM).reduce((s,v)=>s+v.sub,0);
   const thisGrandTotal=Object.values(thisPM).reduce((s,v)=>s+v.total,0);
   const nextGrandSub=Object.values(nextPM).reduce((s,v)=>s+v.sub,0);
   const nextGrandTotal=Object.values(nextPM).reduce((s,v)=>s+v.total,0);
-  setCardTotal('pay-method-list',fmtGBP(nextGrandSub),'inc. VAT '+fmtGBP(nextGrandTotal));
+
+  // Store for breakdown modal access
+  window._pmData={thisPM,nextPM,thisKey,nextKey2,thisGrandSub,thisGrandTotal,nextGrandSub,nextGrandTotal};
 
   // SVG donut helper
-  function pmDonut(dataObj,grandTotal,label){
-    const r=42,cx=60,cy=60,sw=16,circ=2*Math.PI*r;
-    let offsetAngle=0;
+  function pmDonut(dataObj,grandSub,label,which){
+    const r=52,cx=70,cy=70,sw=18,circ=2*Math.PI*r;
+    let cumLen=0;
     const allPMs=[...PM_LABELS,'Unspecified'];
     const segs=allPMs.map(pm=>{
-      const v=dataObj[pm]||{sub:0,total:0};
+      const v=dataObj[pm]||{sub:0};
       if(!v.sub)return'';
-      const pct=grandTotal?v.sub/grandTotal:0;
+      const pct=grandSub?v.sub/grandSub:0;
       const dash=pct*circ;
       const gap=circ-dash;
-      const seg=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${(-offsetAngle).toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt"/>`;
-      offsetAngle+=dash;
-      return seg;
+      const offset=-cumLen;
+      cumLen+=dash;
+      return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.75'" onmouseleave="this.style.opacity='1'" onclick="showPMBreakdown('${pm}','${which}')"/>`;
     }).join('');
-    const centerAmt=grandTotal?fmtShort(grandTotal):'—';
-    return`<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1">
-      <div style="font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:0.5px;font-family:var(--mono)">${label}</div>
-      <svg width="120" height="120" viewBox="0 0 120 120">
+    const centerAmt=grandSub?fmtGBP(grandSub):'—';
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;min-width:160px">
+      <div style="font-size:11px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;font-family:var(--mono)">${label}</div>
+      <svg width="140" height="140" viewBox="0 0 140 140">
         <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
         ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
-        <text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="9" fill="#9BA8B3" font-family="monospace">ex. VAT</text>
-        <text x="${cx}" y="${cy+9}" text-anchor="middle" font-size="12" font-weight="bold" fill="#1C2B3A" font-family="monospace">${centerAmt}</text>
+        <text x="${cx}" y="${cy-7}" text-anchor="middle" font-size="9" fill="var(--ink3)" font-family="monospace">ex. VAT</text>
+        <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
+      <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. VAT ${fmtGBP(Object.values(dataObj).reduce((s,v)=>s+v.total,0))}</div>
     </div>`;
   }
 
   const allPMKeys=[...PM_LABELS,'Unspecified'];
   const legendRows=allPMKeys.filter(pm=>(thisPM[pm]?.sub||0)+(nextPM[pm]?.sub||0)>0).map(pm=>{
-    return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-      <div style="width:10px;height:10px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
-      <div style="font-size:12px;font-weight:600;flex:1">${PM_ICONS[pm]} ${pm}</div>
-      <div style="text-align:right;min-width:90px">
-        <div style="font-size:11px;font-family:var(--mono);font-weight:600">${fmtGBP(thisPM[pm]?.sub||0)}</div>
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background 0.1s" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+      <div style="width:12px;height:12px;border-radius:3px;background:${PM_HEX[pm]};flex-shrink:0"></div>
+      <div style="font-size:12px;font-weight:600;flex:1;color:var(--ink)">${PM_ICONS[pm]} ${pm}</div>
+      <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('${pm}','this')">
+        <div style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--ink)">${fmtGBP(thisPM[pm]?.sub||0)}</div>
         <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(thisPM[pm]?.total||0)}</div>
+        <div style="font-size:9px;color:var(--accent);font-family:var(--mono);margin-top:1px">This month ↗</div>
       </div>
-      <div style="text-align:right;min-width:90px">
-        <div style="font-size:11px;font-family:var(--mono);font-weight:600">${fmtGBP(nextPM[pm]?.sub||0)}</div>
+      <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('${pm}','next')">
+        <div style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--ink)">${fmtGBP(nextPM[pm]?.sub||0)}</div>
         <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(nextPM[pm]?.total||0)}</div>
+        <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">Next month ↗</div>
       </div>
     </div>`;
   }).join('');
 
-  if(pmCard){
-    pmCard.innerHTML=`
-      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:8px">
-        ${pmDonut(thisPM,thisGrandSub,'This month')}
-        ${pmDonut(nextPM,nextGrandSub,'Next month')}
-      </div>
-      <div>
-        <div style="display:flex;align-items:center;gap:8px;padding:0 0 5px;border-bottom:2px solid var(--border)">
-          <div style="width:10px;flex-shrink:0"></div>
-          <div style="font-size:10px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">Method</div>
-          <div style="min-width:90px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">This month</div>
-          <div style="min-width:90px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink3);font-family:var(--mono)">Next month</div>
+  const pmFace=document.getElementById('pay-method-face');
+  if(pmFace){
+    pmFace.innerHTML=`
+      <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div style="display:flex;gap:24px;align-items:center;justify-content:center;flex-shrink:0">
+          ${pmDonut(thisPM,thisGrandSub,'This month','this')}
+          ${pmDonut(nextPM,nextGrandSub,'Next month','next')}
         </div>
-        ${legendRows||'<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No payment method data yet.</div>'}
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 0 0;margin-top:2px">
-          <div style="width:10px;flex-shrink:0"></div>
-          <div style="font-size:12px;font-weight:700;flex:1">Total</div>
-          <div style="text-align:right;min-width:90px"><div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(thisGrandSub)}</div><div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div></div>
-          <div style="text-align:right;min-width:90px"><div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(nextGrandSub)}</div><div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(nextGrandTotal)}</div></div>
+        <div style="flex:1;min-width:260px">
+          <div style="display:flex;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid var(--border)">
+            <div style="width:12px;flex-shrink:0"></div>
+            <div style="font-size:10px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">Method</div>
+            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">This month</div>
+            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">Next month</div>
+          </div>
+          ${legendRows||'<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No payment method data yet.</div>'}
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2)">
+            <div style="width:12px;flex-shrink:0"></div>
+            <div style="font-size:12px;font-weight:700;flex:1;color:var(--ink)">Total</div>
+            <div style="text-align:right;min-width:110px">
+              <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtGBP(thisGrandSub)}</div>
+              <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div>
+            </div>
+            <div style="text-align:right;min-width:110px">
+              <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--teal)">${fmtGBP(nextGrandSub)}</div>
+              <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(nextGrandTotal)}</div>
+            </div>
+          </div>
         </div>
       </div>`;
   }
 }
 
 // ── Collapsible card toggle ────────────────────────────────────────────
-const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false,'pay-method-list':false};
+const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false};
 function applyCardState(bodyId){
   const open=cardStates[bodyId];
   const body=document.getElementById(bodyId);
@@ -2719,6 +2747,118 @@ function exportCommission(){
     })
     .subscribe();
 })();
+
+// ── Payment Method Breakdown Modal ──────────────────────────────────
+window._pmBreakdownContext={pm:null,which:null};
+
+function showPMBreakdown(pm,which){
+  window._pmBreakdownContext={pm,which};
+  const d=window._pmData;
+  if(!d)return;
+  const icon={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'}[pm]||'';
+  const whichLabel=which==='this'?'This month':'Next month';
+  document.getElementById('pm-breakdown-title').textContent=icon+' '+pm+' — '+whichLabel;
+
+  let rows='',totalSub=0,totalVAT=0;
+
+  if(which==='this'){
+    const invs=(d.thisPM[pm]?.invoices)||[];
+    document.getElementById('pm-breakdown-sub').textContent=invs.length+' invoice'+(invs.length!==1?'s':'');
+    if(!invs.length){
+      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No invoices for this payment method this month.</div>';
+    } else {
+      rows=`<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Customer</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Date</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Ex VAT</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Inc VAT</th>
+        </tr></thead><tbody>`;
+      invs.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(inv=>{
+        const c=DB.customers.find(x=>x.id===inv.customerId);
+        const sub=inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100));
+        totalSub+=sub; totalVAT+=inv.total;
+        rows+=`<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <td style="padding:8px 12px;font-size:13px;font-weight:600">${c?.name||'Unknown'}<br><span style="font-size:11px;color:var(--ink3)">${c?.company||''}</span></td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--ink2);font-family:var(--mono)">${inv.date||'—'}</td>
+          <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);font-weight:600">${fmtGBP(sub)}</td>
+          <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--ink3)">${fmtGBP(inv.total)}</td>
+        </tr>`;
+      });
+      rows+='</tbody></table>';
+    }
+  } else {
+    const scheds=(d.nextPM[pm]?.schedules)||[];
+    document.getElementById('pm-breakdown-sub').textContent=scheds.length+' schedule'+(scheds.length!==1?'s':'');
+    if(!scheds.length){
+      rows='<div style="text-align:center;padding:24px;color:var(--ink3)">No forecast schedules for this payment method next month.</div>';
+    } else {
+      rows=`<table style="width:100%;border-collapse:collapse">
+        <thead><tr style="background:var(--bg)">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Customer</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Schedule</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Ex VAT</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;color:var(--ink3);font-weight:700;text-transform:uppercase;letter-spacing:0.6px;border-bottom:2px solid var(--border)">Inc VAT (est.)</th>
+        </tr></thead><tbody>`;
+      scheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
+        const c=DB.customers.find(x=>x.id===s.customerId);
+        const sub=s.amount||0;
+        const total=sub*(1+(s.vatRate||20)/100);
+        totalSub+=sub; totalVAT+=total;
+        rows+=`<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
+          <td style="padding:8px 12px;font-size:13px;font-weight:600">${c?.name||s.custName||'Unknown'}<br><span style="font-size:11px;color:var(--ink3)">${c?.company||''}</span></td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--ink2)">${s.description||'—'}<br><span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">${s.schedStart||''} – ${s.schedEnd||'ongoing'}</span></td>
+          <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);font-weight:600">${fmtGBP(sub)}</td>
+          <td style="padding:8px 12px;text-align:right;font-size:12px;font-family:var(--mono);color:var(--ink3)">${fmtGBP(total)}</td>
+        </tr>`;
+      });
+      rows+='</tbody></table>';
+    }
+  }
+
+  document.getElementById('pm-breakdown-body').innerHTML=rows;
+  document.getElementById('pm-breakdown-total').innerHTML=
+    `<span style="color:var(--ink3)">Total ex VAT:</span> <span style="color:var(--accent)">${fmtGBP(totalSub)}</span>&nbsp;&nbsp;<span style="color:var(--ink3)">inc VAT:</span> <span>${fmtGBP(totalVAT)}</span>`;
+  showOverlay('pm-breakdown-modal');
+}
+
+function exportPMBreakdown(){
+  const {pm,which}=window._pmBreakdownContext;
+  const d=window._pmData;
+  if(!d||!pm)return;
+  const r2=v=>Math.round(v*100)/100;
+  const whichLabel=which==='this'?'This Month':'Next Month';
+  const rows=[[pm+' — '+whichLabel,'','','']];
+  if(which==='this'){
+    rows.push(['Customer','Company','Date','Ex VAT','Inc VAT']);
+    const invs=(d.thisPM[pm]?.invoices)||[];
+    let totSub=0,totTotal=0;
+    invs.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(inv=>{
+      const c=DB.customers.find(x=>x.id===inv.customerId);
+      const sub=r2(inv.subtotal||(inv.total/(1+(inv.vatRate||20)/100)));
+      totSub+=sub; totTotal+=r2(inv.total);
+      rows.push([c?.name||'Unknown',c?.company||'',inv.date||'',sub,r2(inv.total)]);
+    });
+    rows.push(['','','Total',r2(totSub),r2(totTotal)]);
+  } else {
+    rows.push(['Customer','Company','Description','Period','Ex VAT','Inc VAT (est.)']);
+    const scheds=(d.nextPM[pm]?.schedules)||[];
+    let totSub=0,totTotal=0;
+    scheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
+      const c=DB.customers.find(x=>x.id===s.customerId);
+      const sub=r2(s.amount||0);
+      const total=r2(sub*(1+(s.vatRate||20)/100));
+      totSub+=sub; totTotal+=total;
+      rows.push([c?.name||s.custName||'Unknown',c?.company||'',s.description||'',(s.schedStart||'')+' – '+(s.schedEnd||'ongoing'),sub,total]);
+    });
+    rows.push(['','','','Total',r2(totSub),r2(totTotal)]);
+  }
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,pm.slice(0,31));
+  XLSX.writeFile(wb,`payment-method-${pm.replace(/\s+/g,'-').toLowerCase()}-${whichLabel.toLowerCase().replace(/\s+/g,'-')}.xlsx`);
+}
+
 </script>
 
   <!-- Invoice Changes Export Modal -->
@@ -2778,5 +2918,29 @@ function exportCommission(){
       </div>
     </div>
   </div>
+
+<!-- Payment Method Breakdown Modal -->
+<div class="overlay" id="pm-breakdown-modal" onclick="if(event.target===this)closeOverlay('pm-breakdown-modal')">
+  <div class="modal" style="max-width:700px;width:95%">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title" id="pm-breakdown-title">Payment Method Breakdown</div>
+        <div class="modal-sub" id="pm-breakdown-sub"></div>
+      </div>
+      <button class="xbtn" onclick="closeOverlay('pm-breakdown-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+      <div id="pm-breakdown-body"></div>
+    </div>
+    <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-top:1px solid var(--border)">
+      <div id="pm-breakdown-total" style="font-size:13px;font-family:var(--mono);font-weight:600;color:var(--ink)"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="exportPMBreakdown()">📥 Export to Excel</button>
+        <button class="btn btn-ghost" onclick="closeOverlay('pm-breakdown-modal')">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
