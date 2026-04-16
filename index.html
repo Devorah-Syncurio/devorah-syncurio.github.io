@@ -1661,7 +1661,7 @@ function renderDash(){
   const thisMonthInc = isFutureDash?(thisFcMonth?thisFcMonth.recurTotal:0):total;
   const thisMonthCnt = isFutureDash?(thisFcMonth?thisFcMonth.items.length:0):invs.length;
   const thisMonthLbl = isFutureDash
-    ?`Projected ${new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'})}`
+    ?`Predicted ${new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'})}`
     :'This month invoiced';
   if(document.getElementById('ds-total-lbl'))document.getElementById('ds-total-lbl').textContent=thisMonthLbl;
 
@@ -1710,7 +1710,7 @@ function renderDash(){
     let td=new Date(trendStart+'-01');
     for(let i=0;i<trendN;i++){
       const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
-      const isFuture=k>key;
+      const isFuture=k>nowKey;
       if(isFuture){trendFutureKeys.push(k);}
       const t=isFuture
         ?(()=>{const fc=buildForecast(0,k,k);return fc.length?fc[0].recurTotal:0;})()
@@ -1719,11 +1719,11 @@ function renderDash(){
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
     }
   const maxT=Math.max(...bars.map(b=>b.t),1);
-  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${b.isFuture?'Projected: ':''}${fmtGBP(b.t)}"></div></div>`).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map(b=>`<div class="mbar-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px" title="${b.isFuture?'Forecast: ':''}${fmtGBP(b.t)}"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
   const projN=trendFutureKeys.length;
   const noteEl=document.getElementById('trend-proj-note');
-  if(noteEl)noteEl.textContent=projN>0?`* Projected ${projN} month${projN!==1?'s':''} from recurring schedules`:'';
+  if(noteEl)noteEl.textContent=projN>0?`* Forecast from recurring schedules (${projN} month${projN!==1?'s':''})`:'';
   } // end trend block
 
   // (#7) Revenue by company (not customer)
@@ -1838,8 +1838,8 @@ function renderDash(){
   PM_LABELS.forEach(p=>{nextPM[p]={sub:0,total:0,schedules:[]};});
   nextPM['Unspecified']={sub:0,total:0,schedules:[]};
   // Use all future months from the trend window (populated above), else fall back to next month
-  const projKeys=trendFutureKeys.length?trendFutureKeys:[nextKey2];
-  const projMonthCount=projKeys.length;
+  const projKeys=[nextKey2];
+  const projMonthCount=1;
   projKeys.forEach(projKey=>{
     DB.schedules.filter(s=>s.active!==false).forEach(s=>{
       const start=s.schedStart,end=s.schedEnd||'9999-12';
@@ -1889,7 +1889,7 @@ function renderDash(){
         <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
       <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. VAT ${fmtGBP(Object.values(dataObj).reduce((s,v)=>s+v.total,0))}</div>
-      ${(which==='next'||isFutureDash)?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:2px">* Projected from recurring</div>`:''}
+      ${which==='next'?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:2px">* Forecast from recurring</div>`:(isFutureDash?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:2px">* Predicted from recurring</div>`:'')}
     </div>`;
   }
 
@@ -1901,12 +1901,12 @@ function renderDash(){
       <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('${pm}','this')">
         <div style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--ink)">${fmtGBP(thisPM[pm]?.sub||0)}</div>
         <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(thisPM[pm]?.total||0)}</div>
-        <div style="font-size:9px;color:${isFutureDash?'var(--teal)':'var(--accent)'};font-family:var(--mono);margin-top:1px">${isFutureDash?'Projected ↗':'This month ↗'}</div>
+        <div style="font-size:9px;color:${isFutureDash?'var(--teal)':'var(--accent)'};font-family:var(--mono);margin-top:1px">${isFutureDash?'Predicted ↗':'This month ↗'}</div>
       </div>
       <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('${pm}','next')">
         <div style="font-size:12px;font-family:var(--mono);font-weight:600;color:var(--ink)">${fmtGBP(nextPM[pm]?.sub||0)}</div>
         <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(nextPM[pm]?.total||0)}</div>
-        <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">${projMonthCount===1?'Next month':'Projected'} ↗</div>
+        <div style="font-size:9px;color:var(--teal);font-family:var(--mono);margin-top:1px">Next month ↗</div>
       </div>
     </div>`;
   }).join('');
@@ -1916,21 +1916,21 @@ function renderDash(){
     pmFace.innerHTML=`
       <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
         <div style="display:flex;gap:24px;align-items:center;justify-content:center;flex-shrink:0">
-          ${pmDonut(thisPM,thisGrandSub,isFutureDash?'Projected':'This month','this')}
-          ${pmDonut(nextPM,nextGrandSub,projMonthCount===1?'Next month':`Projected (${projMonthCount}m)`,'next')}
+          ${pmDonut(thisPM,thisGrandSub,isFutureDash?'Predicted':'This month','this')}
+          ${pmDonut(nextPM,nextGrandSub,'Next month','next')}
         </div>
         <div style="flex:1;min-width:260px">
           <div style="display:flex;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid var(--border)">
             <div style="width:12px;flex-shrink:0"></div>
             <div style="font-size:10px;font-weight:700;flex:1;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">Method</div>
-            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">${isFutureDash?'Projected':'This month'}</div>
-            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--teal);font-family:var(--mono)">${projMonthCount===1?'Next month':`Projected (${projMonthCount}m)`}</div>
+            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--ink3);font-family:var(--mono)">${isFutureDash?'Predicted':'This month'}</div>
+            <div style="min-width:110px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--teal);font-family:var(--mono)">Next month</div>
           </div>
           ${legendRows||'<div style="text-align:center;color:var(--ink3);font-size:13px;padding:16px 0">No payment method data yet.</div>'}
           <div style="display:flex;align-items:center;gap:10px;padding:8px 0 0;margin-top:4px;border-top:2px solid var(--border2)">
             <div style="width:12px;flex-shrink:0"></div>
             <div style="font-size:12px;font-weight:700;flex:1;color:var(--ink)">Total</div>
-            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','this')" title="${isFutureDash?'View all projected':'View all this month'}">
+            <div style="text-align:right;min-width:110px;cursor:pointer" onclick="showPMBreakdown('ALL','this')" title="${isFutureDash?'View all predicted':'View all this month'}">
               <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--accent)">${fmtGBP(thisGrandSub)}</div>
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3)">inc. ${fmtGBP(thisGrandTotal)}</div>
               <div style="font-size:9px;color:var(--accent);font-family:var(--mono);margin-top:1px">View all ↗</div>
