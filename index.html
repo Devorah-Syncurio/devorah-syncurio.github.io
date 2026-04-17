@@ -305,7 +305,6 @@ tbody tr:hover{background:var(--bg)}
         <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
       <div class="dgrid">
-        <div style="display:flex;flex-direction:column;gap:20px">
           <!-- Monthly trend with 6 past + forecast -->
           <div class="card">
             <div class="card-hdr"><span class="card-title">Monthly trend</span>
@@ -338,25 +337,26 @@ tbody tr:hover{background:var(--bg)}
               <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
             </div>
           </div>
-          <div class="card" id="pay-method-face-card">
-            <div class="card-hdr" style="background:var(--bg)">
-              <span class="card-title">Payment methods</span>
-              <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a segment or method to see breakdown</span>
-            </div>
-            <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
+          <!-- Right column: 3 cards, same height as trend chart -->
+          <div style="display:flex;flex-direction:column;justify-content:space-between">
+            <!-- Next month forecast breakdown -->
+            <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
+            <!-- All customers this month -->
+            <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
+            <!-- Revenue by company -->
+            <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
           </div>
+      </div>
+      <!-- Payment methods: below trend chart, left-column width only -->
+      <div style="margin-top:20px;display:grid;grid-template-columns:1.3fr 1fr;gap:20px">
+        <div class="card" id="pay-method-face-card">
+          <div class="card-hdr" style="background:var(--bg)">
+            <span class="card-title">Payment methods</span>
+            <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a segment or method to see breakdown</span>
+          </div>
+          <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
-        <div style="display:flex;flex-direction:column;justify-content:space-between;height:100%">
-          <!-- Next month forecast breakdown -->
-          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
-          <!-- All customers this month -->
-          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
-          <!-- Revenue by company -->
-          <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
-
-        </div>
-
-    </div>
+      </div>
 
     </div>
 
