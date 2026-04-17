@@ -277,7 +277,7 @@ tbody tr:hover{background:var(--bg)}
     <div class="page-title" id="pageTitle">Dashboard</div>
     <div class="topbar-right">
       <div style="position:relative" id="export-dd-wrap">
-        <button class="btn btn-ghost" onclick="toggleExportDd(event)" id="export-dd-btn">↓ Export ▾</button>
+        <button class="btn btn-ghost" onclick="toggleExportDd(event)" id="export-dd-btn">↓ Reports ▾</button>
         <div id="export-dd" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 28px rgba(28,43,58,0.14);min-width:210px;z-index:400;overflow:hidden">
           <div class="exp-dd-item" onclick="openExport();closeExportDd()">📊 Export to Excel</div>
           <div class="exp-dd-item" onclick="exportVarianceReport();closeExportDd()">📈 Variance Report</div>
@@ -346,7 +346,7 @@ tbody tr:hover{background:var(--bg)}
             <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;justify-content:flex-start;gap:16px">
+        <div style="display:flex;flex-direction:column;justify-content:space-between;height:100%">
           <!-- Next month forecast breakdown -->
           <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
           <!-- All customers this month -->
