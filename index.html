@@ -1872,7 +1872,6 @@ function renderDash(){
     const incTotal=Object.values(dataObj).reduce((s,v)=>s+v.total,0);
     const centerAmt=grandSub?fmtGBP(grandSub):'\u2014';
     const centerInc=fmtGBP(incTotal);
-    const labelSafe=label.replace(/'/g,"\'").replace(/"/g,'&quot;');
     const segs=allPMs.map(pm=>{
       const v=dataObj[pm]||{sub:0};
       if(!v.sub)return'';
@@ -1883,30 +1882,38 @@ function renderDash(){
       cumLen+=dash;
       const subFmt=fmtGBP(v.sub);
       const pmSafe=pm.replace(/'/g,"\'").replace(/"/g,'&quot;');
-      return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.7';document.getElementById('dc-lbl-${which}').textContent='${pmSafe}';document.getElementById('dc-amt-${which}').textContent='${subFmt}';" onmouseleave="this.style.opacity='1';document.getElementById('dc-lbl-${which}').textContent='${labelSafe}';document.getElementById('dc-amt-${which}').textContent='${centerAmt}';" onclick="showPMBreakdown('${pm}','${which}')"/>`;
+      return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.75';pmTip(event,'${pmSafe}','${subFmt}');" onmousemove="pmTipMove(event);" onmouseleave="this.style.opacity='1';pmTipHide();" onclick="showPMBreakdown('${pm}','${which}')"/>`;
     }).join('');
-    const keyRows=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
-      return`<div style="display:flex;align-items:center;gap:6px;padding:1px 0;cursor:pointer;line-height:1.5" onclick="showPMBreakdown('${pm}','${which}')">
-        <div style="width:9px;height:9px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
-        <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1;white-space:nowrap">${pm}</div>
-        <div style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600">${fmtGBP(dataObj[pm].sub)}</div>
+    const legendItems=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
+      return`<div style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer" onclick="showPMBreakdown('${pm}','${which}')" onmouseenter="this.style.opacity='0.75'" onmouseleave="this.style.opacity='1'">
+        <svg width="11" height="11" viewBox="0 0 11 11" style="flex-shrink:0"><circle cx="5.5" cy="5.5" r="5" fill="${PM_HEX[pm]}"/></svg>
+        <span style="font-size:11px;color:var(--ink);font-family:var(--mono);white-space:nowrap;flex:1">${pm}</span>
+        <span style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600;margin-left:8px">${fmtGBP(dataObj[pm].sub)}</span>
       </div>`;
     }).join('');
     const footnote=which==='next'
-      ?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:6px">* Forecast from recurring</div>`
-      :(isFutureDash?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:6px">* Predicted from recurring</div>`:'');
-    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:190px;flex-shrink:0">
-      <div style="font-size:12px;font-weight:700;color:var(--ink);font-family:var(--sans);text-align:center;margin-bottom:4px;letter-spacing:0.01em">${label}</div>
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
-        ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
-        <text id="dc-amt-${which}" x="${cx}" y="${cy+6}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
-      </svg>
-      <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px">inc. ${centerInc}</div>
-      <div style="width:100%;padding:4px 8px 0;border-top:1px solid var(--border);margin-top:4px;align-self:stretch;display:flex;flex-direction:column;gap:0">${keyRows}</div>
-      ${footnote}
+      ?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:left;margin-top:4px">* Forecast from recurring</div>`
+      :(isFutureDash?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:left;margin-top:4px">* Predicted from recurring</div>`:'');
+    return`<div style="display:flex;flex-direction:column;align-items:flex-start;gap:0;flex-shrink:0">
+      <div style="font-size:13px;font-weight:700;color:var(--ink);font-family:var(--sans);margin-bottom:6px;letter-spacing:0.01em">${label}</div>
+      <div style="display:flex;flex-direction:row;align-items:center;gap:14px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">
+          <svg width="140" height="140" viewBox="0 0 140 140">
+            <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
+            ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
+            <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="11" fill="var(--ink3)" font-family="monospace">${label}</text>
+            <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
+          </svg>
+          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);margin-top:2px">inc. ${centerInc}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:130px">
+          ${legendItems}
+          ${footnote}
+        </div>
+      </div>
     </div>`;
   }
+
 
   const allPMKeys=[...PM_LABELS,'Unspecified'];
   const legendRows=allPMKeys.filter(pm=>(thisPM[pm]?.sub||0)+(nextPM[pm]?.sub||0)>0).map(pm=>{
@@ -1929,14 +1936,31 @@ function renderDash(){
   const pmFace=document.getElementById('pay-method-face');
   if(pmFace){
     pmFace.innerHTML=`
-      <div style="display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap;justify-content:center">
-        ${pmDonut(thisPM,thisGrandSub,isFutureDash?'Predicted':'This month','this')}
-        ${pmDonut(nextPM,nextGrandSub,'Next month','next')}
+      <div style="display:flex;gap:0;align-items:flex-start;flex-wrap:wrap;justify-content:center">
+        <div style="padding-right:28px">${pmDonut(thisPM,thisGrandSub,isFutureDash?'Predicted':'This month','this')}</div>
+        <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
+        <div style="padding-left:28px">${pmDonut(nextPM,nextGrandSub,'Next month','next')}</div>
       </div>`;
   }
 }
 
-// ── Collapsible card toggle ────────────────────────────────────────────
+
+  function pmTip(e,name,amt){
+    var t=document.getElementById('pm-tip');
+    t.textContent=name+': '+amt;
+    t.style.display='block';
+    t.style.left=(e.clientX+14)+'px';
+    t.style.top=(e.clientY-12)+'px';
+  }
+  function pmTipMove(e){
+    var t=document.getElementById('pm-tip');
+    t.style.left=(e.clientX+14)+'px';
+    t.style.top=(e.clientY-12)+'px';
+  }
+  function pmTipHide(){
+    document.getElementById('pm-tip').style.display='none';
+  }
+  // ── Collapsible card toggle ────────────────────────────────────────────
 const cardStates={'rev-bars':false,'dash-fc-list':false,'cust-month-list':false};
 function applyCardState(bodyId){
   const open=cardStates[bodyId];
@@ -3124,5 +3148,6 @@ function exportPMBreakdown(){
   </div>
 </div>
 
+<div id="pm-tip" style="position:fixed;display:none;background:rgba(30,30,30,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-family:monospace;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25)"></div>
 </body>
 </html>
