@@ -1886,7 +1886,7 @@ function renderDash(){
     const keyRows=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
       return`<div style="display:flex;align-items:center;gap:6px;padding:1px 0;cursor:pointer;line-height:1.5" onclick="showPMBreakdown('${pm}','${which}')">
         <div style="width:9px;height:9px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
-        <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1">${pm}</div>
+        <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1;white-space:nowrap">${pm}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600">${fmtGBP(dataObj[pm].sub)}</div>
       </div>`;
     }).join('');
