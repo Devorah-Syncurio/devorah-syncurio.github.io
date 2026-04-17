@@ -928,9 +928,14 @@ function closeOverlay(id){
 
 // Debounce helper
 function debounce(fn,ms=300){let t;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms);};}
-const _dRenderInvoices=debounce(renderInvoices,250);
-const _dRenderCustomers=debounce(renderCustomers,250);
-const _dRenderRecurring=debounce(renderRecurring,250);
+let _dRenderInvoices=function(){renderInvoices();};
+let _dRenderCustomers=function(){renderCustomers();};
+let _dRenderRecurring=function(){renderRecurring();};
+document.addEventListener('DOMContentLoaded',function(){
+  _dRenderInvoices=debounce(renderInvoices,250);
+  _dRenderCustomers=debounce(renderCustomers,250);
+  _dRenderRecurring=debounce(renderRecurring,250);
+});
 document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)closeOverlay(el.id);}));
 
 // ── Confirm ───────────────────────────────────────────────────────────
@@ -3228,7 +3233,6 @@ function openCustProfile(id){
     btn.style.display=scrolled>300?'flex':'none';
   }
   window.addEventListener('scroll',onScroll,{passive:true});
-  document.addEventListener('scroll',onScroll,{passive:true,capture:true});
 })();
 </script>
 
