@@ -1795,7 +1795,7 @@ function renderDash(){
   // ── Payment method card: this month (actuals) + next month (forecast) ──
   const pmCard=document.getElementById('pay-method-list');
   const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
-  const PM_HEX={'Direct Debit':'#0e6e72','Standing Order':'#c9a84c','Upon Invoice':'#7B94A7','Unspecified':'#9BA8B3'};
+  const PM_HEX={'Direct Debit':'#5B7FDE','Standing Order':'#E8834D','Upon Invoice':'#52B788','Unspecified':'#9CA3AF'};
   const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
 
   // Build this-month data by payment method (actuals or forecast if future month)
@@ -1866,7 +1866,7 @@ function renderDash(){
 
   // SVG donut helper
   function pmDonut(dataObj,grandSub,label,which){
-    const r=68,cx=90,cy=90,sw=22,circ=2*Math.PI*r;
+    const r=52,cx=70,cy=70,sw=16,circ=2*Math.PI*r;
     let cumLen=0;
     const allPMs=[...PM_LABELS,'Unspecified'];
     const incTotal=Object.values(dataObj).reduce((s,v)=>s+v.total,0);
@@ -1886,22 +1886,25 @@ function renderDash(){
       return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.7';document.getElementById('dc-lbl-${which}').textContent='${pmSafe}';document.getElementById('dc-amt-${which}').textContent='${subFmt}';" onmouseleave="this.style.opacity='1';document.getElementById('dc-lbl-${which}').textContent='${labelSafe}';document.getElementById('dc-amt-${which}').textContent='${centerAmt}';" onclick="showPMBreakdown('${pm}','${which}')"/>`;
     }).join('');
     const keyRows=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
-      return`<div style="display:flex;align-items:center;gap:7px;padding:3px 0" onclick="showPMBreakdown('${pm}','${which}')" style="cursor:pointer">
-        <div style="width:10px;height:10px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
+      return`<div style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer" onclick="showPMBreakdown('${pm}','${which}')">
+        <div style="width:9px;height:9px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
         <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1">${pm}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600">${fmtGBP(dataObj[pm].sub)}</div>
       </div>`;
     }).join('');
-    return`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:220px;flex-shrink:0">
-      <svg width="180" height="180" viewBox="0 0 180 180">
+    const footnote=which==='next'
+      ?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:6px">* Forecast from recurring</div>`
+      :(isFutureDash?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:6px">* Predicted from recurring</div>`:'');
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:190px;flex-shrink:0">
+      <div style="font-size:12px;font-weight:700;color:var(--ink);font-family:var(--sans);text-align:center;margin-bottom:4px;letter-spacing:0.01em">${label}</div>
+      <svg width="140" height="140" viewBox="0 0 140 140">
         <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
         ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
-        <text id="dc-lbl-${which}" x="${cx}" y="83" text-anchor="middle" font-size="10" fill="var(--ink3)" font-family="monospace">${label}</text>
-        <text id="dc-amt-${which}" x="${cx}" y="100" text-anchor="middle" font-size="15" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
+        <text id="dc-amt-${which}" x="${cx}" y="${cy+6}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
-      <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:-2px">inc. ${centerInc}</div>
-      <div style="width:100%;padding:6px 12px 0;border-top:1px solid var(--border);margin-top:6px">${keyRows}</div>
-      ${which==='next'?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:8px">* Forecast from recurring</div>`:(isFutureDash?`<div style="font-size:9px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:8px">* Predicted from recurring</div>`:'')}
+      <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px">inc. ${centerInc}</div>
+      <div style="width:100%;padding:5px 8px 0;border-top:1px solid var(--border);margin-top:5px">${keyRows}</div>
+      ${footnote}
     </div>`;
   }
 
