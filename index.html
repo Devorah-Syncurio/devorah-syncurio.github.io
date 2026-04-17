@@ -1795,7 +1795,7 @@ function renderDash(){
   // ── Payment method card: this month (actuals) + next month (forecast) ──
   const pmCard=document.getElementById('pay-method-list');
   const PM_LABELS=['Direct Debit','Standing Order','Upon Invoice'];
-  const PM_HEX={'Direct Debit':'#5B7FDE','Standing Order':'#E8834D','Upon Invoice':'#52B788','Unspecified':'#9CA3AF'};
+  const PM_HEX={'Direct Debit':'#1C2B3A','Standing Order':'#F07830','Upon Invoice':'#2E86AB','Unspecified':'#9CA3AF'};
   const PM_ICONS={'Direct Debit':'🏦','Standing Order':'📅','Upon Invoice':'📄','Unspecified':'❓'};
 
   // Build this-month data by payment method (actuals or forecast if future month)
@@ -1886,7 +1886,7 @@ function renderDash(){
       return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.7';document.getElementById('dc-lbl-${which}').textContent='${pmSafe}';document.getElementById('dc-amt-${which}').textContent='${subFmt}';" onmouseleave="this.style.opacity='1';document.getElementById('dc-lbl-${which}').textContent='${labelSafe}';document.getElementById('dc-amt-${which}').textContent='${centerAmt}';" onclick="showPMBreakdown('${pm}','${which}')"/>`;
     }).join('');
     const keyRows=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
-      return`<div style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer" onclick="showPMBreakdown('${pm}','${which}')">
+      return`<div style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer" onclick="showPMBreakdown('${pm}','${which}')">
         <div style="width:9px;height:9px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
         <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1">${pm}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600">${fmtGBP(dataObj[pm].sub)}</div>
@@ -1903,7 +1903,7 @@ function renderDash(){
         <text id="dc-amt-${which}" x="${cx}" y="${cy+6}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
       <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px">inc. ${centerInc}</div>
-      <div style="width:100%;padding:5px 8px 0;border-top:1px solid var(--border);margin-top:5px">${keyRows}</div>
+      <div style="width:100%;padding:4px 8px 0;border-top:1px solid var(--border);margin-top:4px;align-self:stretch">${keyRows}</div>
       ${footnote}
     </div>`;
   }
