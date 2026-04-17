@@ -3224,7 +3224,7 @@ function openCustProfile(id){
 
 
 // Back-to-top button
-(function(){
+document.addEventListener('DOMContentLoaded',function(){
   const btn=document.getElementById('back-to-top');
   if(!btn)return;
   function onScroll(){
@@ -3232,12 +3232,10 @@ function openCustProfile(id){
     const scrolled=container?container.scrollTop:(window.scrollY||document.documentElement.scrollTop);
     btn.style.display=scrolled>300?'flex':'none';
   }
-  document.addEventListener('DOMContentLoaded',function(){
-    const container=document.querySelector('.content');
-    if(container)container.addEventListener('scroll',onScroll,{passive:true});
-    window.addEventListener('scroll',onScroll,{passive:true});
-  });
-})();
+  const container=document.querySelector('.content');
+  if(container)container.addEventListener('scroll',onScroll,{passive:true});
+  window.addEventListener('scroll',onScroll,{passive:true});
+});
 </script>
 
   <!-- Invoice Changes Export Modal -->
