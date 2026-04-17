@@ -214,6 +214,8 @@ tbody tr:hover{background:var(--bg)}
 .trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
 /* Empty */
 .empty{text-align:center;padding:40px 24px;color:var(--ink3)}
+#back-to-top{position:fixed;bottom:28px;right:28px;width:38px;height:38px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:18px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);display:none;align-items:center;justify-content:center;z-index:999;transition:opacity .2s;}
+#back-to-top:hover{opacity:.85;}
 .empty-icon{font-size:36px;margin-bottom:10px;opacity:0.4}
 .empty-text{font-size:13px;margin-bottom:14px}
 /* Toast */
@@ -366,7 +368,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="card-hdr" style="position:sticky;top:57px;z-index:50;background:var(--surface);border-radius:12px 12px 0 0">
           <span class="card-title">All Invoices</span>
           <div class="filters">
-            <input class="sinp" id="inv-search" placeholder="Search…" oninput="renderInvoices()">
+            <input class="sinp" id="inv-search" placeholder="Search…" oninput="_dRenderInvoices()">
             <select class="fltsel" id="inv-cf" onchange="renderInvoices()"><option value="">All</option></select>
             <select class="fltsel" id="inv-mf" onchange="renderInvoices()"><option value="">All months</option></select>
             <select class="fltsel" id="inv-rf" onchange="renderInvoices()">
@@ -397,7 +399,7 @@ tbody tr:hover{background:var(--bg)}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;position:sticky;top:57px;z-index:50;background:var(--bg);padding-top:8px;padding-bottom:12px">
         <p style="color:var(--ink2);font-size:13px">Recurring invoices generate automatically each month.</p>
         <div style="display:flex;gap:10px;align-items:center">
-          <input class="sinp" id="recur-search" placeholder="Search schedules…" oninput="renderRecurring()" style="width:200px">
+          <input class="sinp" id="recur-search" placeholder="Search schedules…" oninput="_dRenderRecurring()" style="width:200px">
           <div class="seg-ctrl" id="recur-status-filter">
             <button class="seg-btn active" data-val="all" onclick="setRecurFilter('all')">All</button>
             <button class="seg-btn" data-val="active" onclick="setRecurFilter('active')">Active</button>
@@ -439,7 +441,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="card-hdr" style="position:sticky;top:57px;z-index:50;background:var(--surface);border-radius:12px 12px 0 0">
           <span class="card-title">Customers</span>
           <div style="display:flex;gap:8px;align-items:center">
-            <input class="sinp" id="cust-search" placeholder="Search customers…" oninput="renderCustomers()" style="width:180px">
+            <input class="sinp" id="cust-search" placeholder="Search customers…" oninput="_dRenderCustomers()" style="width:180px">
             <select class="fltsel" id="cust-sort" onchange="renderCustomers()">
               <option value="name-az">Name A–Z</option>
               <option value="name-za">Name Z–A</option>
@@ -904,9 +906,31 @@ function clearCommFilters(){
 }
 
 // ── Overlays ──────────────────────────────────────────────────────────
-function openOverlay(id){document.getElementById(id).classList.add('open');}
+function openOverlay(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='inv-modal'||id==='cust-modal'){
+    window._formDirty=false;
+    setTimeout(()=>{
+      document.querySelectorAll(`#${id} input,#${id} select,#${id} textarea`)
+        .forEach(el=>el.addEventListener('input',()=>window._formDirty=true));
+    },50);
+  }
+}
 function showOverlay(id){document.getElementById(id).classList.add('open');}
-function closeOverlay(id){document.getElementById(id).classList.remove('open');}
+function closeOverlay(id){
+  // Dirty-check for edit modals
+  if((id==='inv-modal'||id==='cust-modal')&&window._formDirty){
+    if(!confirm('You have unsaved changes. Close anyway?'))return;
+  }
+  window._formDirty=false;
+  document.getElementById(id).classList.remove('open');
+}
+
+// Debounce helper
+function debounce(fn,ms=300){let t;return(...args)=>{clearTimeout(t);t=setTimeout(()=>fn(...args),ms);};}
+const _dRenderInvoices=debounce(renderInvoices,250);
+const _dRenderCustomers=debounce(renderCustomers,250);
+const _dRenderRecurring=debounce(renderRecurring,250);
 document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)closeOverlay(el.id);}));
 
 // ── Confirm ───────────────────────────────────────────────────────────
@@ -980,7 +1004,7 @@ function saveCust(thenAction){
     newId='c'+Date.now();
     DB.customers.push({id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8});
   }
-  persist();closeOverlay('cust-modal');showToast(editCustId?'Customer updated.':'Customer added!');
+  persist();window._formDirty=false;closeOverlay('cust-modal');showToast(editCustId?'Customer updated.':'Customer added!');
   renderCustomers();fillCustDd('');refreshFilters();
   return newId;
 }
@@ -1317,7 +1341,7 @@ function saveInv(){
   }else{
     payload.id='i'+Date.now();DB.seq++;DB.invoices.unshift(payload);
   }
-  persist();closeOverlay('inv-modal');showToast(editInvId?'Invoice updated!':'Invoice created!');
+  persist();window._formDirty=false;closeOverlay('inv-modal');showToast(editInvId?'Invoice updated!':'Invoice created!');
   renderDash();renderInvoices();refreshFilters();
 }
 
@@ -1472,6 +1496,7 @@ function viewSchedPreview(sid){
 
 // ── Invoices table with sorting (#10) ─────────────────────────────────
 let invSort={col:'date',dir:-1};
+window._formDirty=false;
 function sortTable(tbl,col,th){
   if(tbl==='inv'){invSort.dir=(invSort.col===col)?-invSort.dir:-1;invSort.col=col;document.querySelectorAll('#inv-table th').forEach(t=>t.classList.remove('sorted'));if(th)th.classList.add('sorted');renderInvoices();}
 }
@@ -1513,7 +1538,26 @@ function renderInvoices(){
     return 0;
   });
   const tb=document.getElementById('inv-tbody'),em=document.getElementById('inv-empty');
-  if(!invs.length){tb.innerHTML='';em.style.display='block';return;}
+  if(!invs.length){
+    tb.innerHTML='';
+    // Contextual empty message
+    const mfVal=document.getElementById('inv-mf')?.value||'';
+    const cfVal=document.getElementById('inv-cf')?.value||'';
+    const qVal=(document.getElementById('inv-search')?.value||'').trim();
+    let emIcon='≡', emMsg='No invoices found.';
+    if(mfVal){
+      const [yr,mo]=mfVal.split('-');
+      const monthName=new Date(+yr,+mo-1,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+      emMsg=`No invoices in ${monthName}.`;
+    } else if(qVal){
+      emMsg=`No invoices matching "${qVal}".`;
+    } else if(cfVal){
+      emMsg='No invoices for this customer.';
+    }
+    em.querySelector('.empty-text').textContent=emMsg;
+    em.style.display='block';
+    return;
+  }
   em.style.display='none';
   tb.innerHTML=invs.map(inv=>{
     const c=DB.customers.find(x=>x.id===inv.customerId);
@@ -3173,6 +3217,19 @@ function openCustProfile(id){
 }
 
 
+
+// Back-to-top button
+(function(){
+  const btn=document.getElementById('back-to-top');
+  if(!btn)return;
+  function onScroll(){
+    const scrolled=window.scrollY||document.documentElement.scrollTop||
+      Array.from(document.querySelectorAll('.tab-content.active')).reduce((a,el)=>Math.max(a,el.scrollTop),0);
+    btn.style.display=scrolled>300?'flex':'none';
+  }
+  window.addEventListener('scroll',onScroll,{passive:true});
+  document.addEventListener('scroll',onScroll,{passive:true,capture:true});
+})();
 </script>
 
   <!-- Invoice Changes Export Modal -->
@@ -3301,5 +3358,6 @@ function openCustProfile(id){
 </div>
 <div id="pm-tip" style="position:fixed;display:none;background:rgba(30,30,30,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-family:monospace;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25)"></div>
 
+<button id="back-to-top" title="Back to top" onclick="document.querySelector('.content')||window.scrollTo({top:0,behavior:'smooth'});document.querySelectorAll('.tab-content.active,.content').forEach(el=>el.scrollTo({top:0,behavior:'smooth'}));">↑</button>
 </body>
 </html>
