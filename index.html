@@ -1886,7 +1886,7 @@ function renderDash(){
       return`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${PM_HEX[pm]}" stroke-width="${sw}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="butt" style="cursor:pointer;transition:opacity 0.15s" onmouseenter="this.style.opacity='0.7';document.getElementById('dc-lbl-${which}').textContent='${pmSafe}';document.getElementById('dc-amt-${which}').textContent='${subFmt}';" onmouseleave="this.style.opacity='1';document.getElementById('dc-lbl-${which}').textContent='${labelSafe}';document.getElementById('dc-amt-${which}').textContent='${centerAmt}';" onclick="showPMBreakdown('${pm}','${which}')"/>`;
     }).join('');
     const keyRows=allPMs.filter(pm=>dataObj[pm]?.sub>0).map(pm=>{
-      return`<div style="display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer" onclick="showPMBreakdown('${pm}','${which}')">
+      return`<div style="display:flex;align-items:center;gap:6px;padding:1px 0;cursor:pointer;line-height:1.5" onclick="showPMBreakdown('${pm}','${which}')">
         <div style="width:9px;height:9px;border-radius:2px;background:${PM_HEX[pm]};flex-shrink:0"></div>
         <div style="font-size:11px;color:var(--ink);font-family:var(--mono);flex:1">${pm}</div>
         <div style="font-size:11px;font-family:var(--mono);color:var(--ink);font-weight:600">${fmtGBP(dataObj[pm].sub)}</div>
@@ -1903,7 +1903,7 @@ function renderDash(){
         <text id="dc-amt-${which}" x="${cx}" y="${cy+6}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
       </svg>
       <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:1px">inc. ${centerInc}</div>
-      <div style="width:100%;padding:4px 8px 0;border-top:1px solid var(--border);margin-top:4px;align-self:stretch">${keyRows}</div>
+      <div style="width:100%;padding:4px 8px 0;border-top:1px solid var(--border);margin-top:4px;align-self:stretch;display:flex;flex-direction:column;gap:0">${keyRows}</div>
       ${footnote}
     </div>`;
   }
