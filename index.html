@@ -50,7 +50,7 @@
   --teal:#0e6e72;--teal-light:#e4f4f5;
   --serif:'Instrument Serif',serif;--sans:'Figtree',sans-serif;--mono:'JetBrains Mono',monospace;
 }
-body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
+body{font-family:var(--sans);background:linear-gradient(135deg,#d8dff0 0%,#eef0f5 45%,#e5ecf6 100%) fixed;color:var(--ink);min-height:100vh;font-size:14px;line-height:1.5}
 .shell{display:flex;min-height:100vh}
 .sidebar{width:230px;flex-shrink:0;background:#1C2333;display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:200;overflow-y:auto}
 .main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh}
@@ -66,7 +66,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0}
 .sidebar-footer{margin-top:auto;padding:20px 24px;border-top:1px solid rgba(255,255,255,0.08)}
 .sidebar-footer p{font-size:11px;color:rgba(255,255,255,0.25);font-family:var(--mono)}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 4px rgba(28,43,58,0.05)}
+.topbar{background:rgba(255,255,255,0.88);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.6);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 12px rgba(28,43,58,0.08)}
 .page-title{font-family:var(--serif);font-size:26px;letter-spacing:-0.5px}
 .topbar-right{display:flex;gap:10px;align-items:center}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:6px;border:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:600;transition:all 0.15s}
@@ -83,14 +83,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:10
 .mbtn{width:34px;height:34px;border-radius:50%;background:var(--surface);border:1px solid var(--border2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.15s;color:var(--ink2)}
 .mbtn:hover{background:#FDE8D0;border-color:#F07830;color:#C05A10}
 .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06)}
+.stat{background:rgba(255,255,255,0.80);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.7);border-radius:12px;padding:20px 22px;position:relative;overflow:hidden;box-shadow:0 4px 20px rgba(28,43,58,0.09)}
 .stat-bar{position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
 .stat-bar.gold{background:var(--gold)}.stat-bar.rust{background:var(--accent2)}.stat-bar.slate{background:var(--ink3)}.stat-bar.teal{background:var(--teal)}
 .stat-lbl{font-size:11px;color:var(--ink3);letter-spacing:1px;text-transform:uppercase;font-family:var(--mono);margin-bottom:8px}
 .stat-val{font-family:var(--serif);font-size:30px;letter-spacing:-1px;line-height:1}
 .stat-sub{font-size:11px;color:var(--ink3);margin-top:5px;font-family:var(--mono)}
 /* Cards */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;box-shadow:0 2px 8px rgba(28,43,58,0.06)}
+.card{background:rgba(255,255,255,0.80);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,0.7);border-radius:12px;overflow:hidden;margin-bottom:20px;box-shadow:0 4px 20px rgba(28,43,58,0.09)}
 .card-hdr{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;background:var(--bg)}
 .card-title{font-weight:600;font-size:14px;flex:1}
 .card-toggle{background:none;border:none;cursor:pointer;padding:0 0 0 6px;color:var(--ink3);font-size:14px;line-height:1;transition:transform .2s;display:inline-flex;align-items:center}
@@ -127,7 +127,7 @@ tbody tr:hover{background:var(--bg)}
 /* Modals */
 .overlay{position:fixed;inset:0;background:rgba(26,25,22,0.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 0.2s}
 .overlay.open{opacity:1;pointer-events:all}
-.modal{background:var(--surface);border:1px solid var(--border2);border-radius:14px;padding:30px;width:660px;max-height:90vh;overflow-y:auto;transform:translateY(12px);transition:transform 0.2s;box-shadow:0 8px 32px rgba(28,43,58,0.18)}
+.modal{background:rgba(255,255,255,0.93);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.7);border-radius:14px;padding:30px;width:660px;max-height:90vh;overflow-y:auto;transform:translateY(12px);transition:transform 0.2s;box-shadow:0 12px 40px rgba(28,43,58,0.18)}
 .overlay.open .modal{transform:translateY(0)}
 .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
 .modal-title{font-family:var(--serif);font-size:24px;letter-spacing:-0.3px}
@@ -142,7 +142,7 @@ tbody tr:hover{background:var(--bg)}
 .fg.full{grid-column:1/-1}
 .flbl{font-size:11px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;font-family:var(--mono)}
 .finp,.fsel,.ftxt{background:var(--bg);border:1px solid var(--border2);color:var(--ink);padding:9px 12px;border-radius:7px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color 0.15s,box-shadow 0.15s}
-.finp:focus,.fsel:focus,.ftxt:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,92,63,0.1)}
+.finp:focus,.fsel:focus,.ftxt:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,120,48,0.15)}
 .fsel option{background:var(--surface)}
 .ftxt{resize:vertical;min-height:60px;width:100%}
 .fhint{font-size:11px;color:var(--ink3);font-family:var(--mono)}
@@ -234,6 +234,19 @@ tbody tr:hover{background:var(--bg)}
 ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 @media(max-width:900px){.sgrid{grid-template-columns:1fr 1fr}.dgrid{grid-template-columns:1fr}.sidebar{width:190px}.main{margin-left:190px}}
 @media(max-width:640px){.sidebar{display:none}.main{margin-left:0}}
+
+/* Export dropdown */
+.exp-dd-item{padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;color:var(--ink2);transition:background 0.12s;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.exp-dd-item:last-child{border-bottom:none}
+.exp-dd-item:hover{background:rgba(240,120,48,0.08);color:var(--accent)}
+/* Customer profile */
+.cp-stat{text-align:center;padding:16px 12px;background:rgba(240,120,48,0.05);border-radius:10px;border:1px solid rgba(240,120,48,0.12)}
+.cp-stat-val{font-family:var(--serif);font-size:24px;letter-spacing:-0.5px;color:var(--accent)}
+.cp-stat-lbl{font-size:10px;color:var(--ink3);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;margin-top:3px}
+.cp-name-cell{cursor:pointer;transition:color 0.15s}
+.cp-name-cell:hover{color:var(--accent)!important;text-decoration:underline;text-underline-offset:3px}
+/* Sinp orange focus */
+.sinp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(240,120,48,0.15)}
 </style>
 </head>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -263,9 +276,14 @@ tbody tr:hover{background:var(--bg)}
   <div class="topbar">
     <div class="page-title" id="pageTitle">Dashboard</div>
     <div class="topbar-right">
-      <button class="btn btn-ghost" onclick="openExport()">↓ Export to Excel</button>
-      <button class="btn btn-ghost" onclick="exportVarianceReport()" title="Export variance comparison between current month actuals and next month forecast">↓ Variance Report</button>
-      <button class="btn btn-ghost" onclick="showInvoiceChangesModal()" title="Compare invoices across two date ranges">↓ Invoice Changes</button>
+      <div style="position:relative" id="export-dd-wrap">
+        <button class="btn btn-ghost" onclick="toggleExportDd(event)" id="export-dd-btn">↓ Export ▾</button>
+        <div id="export-dd" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:rgba(255,255,255,0.96);backdrop-filter:blur(16px);border:1px solid var(--border2);border-radius:10px;box-shadow:0 8px 28px rgba(28,43,58,0.14);min-width:210px;z-index:400;overflow:hidden">
+          <div class="exp-dd-item" onclick="openExport();closeExportDd()">📊 Export to Excel</div>
+          <div class="exp-dd-item" onclick="exportVarianceReport();closeExportDd()">📈 Variance Report</div>
+          <div class="exp-dd-item" onclick="showInvoiceChangesModal();closeExportDd()">🔄 Invoice Changes</div>
+        </div>
+      </div>
       <button class="btn btn-ghost" onclick="openCustModal()">+ Customer</button>
       <button class="btn btn-primary" onclick="openInvModal()">+ New Invoice</button>
     </div>
@@ -1004,7 +1022,7 @@ function renderCustomers(){
     const sc=DB.schedules.filter(s=>s.customerId===c.id&&s.active).length;
     return`<tr>
       <td><span style="width:10px;height:10px;border-radius:50%;background:${COLS[c.ci||0]};display:inline-block"></span></td>
-      <td style="font-weight:600">${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
+      <td class="cp-name-cell" style="font-weight:600" onclick="openCustProfile('${c.id}')">⊡ ${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
       <td class="muted">${c.company||'—'}</td><td class="muted">${c.email||'—'}</td>
       <td class="r">${invs.length}</td><td class="r">${tot?fmtGBP(tot):'—'}</td>
       <td><div style="display:flex;gap:6px">
@@ -3148,6 +3166,140 @@ function exportPMBreakdown(){
   </div>
 </div>
 
+
+<!-- Customer Profile Modal -->
+<div class="overlay" id="cust-profile-overlay" onclick="if(event.target===this)closeOverlay('cust-profile-overlay')">
+  <div class="modal" style="width:780px;max-width:95vw">
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div id="cp-dot" style="width:18px;height:18px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 3px rgba(0,0,0,0.06)"></div>
+        <div>
+          <div class="modal-title" id="cp-name">Customer</div>
+          <div class="modal-sub" id="cp-company"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost btn-sm" id="cp-edit-btn">✎ Edit</button>
+        <button class="btn btn-primary btn-sm" id="cp-inv-btn">+ Invoice</button>
+        <button class="xbtn" onclick="closeOverlay('cust-profile-overlay')">✕</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px" id="cp-stats"></div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);font-family:var(--mono);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Invoice History</div>
+    <div id="cp-no-inv" style="text-align:center;padding:30px 0;color:var(--ink3);font-size:13px;display:none">No invoices yet for this customer.</div>
+    <div id="cp-inv-wrap" style="overflow-y:auto;max-height:340px;border-radius:8px;border:1px solid var(--border)">
+      <table id="cp-inv-table">
+        <thead><tr>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Period</th>
+          <th class="r">Ex VAT</th>
+          <th class="r">Inc VAT</th>
+          <th>Type</th>
+        </tr></thead>
+        <tbody id="cp-inv-tbody"></tbody>
+      </table>
+    </div>
+    <div id="cp-schedules-section" style="margin-top:20px;display:none">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);font-family:var(--mono);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">Active Recurring Schedules</div>
+      <div id="cp-schedules-list"></div>
+    </div>
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeOverlay('cust-profile-overlay')">Close</button>
+    </div>
+  </div>
+</div>
 <div id="pm-tip" style="position:fixed;display:none;background:rgba(30,30,30,0.88);color:#fff;padding:5px 14px;border-radius:20px;font-size:12px;font-family:monospace;pointer-events:none;z-index:9999;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.25)"></div>
+
+// ── Export dropdown ────────────────────────────────────────────────────
+function toggleExportDd(e){
+  e.stopPropagation();
+  const dd=document.getElementById('export-dd');
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+function closeExportDd(){
+  const dd=document.getElementById('export-dd');
+  if(dd)dd.style.display='none';
+}
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('export-dd-wrap');
+  if(wrap&&!wrap.contains(e.target))closeExportDd();
+});
+
+// ── Customer Profile ───────────────────────────────────────────────────
+function openCustProfile(id){
+  const c=DB.customers.find(x=>x.id===id);
+  if(!c)return;
+  const invs=DB.invoices.filter(i=>i.customerId===id).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const scheds=DB.schedules.filter(s=>s.customerId===id&&s.active);
+
+  // Header
+  document.getElementById('cp-dot').style.background=COLS[c.ci||0];
+  document.getElementById('cp-name').textContent=c.name;
+  const subParts=[c.company,c.email].filter(Boolean);
+  document.getElementById('cp-company').textContent=subParts.join(' · ')||'No additional details';
+
+  // Action buttons
+  document.getElementById('cp-edit-btn').onclick=()=>{closeOverlay('cust-profile-overlay');openCustModal(id);};
+  document.getElementById('cp-inv-btn').onclick=()=>{closeOverlay('cust-profile-overlay');openInvModal(null,false,id);};
+
+  // Stats
+  const totEx=invs.reduce((s,i)=>s+(i.total||0),0);
+  const totInc=invs.reduce((s,i)=>s+(i.totalInc||i.total*1.2||0),0);
+  const lastInv=invs.length?invs[0]:null;
+  document.getElementById('cp-stats').innerHTML=[
+    {val:fmtGBP(totEx),lbl:'Total Ex VAT'},
+    {val:fmtGBP(totInc||totEx*1.2),lbl:'Total Inc VAT'},
+    {val:invs.length,lbl:'Invoices'},
+    {val:scheds.length,lbl:'Active Schedules'},
+  ].map(s=>`<div class="cp-stat"><div class="cp-stat-val">${s.val}</div><div class="cp-stat-lbl">${s.lbl}</div></div>`).join('');
+
+  // Invoice table
+  const tbody=document.getElementById('cp-inv-tbody');
+  const noInv=document.getElementById('cp-no-inv');
+  const wrap=document.getElementById('cp-inv-wrap');
+  if(!invs.length){
+    tbody.innerHTML='';wrap.style.display='none';noInv.style.display='block';
+  }else{
+    wrap.style.display='';noInv.style.display='none';
+    tbody.innerHTML=invs.map(i=>{
+      const desc=(i.lines&&i.lines.length)?i.lines.map(l=>l.desc).filter(Boolean).join(', ')||'—':'—';
+      const period=i.period||'';
+      return`<tr>
+        <td style="font-family:var(--mono);font-size:12px;white-space:nowrap">${i.date||'—'}</td>
+        <td style="font-size:13px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${desc.replace(/"/g,'&quot;')}">${desc}</td>
+        <td style="font-family:var(--mono);font-size:12px;color:var(--ink3)">${period}</td>
+        <td class="r">${fmtGBP(i.total||0)}</td>
+        <td class="r">${fmtGBP(i.totalInc||0)}</td>
+        <td><span class="badge ${i.scheduleId?'b-recur':'b-active'}">${i.scheduleId?'↻ Recur':'One-off'}</span></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Schedules section
+  const schedSec=document.getElementById('cp-schedules-section');
+  const schedList=document.getElementById('cp-schedules-list');
+  if(scheds.length){
+    schedSec.style.display='block';
+    schedList.innerHTML=scheds.map(s=>{
+      const amt=s.lines?s.lines.reduce((t,l)=>t+(l.qty||1)*(l.price||0),0):0;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--teal-light);border-radius:8px;margin-bottom:8px;border:1px solid rgba(14,110,114,0.15)">
+        <div>
+          <div style="font-weight:600;font-size:13px">${s.name||'Schedule'}</div>
+          <div style="font-size:11px;color:var(--ink3);font-family:var(--mono);margin-top:2px">From ${s.schedStart||'—'}${s.schedEnd?' → '+s.schedEnd:' (ongoing)'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--serif);font-size:18px;color:var(--teal)">${fmtGBP(amt)}</div>
+          <div style="font-size:11px;color:var(--ink3);font-family:var(--mono)">per month ex VAT</div>
+        </div>
+      </div>`;
+    }).join('');
+  }else{
+    schedSec.style.display='none';
+  }
+
+  openOverlay('cust-profile-overlay');
+}
+
 </body>
 </html>
