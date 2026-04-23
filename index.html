@@ -1933,7 +1933,7 @@ function renderDash(){
 
   // SVG donut helper
   function pmDonut(dataObj,grandSub,label,which){
-    const r=52,cx=70,cy=70,sw=16,circ=2*Math.PI*r;
+    const r=44,cx=58,cy=58,sw=14,circ=2*Math.PI*r;
     let cumLen=0;
     const allPMs=[...PM_LABELS,'Unspecified'];
     const incTotal=Object.values(dataObj).reduce((s,v)=>s+v.total,0);
@@ -1965,7 +1965,7 @@ function renderDash(){
       <div style="font-size:13px;font-weight:700;color:var(--ink);font-family:var(--sans);margin-bottom:6px;letter-spacing:0.01em">${label}</div>
       <div style="display:flex;flex-direction:row;align-items:center;gap:14px">
         <div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">
-          <svg width="140" height="140" viewBox="0 0 140 140">
+          <svg width="116" height="116" viewBox="0 0 116 116">
             <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
             ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
             <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="11" fill="var(--ink3)" font-family="monospace">${label}</text>
@@ -1973,7 +1973,7 @@ function renderDash(){
           </svg>
           <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);margin-top:2px">inc. ${centerInc}</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:2px;min-width:130px">
+        <div style="display:flex;flex-direction:column;gap:2px;min-width:110px">
           ${legendItems}
           ${footnote}
         </div>
@@ -2003,10 +2003,10 @@ function renderDash(){
   const pmFace=document.getElementById('pay-method-face');
   if(pmFace){
     pmFace.innerHTML=`
-      <div style="display:flex;gap:0;align-items:flex-start;flex-wrap:wrap;justify-content:center">
-        <div style="padding-right:28px">${pmDonut(thisPM,thisGrandSub,isFutureDash?'Predicted':'This month','this')}</div>
-        <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px"></div>
-        <div style="padding-left:28px">${pmDonut(nextPM,nextGrandSub,'Next month','next')}</div>
+      <div style="display:flex;gap:0;align-items:flex-start;flex-wrap:nowrap;justify-content:center">
+        <div style="padding-right:14px;flex:1;min-width:0">${pmDonut(thisPM,thisGrandSub,isFutureDash?'Predicted':'This month','this')}</div>
+        <div style="width:1px;background:var(--border);align-self:stretch;margin:0 4px;flex-shrink:0"></div>
+        <div style="padding-left:14px;flex:1;min-width:0">${pmDonut(nextPM,nextGrandSub,'Next month','next')}</div>
       </div>`;
   }
 }
