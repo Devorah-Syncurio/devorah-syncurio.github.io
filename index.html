@@ -810,6 +810,18 @@ tbody tr:hover{background:var(--bg)}
       <div class="rcb-title">📋 Keep existing invoices</div>
       <div class="rcb-sub">Leave all existing invoices untouched. Only create new invoices for months not yet covered by this template.</div>
     </button>
+    <button class="regen-choice-btn" id="regen-btn-fromdate">
+      <div class="rcb-title">✂️ Apply from month forward</div>
+      <div class="rcb-sub">Keep all invoices before your chosen month exactly as they are. Regenerate invoices from that month onward with the new settings.</div>
+    </button>
+    <div id="regen-fromdate-row" style="display:none;margin-top:4px;padding:12px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+      <label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em">Apply changes from month:</label>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <input type="month" id="regen-fromdate-input" class="finp" style="width:170px;padding:7px 10px">
+        <button class="btn btn-primary btn-sm" id="regen-btn-fromdate-confirm">Apply</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('regen-fromdate-row').style.display='none'">Back</button>
+      </div>
+    </div>
     <button class="btn btn-ghost" onclick="closeRegenConf()" style="width:100%;margin-top:4px">Cancel</button>
   </div>
 </div>
@@ -1131,6 +1143,36 @@ function keepRegenSchedule(s){
   });
 }
 
+// Regenerate invoices for a schedule from a given YYYY-MM onward, leaving earlier ones intact
+function regenFromDate(s, fromYYYYMM){
+  // Remove only invoices on/after fromYYYYMM for this schedule
+  DB.invoices=DB.invoices.filter(i=>{
+    if(i.scheduleId!==s.id)return true;
+    const m=(i.periodStart||i.date||'').slice(0,7);
+    return m<fromYYYYMM;
+  });
+  // Regenerate months >= fromYYYYMM
+  let seq=0;
+  schedMonths(s).filter(m=>m>=fromYYYYMM).forEach(mKey=>{
+    const[yr,mo]=mKey.split('-').map(Number);
+    const day=Math.min(s.dayOfMonth||1,28);
+    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const inv={
+      id:'ri'+Date.now()+'_'+(seq++),
+      scheduleId:s.id,customerId:s.customerId,
+      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+      currency:s.currency,
+      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
+      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
+      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
+      serviceType:s.serviceType||'',
+      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
+    };
+    inv.total=inv.subtotal+inv.vat;
+    DB.invoices.unshift(inv);DB.seq++;
+  });
+}
+
 // Show the regen choice dialog; after() is called once user picks
 let _regenAfter=null,_regenSched=null;
 function showRegenChoice(s,after){
@@ -1138,15 +1180,30 @@ function showRegenChoice(s,after){
   _regenSched=s;_regenAfter=after;
   document.getElementById('regen-msg').innerHTML=
     `This template has <strong>${n}</strong> existing invoice${n!==1?'s':''} already generated. Choose how to handle them:`;
+  document.getElementById('regen-fromdate-row').style.display='none';
   document.getElementById('regen-btn-update').onclick=()=>{
     closeRegenConf();regenSchedule(_regenSched);if(_regenAfter)_regenAfter('updated');
   };
   document.getElementById('regen-btn-keep').onclick=()=>{
     closeRegenConf();keepRegenSchedule(_regenSched);if(_regenAfter)_regenAfter('kept');
   };
+  document.getElementById('regen-btn-fromdate').onclick=()=>{
+    // Default to current month
+    document.getElementById('regen-fromdate-input').value=today().slice(0,7);
+    document.getElementById('regen-fromdate-row').style.display='';
+  };
+  document.getElementById('regen-btn-fromdate-confirm').onclick=()=>{
+    const fromVal=document.getElementById('regen-fromdate-input').value;
+    if(!fromVal){showToast('Please choose a month.');return;}
+    closeRegenConf();regenFromDate(_regenSched,fromVal);
+    if(_regenAfter)_regenAfter('fromdate');
+  };
   document.getElementById('regen-conf').classList.add('open');
 }
-function closeRegenConf(){document.getElementById('regen-conf').classList.remove('open');}
+function closeRegenConf(){
+  document.getElementById('regen-conf').classList.remove('open');
+  document.getElementById('regen-fromdate-row').style.display='none';
+}
 
 function genRecurring(){
   let changed=false;
@@ -1282,7 +1339,7 @@ function saveInv(){
     if(existingCount>0){
       showRegenChoice(s,(mode)=>{
         persist();
-        const msg=mode==='updated'?'Schedule updated — invoices regenerated.':'Schedule updated — existing invoices kept.';
+        const msg=mode==='updated'?'Schedule updated — invoices regenerated.':mode==='fromdate'?'Schedule updated — invoices from chosen month regenerated.':'Schedule updated — existing invoices kept.';
         showToast(msg);renderRecurring();renderDash();renderInvoices();refreshFilters();
       });
     }else{
@@ -1312,7 +1369,7 @@ function saveInv(){
           if(existingCount>0){
             showRegenChoice(s,(mode)=>{
               persist();
-              const msg=mode==='updated'?'Schedule updated — invoices regenerated.':'Schedule updated — existing invoices kept.';
+              const msg=mode==='updated'?'Schedule updated — invoices regenerated.':mode==='fromdate'?'Schedule updated — invoices from chosen month regenerated.':'Schedule updated — existing invoices kept.';
               showToast(msg);renderRecurring();renderDash();renderInvoices();refreshFilters();
             });
           }else{
