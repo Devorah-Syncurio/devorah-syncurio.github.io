@@ -371,14 +371,15 @@ tbody tr:hover{background:var(--bg)}
           </div>
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:12px;align-self:start">
-          <div class="card" id="mom-card" style="overflow:hidden">
+        <div style="display:flex;flex-direction:row;gap:12px;align-self:start">
+          <div class="card" id="mom-card" style="overflow:hidden;flex:1;min-width:0">
             <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
               <span class="card-title" style="font-size:12px">Month on month</span>
             </div>
             <div class="card-body" id="mom-body" style="padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
           </div>
-          <div class="card" id="tom-card" style="overflow:hidden">
+          <div style="width:1px;background:var(--border);align-self:stretch"></div>
+          <div class="card" id="tom-card" style="overflow:hidden;flex:1;min-width:0">
             <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
               <span class="card-title" style="font-size:12px">This vs next month</span>
             </div>
@@ -1973,7 +1974,7 @@ function renderDash(){
       const fc=buildForecast(0,nextKey,nextKey);
       if(fc.length){
         // buildForecast returns aggregate; rebuild as pseudo-invoice list from recurring
-        nextInvs=DB.recurring.filter(r=>r.status==='active'||r.status===undefined).map(r=>{
+        nextInvs=DB.schedules.filter(r=>r.active!==false).map(r=>{
           const c=DB.customers.find(x=>x.id===r.customerId);
           const vr=r.vatRate??20;
           const sub=r.amount||0;
