@@ -371,11 +371,19 @@ tbody tr:hover{background:var(--bg)}
           </div>
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
-        <div class="card" id="mom-card" style="overflow:hidden;align-self:start">
-          <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
-            <span class="card-title" style="font-size:12px">Month on month</span>
+        <div style="display:flex;flex-direction:column;gap:12px;align-self:start">
+          <div class="card" id="mom-card" style="overflow:hidden">
+            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
+              <span class="card-title" style="font-size:12px">Month on month</span>
+            </div>
+            <div class="card-body" id="mom-body" style="padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
           </div>
-          <div class="card-body" id="mom-body" style="padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px"></div>
+          <div class="card" id="tom-card" style="overflow:hidden">
+            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
+              <span class="card-title" style="font-size:12px">This vs next month</span>
+            </div>
+            <div class="card-body" id="tom-body" style="padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
+          </div>
         </div>
       </div>
 
@@ -1846,7 +1854,96 @@ function renderDash(){
   document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
 
-  // Month-on-month revenue change card
+  // Helper: build customer diff list between two sets of invoices
+  function custDiffs(aInvs, bInvs){
+    // a = "from" month, b = "to" month
+    const aMap={}, bMap={};
+    aInvs.forEach(i=>{
+      const c=DB.customers.find(x=>x.id===i.customerId);
+      const nm=c?.name||'Unknown';
+      aMap[nm]=(aMap[nm]||0)+(i.sub||i.total/(1+(i.vatRate||20)/100));
+    });
+    bInvs.forEach(i=>{
+      const c=DB.customers.find(x=>x.id===i.customerId);
+      const nm=c?.name||'Unknown';
+      bMap[nm]=(bMap[nm]||0)+(i.sub||i.total/(1+(i.vatRate||20)/100));
+    });
+    const all=new Set([...Object.keys(aMap),...Object.keys(bMap)]);
+    const ch=[];
+    all.forEach(nm=>{
+      const av=aMap[nm]||0, bv=bMap[nm]||0;
+      const d=bv-av;
+      if(Math.abs(d)<0.005)return;
+      const type=!aMap[nm]?'new':!bMap[nm]?'lost':'changed';
+      ch.push({nm,d,type});
+    });
+    ch.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+    return ch;
+  }
+
+  // Helper: render a compact MoM-style card body
+  function momCardHTML(deltaEx,deltaInc,vsLabel,noDataMsg){
+    const up=deltaEx>=0;
+    const arrowEx=up?'↑':'↓';
+    const colEx=up?'#3489A9':'#e05252';
+    const arrowInc=deltaInc>=0?'↑':'↓';
+    const colInc=deltaInc>=0?'#3489A9':'#e05252';
+    return `
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:5px">${vsLabel}</div>
+      <div style="font-size:22px;font-weight:700;color:${colEx};font-family:var(--mono);letter-spacing:-0.5px">${arrowEx} ${fmtGBP(Math.abs(deltaEx))}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:3px">ex VAT</div>
+      <div style="font-size:12px;color:${colInc};font-family:var(--mono)">${arrowInc} ${fmtGBP(Math.abs(deltaInc))} <span style="color:var(--ink3);font-size:11px">inc. VAT</span></div>
+      ${noDataMsg?`<div style="font-size:11px;color:var(--ink3);margin-top:4px;font-style:italic">${noDataMsg}</div>`:''}
+    `;
+  }
+
+  // Helper: attach tooltip to a card body element using stored diffs
+  function attachMomTooltip(elId, diffsKey){
+    const el=document.getElementById(elId);
+    const tip=document.getElementById('trend-tooltip');
+    if(!el||!tip)return;
+    const fresh=el.cloneNode(true);
+    el.parentNode.replaceChild(fresh,el);
+    fresh.addEventListener('mouseenter',function(e){showMomTip(e,diffsKey);});
+    fresh.addEventListener('mousemove',function(e){showMomTip(e,diffsKey);});
+    fresh.addEventListener('mouseleave',()=>{tip.style.display='none';});
+  }
+
+  function showMomTip(e,diffsKey){
+    const tip=document.getElementById('trend-tooltip');
+    if(!tip)return;
+    const data=window[diffsKey];
+    if(!data){tip.style.display='none';return;}
+    const {deltaEx,deltaInc,vsLabel,ch,isForecast}=data;
+    const up=deltaEx>=0;
+    const col=up?'#4ecdc4':'#f87171';
+    const sign=up?'↑':'↓';
+    let html=`<div style="font-weight:700;font-size:12px;color:#cdd5e0;margin-bottom:4px">${vsLabel}</div>`;
+    html+=`<div style="font-size:13px;font-weight:700;color:${col};font-family:var(--mono);margin-bottom:2px">${sign} ${fmtGBP(Math.abs(deltaEx))} <span style="font-size:10px;color:#9CA3AF;font-weight:400">ex VAT</span></div>`;
+    html+=`<div style="font-size:11px;color:${col};font-family:var(--mono);margin-bottom:6px">${deltaInc>=0?'↑':'↓'} ${fmtGBP(Math.abs(deltaInc))} <span style="font-size:10px;color:#9CA3AF">inc. VAT</span></div>`;
+    if(isForecast){html+=`<div style="font-size:10px;color:#4ecdc4;margin-bottom:4px">* Next month from recurring schedules</div>`;}
+    if(ch&&ch.length){
+      html+=`<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;display:flex;flex-direction:column;gap:3px">`;
+      ch.slice(0,7).forEach(c=>{
+        const icon=c.type==='new'?'✦':c.type==='lost'?'✖':'~';
+        const cc=c.type==='new'?'#4ecdc4':c.type==='lost'?'#f87171':'#e2b96a';
+        const ds=(c.d>=0?'+':'')+fmtGBP(c.d);
+        html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
+      });
+      if(ch.length>7){html+=`<div style="color:#9CA3AF;font-size:10px;margin-top:2px">+${ch.length-7} more</div>`;}
+      html+=`</div>`;
+    } else {
+      html+=`<div style="font-size:10px;color:#9CA3AF">No individual customer changes</div>`;
+    }
+    tip.innerHTML=html;
+    tip.style.display='block';
+    const x=e.clientX+14,y=e.clientY-10;
+    const tw=tip.offsetWidth||240,th=tip.offsetHeight||80;
+    tip.style.left=(x+tw>window.innerWidth?e.clientX-tw-10:x)+'px';
+    tip.style.top=(y+th>window.innerHeight?e.clientY-th-10:y)+'px';
+  }
+
+  // Month-on-month: current month vs previous month
   {
     const prevMDate=new Date(dashY,dashM-1,1);
     const prevKey=`${prevMDate.getFullYear()}-${String(prevMDate.getMonth()+1).padStart(2,'0')}`;
@@ -1856,19 +1953,45 @@ function renderDash(){
     const prevMonthName=prevMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
     const deltaEx=thisMonthEx-prevEx;
     const deltaInc=thisMonthInc-prevInc;
-    const up=deltaEx>=0;
-    const arrowEx=up?'↑':'↓';
-    const colEx=up?'#3489A9':'#e05252';
-    const arrowInc=deltaInc>=0?'↑':'↓';
-    const colInc=deltaInc>=0?'#3489A9':'#e05252';
+    const ch=custDiffs(prevInvs,invs);
+    window._momDiffs={deltaEx,deltaInc,vsLabel:`vs ${prevMonthName}`,ch,isForecast:false};
     const body=document.getElementById('mom-body');
-    if(body)body.innerHTML=`
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:5px">vs ${prevMonthName}</div>
-      <div style="font-size:22px;font-weight:700;color:${colEx};font-family:var(--mono);letter-spacing:-0.5px">${arrowEx} ${fmtGBP(Math.abs(deltaEx))}</div>
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:3px">ex VAT</div>
-      <div style="font-size:12px;color:${colInc};font-family:var(--mono)">${arrowInc} ${fmtGBP(Math.abs(deltaInc))} <span style="color:var(--ink3);font-size:11px">inc. VAT</span></div>
-      ${prevInvs.length===0?'<div style="font-size:11px;color:var(--ink3);margin-top:4px;font-style:italic">No data last month</div>':''}
-    `;
+    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs ${prevMonthName}`,prevInvs.length===0?'No data last month':null);
+    attachMomTooltip('mom-body','_momDiffs');
+  }
+
+  // This vs next month: current month vs next month forecast
+  {
+    const nextMDate=new Date(dashY,dashM+1,1);
+    const nextKey=`${nextMDate.getFullYear()}-${String(nextMDate.getMonth()+1).padStart(2,'0')}`;
+    const nextMonthName=nextMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    // Next month: use actuals if available, else forecast from recurring
+    const nextActual=DB.invoices.filter(i=>mk(i.date)===nextKey);
+    let nextInvs=nextActual;
+    let isForecast=false;
+    if(!nextActual.length){
+      const fc=buildForecast(0,nextKey,nextKey);
+      if(fc.length){
+        // buildForecast returns aggregate; rebuild as pseudo-invoice list from recurring
+        nextInvs=DB.recurring.filter(r=>r.status==='active'||r.status===undefined).map(r=>{
+          const c=DB.customers.find(x=>x.id===r.customerId);
+          const vr=r.vatRate??20;
+          const sub=r.amount||0;
+          const total=+(sub*(1+vr/100)).toFixed(2);
+          return{customerId:r.customerId,sub,total,vatRate:vr,date:nextKey+'-01',_fromRecurring:true};
+        });
+        isForecast=true;
+      }
+    }
+    const nextEx=nextInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+    const nextInc=nextInvs.reduce((s,i)=>s+i.total,0);
+    const deltaEx=nextEx-thisMonthEx;
+    const deltaInc=nextInc-thisMonthInc;
+    const ch=custDiffs(invs,nextInvs);
+    window._tomDiffs={deltaEx,deltaInc,vsLabel:`vs ${nextMonthName}${isForecast?' *':''}`,ch,isForecast};
+    const body=document.getElementById('tom-body');
+    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs ${nextMonthName}${isForecast?' *':''}`,!nextInvs.length?'No data for next month':null);
+    attachMomTooltip('tom-body','_tomDiffs');
   }
 
   // (#4) Monthly trend: configurable start+count, future months = recurring forecast
@@ -1944,57 +2067,7 @@ function renderDash(){
   if(noteEl)noteEl.textContent=projN>0?`* Forecast from recurring schedules (${projN} month${projN!==1?'s':''})`:'';
   } // end trend block
 
-  // Trend bar tooltip setup (once per render)
-  (function setupTrendTooltip(){
-    const container=document.getElementById('trend-bars');
-    const tip=document.getElementById('trend-tooltip');
-    if(!container||!tip)return;
-    // Remove old listeners by cloning
-    const fresh=container.cloneNode(true);
-    container.parentNode.replaceChild(fresh,container);
-    fresh.addEventListener('mousemove',function(e){
-      const wrap=e.target.closest('[data-bidx]');
-      if(!wrap){tip.style.display='none';return;}
-      const idx=parseInt(wrap.dataset.bidx);
-      const bar=(window._trendBars||[])[idx];
-      const diff=(window._trendDiffs||[])[idx];
-      if(!bar){tip.style.display='none';return;}
-      // Build tooltip HTML
-      const typeCol=bar.type==='current'?'var(--gold)':bar.type==='forecast'?'#4ecdc4':'#9CA3AF';
-      let html=`<div style="font-weight:700;font-size:13px;color:${typeCol};margin-bottom:4px">${bar.fullLbl}</div>`;
-      html+=`<div style="font-size:12px;margin-bottom:6px">${fmtGBP(bar.t)}<span style="font-size:10px;color:#9CA3AF;margin-left:4px">inc VAT</span></div>`;
-      if(diff){
-        const up=diff.delta>=0;
-        const sign=up?'↑':'↓';
-        const col=up?'#4ecdc4':'#f87171';
-        html+=`<div style="font-size:11px;color:${col};font-weight:600;margin-bottom:6px">${sign} ${fmtGBP(Math.abs(diff.delta))} vs ${diff.prevLbl}</div>`;
-        if(diff.ch.length){
-          html+=`<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;display:flex;flex-direction:column;gap:3px">`;
-          const show=diff.ch.slice(0,6);
-          show.forEach(c=>{
-            const icon=c.type==='new'?'✦':c.type==='lost'?'✖':'~';
-            const cc=c.type==='new'?'#4ecdc4':c.type==='lost'?'#f87171':'#e2b96a';
-            const ds=(c.d>=0?'+':'')+fmtGBP(c.d);
-            html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
-          });
-          if(diff.ch.length>6){html+=`<div style="color:#9CA3AF;font-size:10px;margin-top:2px">+${diff.ch.length-6} more</div>`;}
-          html+=`</div>`;
-        } else {
-          html+=`<div style="font-size:10px;color:#9CA3AF">No customer changes</div>`;
-        }
-      } else if(bar.isFuture){
-        html+=`<div style="font-size:10px;color:#4ecdc4">Forecast from recurring schedules</div>`;
-      }
-      tip.innerHTML=html;
-      tip.style.display='block';
-      // Position near cursor, keep within viewport
-      const x=e.clientX+14, y=e.clientY-10;
-      const tw=tip.offsetWidth||240, th=tip.offsetHeight||80;
-      tip.style.left=(x+tw>window.innerWidth?e.clientX-tw-10:x)+'px';
-      tip.style.top=(y+th>window.innerHeight?e.clientY-th-10:y)+'px';
-    });
-    fresh.addEventListener('mouseleave',()=>{tip.style.display='none';});
-  })();
+
 
   // (#7) Revenue by company (not customer)
   const revByComp={};
