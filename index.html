@@ -331,7 +331,8 @@ tbody tr:hover{background:var(--bg)}
                   <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Show</label>
                   <select class="fltsel" id="trend-count" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:12px;padding:3px 8px">
                     <option value="3">3 months</option>
-                    <option value="6" selected>6 months</option>
+                    <option value="6">6 months</option>
+                    <option value="7" selected>7 months</option>
                     <option value="9">9 months</option>
                     <option value="12">12 months</option>
                     <option value="18">18 months</option>
@@ -1855,9 +1856,9 @@ function renderDash(){
       }
       const prev=fromEl.value;
       fromEl.innerHTML=opts.map(o=>`<option value="${o.k}"${o.k===prev?'selected':''}>${o.lbl}</option>`).join('');
-      // Default: 6 months back (or earliest if less data)
+      // Default: 5 months back (or earliest if less data)
       if(!fromEl.value||!opts.find(o=>o.k===fromEl.value)){
-        const def=opts.length>6?opts[opts.length-7]:opts[0];
+        const def=opts.length>5?opts[opts.length-6]:opts[0];
         if(def)fromEl.value=def.k;
       }
     }
