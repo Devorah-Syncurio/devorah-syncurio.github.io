@@ -1978,32 +1978,27 @@ function renderDash(){
     const nextKey=`${nextMDate.getFullYear()}-${String(nextMDate.getMonth()+1).padStart(2,'0')}`;
     const nextMonthName=nextMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
 
-    // Helper: is a schedule active in a given YYYY-MM key?
-    function schedActiveIn(s, key){
-      if(!s.active && s.active!==undefined) return false;
-      if(s.schedStart && key < s.schedStart) return false;
-      if(s.schedEnd   && key > s.schedEnd)   return false;
+    // Helpers — prefixed tom_ to avoid shadowing outer buildForecast
+    const tomSchedActive=(s,k)=>{
+      if(!s.active&&s.active!==undefined)return false;
+      if(s.schedStart&&k<s.schedStart)return false;
+      if(s.schedEnd&&k>s.schedEnd)return false;
       return true;
-    }
-    // Helper: compute subtotal from schedule lines (same as generation code)
-    function schedSub(s){
-      if(s.lines&&s.lines.length) return s.lines.reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
+    };
+    const tomSchedSub=s=>{
+      if(s.lines&&s.lines.length)return s.lines.reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
       return s.amount||0;
-    }
-
-    // Build forecast invoice list for a given month key
-    function buildForecast(key){
-      return DB.schedules.filter(s=>schedActiveIn(s,key)).map(s=>{
-        const vr=s.vatRate??20;
-        const sub=schedSub(s);
-        const total=+(sub*(1+vr/100)).toFixed(2);
-        return{customerId:s.customerId,sub,total,vatRate:vr,date:key+'-01',_fromRecurring:true};
-      });
-    }
+    };
+    const tomBuildForecast=k=>DB.schedules.filter(s=>tomSchedActive(s,k)).map(s=>{
+      const vr=s.vatRate??20;
+      const sub=tomSchedSub(s);
+      const total=+(sub*(1+vr/100)).toFixed(2);
+      return{customerId:s.customerId,sub,total,vatRate:vr,date:k+'-01',_fromRecurring:true};
+    });
 
     // For this month: use actual invoices if they exist, fill gaps with forecast
     const thisActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(thisKey));
-    const thisForecast=buildForecast(thisKey);
+    const thisForecast=tomBuildForecast(thisKey);
     const thisActualCustIds=new Set(thisActual.map(i=>i.customerId));
     const thisMerged=[
       ...thisActual,
@@ -2012,7 +2007,7 @@ function renderDash(){
 
     // For next month: actual if already raised, otherwise forecast
     const nextActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(nextKey));
-    const nextForecast=buildForecast(nextKey);
+    const nextForecast=tomBuildForecast(nextKey);
     const nextActualCustIds=new Set(nextActual.map(i=>i.customerId));
     const nextMerged=[
       ...nextActual,
@@ -2026,7 +2021,7 @@ function renderDash(){
     const deltaEx=nextEx-thisEx;
     const deltaInc=nextInc-thisInc;
     const ch=custDiffs(thisMerged,nextMerged);
-    const allScheds=DB.schedules.filter(s=>schedActiveIn(s,thisKey)||schedActiveIn(s,nextKey));
+    const allScheds=DB.schedules.filter(s=>tomSchedActive(s,thisKey)||tomSchedActive(s,nextKey));
     window._tomDiffs={deltaEx,deltaInc,vsLabel:`vs forecast ${nextMonthName} *`,ch,isForecast:true};
     const body=document.getElementById('tom-body');
     if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs forecast ${nextMonthName} *`,!allScheds.length?'No recurring schedules':null);
