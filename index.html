@@ -313,9 +313,10 @@ tbody tr:hover{background:var(--bg)}
               <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:6px">
                   <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Last</label>
-                  <select class="fltsel" id="trend-count" onchange="renderDash()" style="font-size:12px;padding:3px 8px">
+                  <select class="fltsel" id="trend-quick" onchange="applyTrendQuick(this.value)" style="font-size:12px;padding:3px 8px">
+                    <option value="">Custom</option>
                     <option value="3">3 months</option>
-                    <option value="6" selected>6 months</option>
+                    <option value="6">6 months</option>
                     <option value="9">9 months</option>
                     <option value="12">12 months</option>
                     <option value="18">18 months</option>
@@ -323,13 +324,18 @@ tbody tr:hover{background:var(--bg)}
                   </select>
                 </div>
                 <div style="display:flex;align-items:center;gap:6px">
-                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">+ forecast</label>
-                  <select class="fltsel" id="trend-future" onchange="renderDash()" style="font-size:12px;padding:3px 8px">
-                    <option value="0">none</option>
-                    <option value="1">1 month</option>
-                    <option value="2">2 months</option>
-                    <option value="3" selected>3 months</option>
-                    <option value="6">6 months</option>
+                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">From</label>
+                  <select class="fltsel" id="trend-from" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:12px;padding:3px 8px"></select>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Show</label>
+                  <select class="fltsel" id="trend-count" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:12px;padding:3px 8px">
+                    <option value="3">3 months</option>
+                    <option value="6" selected>6 months</option>
+                    <option value="9">9 months</option>
+                    <option value="12">12 months</option>
+                    <option value="18">18 months</option>
+                    <option value="24">24 months</option>
                   </select>
                 </div>
                 <div class="trend-legend">
@@ -1759,6 +1765,29 @@ function shiftMonth(d){dashM+=d;if(dashM>11){dashM=0;dashY++;}if(dashM<0){dashM=
 
 
 
+function applyTrendQuick(n){
+  if(!n)return;
+  n=parseInt(n);
+  // Set "From" to n months back from today's month, set "Show" to n
+  const now=new Date();
+  const startD=new Date(now.getFullYear(),now.getMonth()-(n-1),1);
+  const startKey=`${startD.getFullYear()}-${String(startD.getMonth()+1).padStart(2,'0')}`;
+  const fromEl=document.getElementById('trend-from');
+  const countEl=document.getElementById('trend-count');
+  if(fromEl){
+    // Ensure the option exists (populate first if needed)
+    if(![...fromEl.options].find(o=>o.value===startKey)){
+      const opt=document.createElement('option');
+      opt.value=startKey;
+      opt.textContent=startD.toLocaleString('en-GB',{month:'short',year:'numeric'});
+      fromEl.prepend(opt);
+    }
+    fromEl.value=startKey;
+  }
+  if(countEl)countEl.value=String(n);
+  renderDash();
+}
+
 function renderDash(){
   // Initialise period pickers on first load
   const key=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
@@ -1813,19 +1842,32 @@ function renderDash(){
   // (#4) Monthly trend: configurable start+count, future months = recurring forecast
   let trendFutureKeys=[];
   {
-    // "Last N months" anchored to selected/current month + optional future forecast bars
+    // Populate "From" selector
+    const fromEl=document.getElementById('trend-from');
+    if(fromEl){
+      const allMK=[...new Set(DB.invoices.map(i=>mk(i.date)))].filter(Boolean).sort();
+      const earliest=allMK.length?allMK[0]:key;
+      const opts=[];
+      for(let i=23;i>=0;i--){
+        const d=new Date(dashY,dashM-i,1);
+        const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        if(k>=earliest)opts.push({k,lbl:d.toLocaleString('en-GB',{month:'short',year:'numeric'})});
+      }
+      const prev=fromEl.value;
+      fromEl.innerHTML=opts.map(o=>`<option value="${o.k}"${o.k===prev?'selected':''}>${o.lbl}</option>`).join('');
+      // Default: 6 months back (or earliest if less data)
+      if(!fromEl.value||!opts.find(o=>o.k===fromEl.value)){
+        const def=opts.length>6?opts[opts.length-7]:opts[0];
+        if(def)fromEl.value=def.k;
+      }
+    }
+    const trendStart=fromEl?.value||key;
     const trendN=parseInt(document.getElementById('trend-count')?.value)||6;
-    const trendFuture=parseInt(document.getElementById('trend-future')?.value)||3;
-    const totalBars=trendN+trendFuture;
-    // Start = (selected month) - (trendN - 1) months back
-    const anchorD=new Date(dashY,dashM-1,1);
-    const startD=new Date(anchorD.getFullYear(),anchorD.getMonth()-(trendN-1),1);
-    const trendStart=`${startD.getFullYear()}-${String(startD.getMonth()+1).padStart(2,'0')}`;
-    // Build totalBars bars; past/current = actuals, future = recurring forecast
+    // Build exactly trendN bars; past/current = actuals, future = recurring forecast
     window._trendBars=window._trendBars||[];
     const bars=[];
     let td=new Date(trendStart+'-01');
-    for(let i=0;i<totalBars;i++){
+    for(let i=0;i<trendN;i++){
       const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
       const isFuture=k>nowKey;
       if(isFuture){trendFutureKeys.push(k);}
