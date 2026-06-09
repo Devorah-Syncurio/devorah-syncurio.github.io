@@ -1969,26 +1969,48 @@ function renderDash(){
     attachMomTooltip('mom-body','_momDiffs');
   }
 
-  // This vs next month: always forecast next month from recurring schedules
+  // This vs next month: compare recurring forecast for THIS month vs NEXT month
+  // Using schedules for both sides avoids "everything is new" when billing hasn't run yet
   {
+    const thisKey=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
     const nextMDate=new Date(dashY,dashM+1,1);
     const nextKey=`${nextMDate.getFullYear()}-${String(nextMDate.getMonth()+1).padStart(2,'0')}`;
     const nextMonthName=nextMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
-    // Always build forecast from active recurring schedules
-    const nextInvs=DB.schedules.filter(r=>r.active!==false).map(r=>{
+    const thisMonthName=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+    const activeScheds=DB.schedules.filter(r=>r.active!==false);
+    // Build recurring forecast for THIS month (baseline)
+    const thisRecurInvs=activeScheds.map(r=>{
+      const vr=r.vatRate??20;
+      const sub=r.amount||0;
+      const total=+(sub*(1+vr/100)).toFixed(2);
+      return{customerId:r.customerId,sub,total,vatRate:vr,date:thisKey+'-01',_fromRecurring:true};
+    });
+    // Build recurring forecast for NEXT month
+    const nextInvs=activeScheds.map(r=>{
       const vr=r.vatRate??20;
       const sub=r.amount||0;
       const total=+(sub*(1+vr/100)).toFixed(2);
       return{customerId:r.customerId,sub,total,vatRate:vr,date:nextKey+'-01',_fromRecurring:true};
     });
-    const nextEx=nextInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
-    const nextInc=nextInvs.reduce((s,i)=>s+i.total,0);
-    const deltaEx=nextEx-thisMonthEx;
-    const deltaInc=nextInc-thisMonthInc;
-    const ch=custDiffs(invs,nextInvs);
+    // Any actual invoices already raised for next month supplement the forecast
+    const nextActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(nextKey));
+    // Merge: prefer actual invoices for a customer if they exist, else use forecast
+    const nextActualCustIds=new Set(nextActual.map(i=>i.customerId));
+    const nextMerged=[
+      ...nextActual,
+      ...nextInvs.filter(i=>!nextActualCustIds.has(i.customerId))
+    ];
+    const thisRecurEx=thisRecurInvs.reduce((s,i)=>s+(i.sub||0),0);
+    const thisRecurInc=thisRecurInvs.reduce((s,i)=>s+i.total,0);
+    const nextMergedEx=nextMerged.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+    const nextMergedInc=nextMerged.reduce((s,i)=>s+i.total,0);
+    const deltaEx=nextMergedEx-thisRecurEx;
+    const deltaInc=nextMergedInc-thisRecurInc;
+    // Diff: recurring this month vs forecast next month — shows only genuine schedule changes
+    const ch=custDiffs(thisRecurInvs,nextMerged);
     window._tomDiffs={deltaEx,deltaInc,vsLabel:`forecast ${nextMonthName} *`,ch,isForecast:true};
     const body=document.getElementById('tom-body');
-    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`forecast ${nextMonthName} *`,!nextInvs.length?'No recurring schedules':null);
+    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`forecast ${nextMonthName} *`,!activeScheds.length?'No recurring schedules':null);
     attachMomTooltip('tom-body','_tomDiffs');
   }
 
