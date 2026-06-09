@@ -1857,13 +1857,11 @@ function renderDash(){
     const deltaEx=thisMonthEx-prevEx;
     const deltaInc=thisMonthInc-prevInc;
     const up=deltaEx>=0;
-    const arrowEx=up?'▲':'▼';
+    const arrowEx=up?'↑':'↓';
     const colEx=up?'#3489A9':'#e05252';
-    const arrowInc=deltaInc>=0?'▲':'▼';
+    const arrowInc=deltaInc>=0?'↑':'↓';
     const colInc=deltaInc>=0?'#3489A9':'#e05252';
     const body=document.getElementById('mom-body');
-    const arrowEx=deltaEx>=0?'↑':'↓';
-    const arrowInc=deltaInc>=0?'↑':'↓';
     if(body)body.innerHTML=`
       <div style="font-size:11px;color:var(--ink3);margin-bottom:5px">vs ${prevMonthName}</div>
       <div style="font-size:22px;font-weight:700;color:${colEx};font-family:var(--mono);letter-spacing:-0.5px">${arrowEx} ${fmtGBP(Math.abs(deltaEx))}</div>
