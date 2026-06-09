@@ -372,7 +372,7 @@ tbody tr:hover{background:var(--bg)}
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
         <div class="card" id="mom-card" style="overflow:hidden">
-          <div class="card-body" id="mom-body" style="padding:16px 18px"></div>
+          <div class="card-body" id="mom-body" style="padding:12px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center"></div>
         </div>
       </div>
 
@@ -1859,20 +1859,12 @@ function renderDash(){
     const arrowInc=deltaInc>=0?'▲':'▼';
     const colInc=deltaInc>=0?'#3489A9':'#e05252';
     const body=document.getElementById('mom-body');
-    const emoji=up?'📈':'📉';
-    const sign=up?'+':'−';
-    const pillBg=up?'rgba(52,137,169,0.12)':'rgba(224,82,82,0.10)';
     if(body)body.innerHTML=`
-      <div style="font-size:11px;color:var(--ink3);margin-bottom:8px;display:flex;align-items:center;gap:5px">
-        <span>${emoji}</span>
-        <span>vs <strong style="color:var(--ink2)">${prevMonthName}</strong></span>
-      </div>
-      <div style="display:inline-flex;align-items:center;gap:7px;background:${pillBg};border-radius:20px;padding:5px 13px;margin-bottom:6px">
-        <span style="font-size:18px;font-weight:700;color:${colEx};font-family:var(--mono)">${sign}${fmtGBP(Math.abs(deltaEx))}</span>
-        <span style="font-size:11px;color:var(--ink3)">ex VAT</span>
-      </div>
-      <div style="font-size:12px;color:${colInc};font-family:var(--mono)">${deltaInc>=0?'+':'−'}${fmtGBP(Math.abs(deltaInc))} <span style="color:var(--ink3);font-size:11px">inc. VAT</span></div>
-      ${prevInvs.length>0?`<div style="font-size:11px;color:var(--ink3);margin-top:8px;border-top:1px solid var(--border);padding-top:7px">Previous: ${fmtGBP(prevEx)} ex · ${fmtGBP(prevInc)} inc</div>`:'<div style="font-size:11px;color:var(--ink3);margin-top:6px;font-style:italic">No invoices last month</div>'}
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:6px">vs ${prevMonthName}</div>
+      <div style="font-size:20px;font-weight:700;color:${colEx};font-family:var(--mono);letter-spacing:-0.5px">${deltaEx>=0?'+':'−'}${fmtGBP(Math.abs(deltaEx))}</div>
+      <div style="font-size:11px;color:var(--ink3);margin-bottom:4px">ex VAT</div>
+      <div style="font-size:12px;color:${colInc};font-family:var(--mono)">${deltaInc>=0?'+':'−'}${fmtGBP(Math.abs(deltaInc))} <span style="color:var(--ink3)">inc. VAT</span></div>
+      ${prevInvs.length===0?'<div style="font-size:11px;color:var(--ink3);margin-top:4px;font-style:italic">No invoices last month</div>':''}
     `;
   }
 
