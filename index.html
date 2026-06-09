@@ -1900,9 +1900,15 @@ function renderDash(){
     if(!el||!tip)return;
     const fresh=el.cloneNode(true);
     el.parentNode.replaceChild(fresh,el);
-    fresh.addEventListener('mouseenter',function(e){showMomTip(e,diffsKey);});
-    fresh.addEventListener('mousemove',function(e){showMomTip(e,diffsKey);});
-    fresh.addEventListener('mouseleave',()=>{tip.style.display='none';});
+    // Track whether the tip is being hovered directly
+    let overCard=false, overTip=false;
+    function hideTip(){tip.style.display='none';}
+    fresh.addEventListener('mouseenter',function(e){overCard=true;showMomTip(e,diffsKey);});
+    fresh.addEventListener('mousemove',function(e){if(overCard)showMomTip(e,diffsKey);});
+    fresh.addEventListener('mouseleave',()=>{overCard=false;setTimeout(()=>{if(!overTip)hideTip();},80);});
+    // Keep tip alive when hovering over it (so user can scroll)
+    tip.addEventListener('mouseenter',()=>{overTip=true;});
+    tip.addEventListener('mouseleave',()=>{overTip=false;setTimeout(()=>{if(!overCard)hideTip();},80);});
   }
 
   function showMomTip(e,diffsKey){
@@ -1914,29 +1920,36 @@ function renderDash(){
     const up=deltaEx>=0;
     const col=up?'#4ecdc4':'#f87171';
     const sign=up?'↑':'↓';
+    // Only rebuild HTML if data key changed (avoid scroll reset while hovering)
+    if(tip._momKey===diffsKey&&tip.style.display==='block')return;
+    tip._momKey=diffsKey;
     let html=`<div style="font-weight:700;font-size:12px;color:#cdd5e0;margin-bottom:4px">${vsLabel}</div>`;
     html+=`<div style="font-size:13px;font-weight:700;color:${col};font-family:var(--mono);margin-bottom:2px">${sign} ${fmtGBP(Math.abs(deltaEx))} <span style="font-size:10px;color:#9CA3AF;font-weight:400">ex VAT</span></div>`;
     html+=`<div style="font-size:11px;color:${col};font-family:var(--mono);margin-bottom:6px">${deltaInc>=0?'↑':'↓'} ${fmtGBP(Math.abs(deltaInc))} <span style="font-size:10px;color:#9CA3AF">inc. VAT</span></div>`;
     if(isForecast){html+=`<div style="font-size:10px;color:#4ecdc4;margin-bottom:4px">* Next month from recurring schedules</div>`;}
     if(ch&&ch.length){
-      html+=`<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px;display:flex;flex-direction:column;gap:3px">`;
-      ch.slice(0,7).forEach(c=>{
+      html+=`<div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">`;
+      // Scrollable list — no cap, shows all customers
+      html+=`<div style="display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto;padding-right:4px">`;
+      ch.forEach(c=>{
         const icon=c.type==='new'?'✦':c.type==='lost'?'✖':'~';
         const cc=c.type==='new'?'#4ecdc4':c.type==='lost'?'#f87171':'#e2b96a';
         const ds=(c.d>=0?'+':'')+fmtGBP(c.d);
         html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
       });
-      if(ch.length>7){html+=`<div style="color:#9CA3AF;font-size:10px;margin-top:2px">+${ch.length-7} more</div>`;}
-      html+=`</div>`;
+      html+=`</div></div>`;
+      if(ch.length>7){html+=`<div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:center">Scroll to see all ${ch.length} customers</div>`;}
     } else {
       html+=`<div style="font-size:10px;color:#9CA3AF">No individual customer changes</div>`;
     }
     tip.innerHTML=html;
     tip.style.display='block';
+    tip.style.pointerEvents='auto';
+    // Position: prefer right of cursor, flip left if off-screen
     const x=e.clientX+14,y=e.clientY-10;
     const tw=tip.offsetWidth||240,th=tip.offsetHeight||80;
     tip.style.left=(x+tw>window.innerWidth?e.clientX-tw-10:x)+'px';
-    tip.style.top=(y+th>window.innerHeight?e.clientY-th-10:y)+'px';
+    tip.style.top=Math.max(4,Math.min(y,window.innerHeight-th-4))+'px';
   }
 
   // Month-on-month: current month vs previous month
