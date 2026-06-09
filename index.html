@@ -1969,48 +1969,67 @@ function renderDash(){
     attachMomTooltip('mom-body','_momDiffs');
   }
 
-  // This vs next month: compare recurring forecast for THIS month vs NEXT month
-  // Using schedules for both sides avoids "everything is new" when billing hasn't run yet
+  // This vs next month: compare what's expected to bill THIS month vs NEXT month
+  // Both sides built from schedules filtered by their schedStart/schedEnd — reveals
+  // genuine changes: new schedules starting, old ones ending, or amount edits.
   {
     const thisKey=`${dashY}-${String(dashM+1).padStart(2,'0')}`;
     const nextMDate=new Date(dashY,dashM+1,1);
     const nextKey=`${nextMDate.getFullYear()}-${String(nextMDate.getMonth()+1).padStart(2,'0')}`;
     const nextMonthName=nextMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
-    const thisMonthName=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
-    const activeScheds=DB.schedules.filter(r=>r.active!==false);
-    // Build recurring forecast for THIS month (baseline)
-    const thisRecurInvs=activeScheds.map(r=>{
-      const vr=r.vatRate??20;
-      const sub=r.amount||0;
-      const total=+(sub*(1+vr/100)).toFixed(2);
-      return{customerId:r.customerId,sub,total,vatRate:vr,date:thisKey+'-01',_fromRecurring:true};
-    });
-    // Build recurring forecast for NEXT month
-    const nextInvs=activeScheds.map(r=>{
-      const vr=r.vatRate??20;
-      const sub=r.amount||0;
-      const total=+(sub*(1+vr/100)).toFixed(2);
-      return{customerId:r.customerId,sub,total,vatRate:vr,date:nextKey+'-01',_fromRecurring:true};
-    });
-    // Any actual invoices already raised for next month supplement the forecast
+
+    // Helper: is a schedule active in a given YYYY-MM key?
+    function schedActiveIn(s, key){
+      if(!s.active && s.active!==undefined) return false;
+      if(s.schedStart && key < s.schedStart) return false;
+      if(s.schedEnd   && key > s.schedEnd)   return false;
+      return true;
+    }
+    // Helper: compute subtotal from schedule lines (same as generation code)
+    function schedSub(s){
+      if(s.lines&&s.lines.length) return s.lines.reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
+      return s.amount||0;
+    }
+
+    // Build forecast invoice list for a given month key
+    function buildForecast(key){
+      return DB.schedules.filter(s=>schedActiveIn(s,key)).map(s=>{
+        const vr=s.vatRate??20;
+        const sub=schedSub(s);
+        const total=+(sub*(1+vr/100)).toFixed(2);
+        return{customerId:s.customerId,sub,total,vatRate:vr,date:key+'-01',_fromRecurring:true};
+      });
+    }
+
+    // For this month: use actual invoices if they exist, fill gaps with forecast
+    const thisActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(thisKey));
+    const thisForecast=buildForecast(thisKey);
+    const thisActualCustIds=new Set(thisActual.map(i=>i.customerId));
+    const thisMerged=[
+      ...thisActual,
+      ...thisForecast.filter(i=>!thisActualCustIds.has(i.customerId))
+    ];
+
+    // For next month: actual if already raised, otherwise forecast
     const nextActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(nextKey));
-    // Merge: prefer actual invoices for a customer if they exist, else use forecast
+    const nextForecast=buildForecast(nextKey);
     const nextActualCustIds=new Set(nextActual.map(i=>i.customerId));
     const nextMerged=[
       ...nextActual,
-      ...nextInvs.filter(i=>!nextActualCustIds.has(i.customerId))
+      ...nextForecast.filter(i=>!nextActualCustIds.has(i.customerId))
     ];
-    const thisRecurEx=thisRecurInvs.reduce((s,i)=>s+(i.sub||0),0);
-    const thisRecurInc=thisRecurInvs.reduce((s,i)=>s+i.total,0);
-    const nextMergedEx=nextMerged.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
-    const nextMergedInc=nextMerged.reduce((s,i)=>s+i.total,0);
-    const deltaEx=nextMergedEx-thisRecurEx;
-    const deltaInc=nextMergedInc-thisRecurInc;
-    // Diff: recurring this month vs forecast next month — shows only genuine schedule changes
-    const ch=custDiffs(thisRecurInvs,nextMerged);
-    window._tomDiffs={deltaEx,deltaInc,vsLabel:`forecast ${nextMonthName} *`,ch,isForecast:true};
+
+    const thisEx=thisMerged.reduce((s,i)=>s+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
+    const thisInc=thisMerged.reduce((s,i)=>s+i.total,0);
+    const nextEx=nextMerged.reduce((s,i)=>s+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
+    const nextInc=nextMerged.reduce((s,i)=>s+i.total,0);
+    const deltaEx=nextEx-thisEx;
+    const deltaInc=nextInc-thisInc;
+    const ch=custDiffs(thisMerged,nextMerged);
+    const allScheds=DB.schedules.filter(s=>schedActiveIn(s,thisKey)||schedActiveIn(s,nextKey));
+    window._tomDiffs={deltaEx,deltaInc,vsLabel:`vs forecast ${nextMonthName} *`,ch,isForecast:true};
     const body=document.getElementById('tom-body');
-    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`forecast ${nextMonthName} *`,!activeScheds.length?'No recurring schedules':null);
+    if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs forecast ${nextMonthName} *`,!allScheds.length?'No recurring schedules':null);
     attachMomTooltip('tom-body','_tomDiffs');
   }
 
