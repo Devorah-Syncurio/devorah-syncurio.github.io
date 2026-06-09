@@ -362,7 +362,7 @@ tbody tr:hover{background:var(--bg)}
             <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
           </div>
       </div>
-      <!-- Payment methods: below trend chart, left-column width only -->
+      <!-- Payment methods + MoM: below trend chart -->
       <div style="margin-top:20px;display:grid;grid-template-columns:1.3fr 1fr;gap:20px">
         <div class="card" id="pay-method-face-card">
           <div class="card-hdr" style="background:var(--bg)">
@@ -370,6 +370,13 @@ tbody tr:hover{background:var(--bg)}
             <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a segment or method to see breakdown</span>
           </div>
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
+        </div>
+        <div class="card" id="mom-card">
+          <div class="card-hdr" style="background:var(--bg)">
+            <span class="card-title">Month on month</span>
+            <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)" id="mom-subtitle"></span>
+          </div>
+          <div class="card-body" id="mom-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;gap:6px;min-height:120px"></div>
         </div>
       </div>
 
@@ -1839,6 +1846,34 @@ function renderDash(){
   document.getElementById('ds-max').textContent=maxInv?(maxEx+' ex. VAT'):'—';
   document.getElementById('ds-max-ex').textContent=maxInv?fmtPound(maxInv.total)+' inc. VAT':'—';
   document.getElementById('ds-max-cust').textContent=maxC?maxC.name:'—';
+
+  // Month-on-month revenue change card
+  {
+    const prevMDate=new Date(dashY,dashM-1,1);
+    const prevKey=`${prevMDate.getFullYear()}-${String(prevMDate.getMonth()+1).padStart(2,'0')}`;
+    const prevInvs=DB.invoices.filter(i=>mk(i.date)===prevKey);
+    const prevEx=prevInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
+    const prevInc=prevInvs.reduce((s,i)=>s+i.total,0);
+    const prevMonthName=prevMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
+    const deltaEx=thisMonthEx-prevEx;
+    const deltaInc=thisMonthInc-prevInc;
+    const up=deltaEx>=0;
+    const arrowEx=up?'▲':'▼';
+    const colEx=up?'#3489A9':'#e05252';
+    const arrowInc=deltaInc>=0?'▲':'▼';
+    const colInc=deltaInc>=0?'#3489A9':'#e05252';
+    const sub=document.getElementById('mom-subtitle');
+    const body=document.getElementById('mom-body');
+    if(sub)sub.textContent=`vs ${prevMonthName}`;
+    if(body)body.innerHTML=`
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span style="font-size:26px;color:${colEx};font-family:var(--mono);font-weight:700;letter-spacing:-1px">${arrowEx} ${fmtGBP(Math.abs(deltaEx))}</span>
+      </div>
+      <div style="font-size:12px;color:var(--ink3);font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;margin-top:-2px">ex VAT</div>
+      <div style="font-size:13px;color:${colInc};font-family:var(--mono);margin-top:6px">${arrowInc} ${fmtGBP(Math.abs(deltaInc))} inc. VAT</div>
+      ${prevInvs.length===0?'<div style="font-size:11px;color:var(--ink3);margin-top:8px;font-style:italic">No invoices in previous month</div>':''}
+    `;
+  }
 
   // (#4) Monthly trend: configurable start+count, future months = recurring forecast
   let trendFutureKeys=[];
