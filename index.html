@@ -588,6 +588,7 @@ tbody tr:hover{background:var(--bg)}
       </div>
       <div class="fg" id="inv-date-row"><label class="flbl">Invoice date *</label><input type="date" class="finp" id="f-date"></div>
       <div class="fg"><label class="flbl">Notes</label><input type="text" class="finp" id="f-notes" placeholder="Optional"></div>
+      <div class="fg" id="f-pm-oo-wrap"><label class="flbl">Payment method</label><select class="fsel" id="f-pm-oo"><option value="">— Select —</option><option value="Direct Debit">Direct Debit</option><option value="Standing Order">Standing Order</option><option value="Upon Invoice">Upon Invoice</option></select></div>
       <input type="hidden" id="f-cur" value="£">
     </div>
   </div>
@@ -1015,6 +1016,7 @@ function toggleRecur(){
   const idr=document.getElementById('inv-date-row');
   if(bps) bps.style.display=recurOn?'none':'';
   if(idr) idr.style.display=recurOn?'none':'';
+  const pmoo=document.getElementById('f-pm-oo-wrap');if(pmoo)pmoo.style.display=recurOn?'none':'';
   // Update save button label
   const sb=document.getElementById('inv-modal-save-btn');
   if(sb) sb.textContent=recurOn?(editSchedId?'Save Schedule':'Save Schedule'):'Save Invoice';
@@ -1294,6 +1296,7 @@ function openInvModal(id,forceRecur,presetCustId){
   document.getElementById('f-ps').value=inv?.periodStart||today();
   document.getElementById('f-pe').value=inv?.periodEnd||'';
   document.getElementById('f-notes').value=inv?.notes||'';
+  document.getElementById('f-pm-oo').value=(inv&&!inv.isRecurring)?inv.paymentMethod||'':'';
   document.getElementById('vat-sel').value=String(inv?.vatRate??20);
   recurOn=false;setRecur(!!(forceRecur||inv?.isRecurring));
   // Save button updated by toggleRecur; ensure correct for non-recurring case
@@ -1451,7 +1454,8 @@ function saveInv(){
   // One-off
   if(!date){showToast('Please set an invoice date.');return;}
   if(!ps){showToast('Please set a period start date.');return;}
-  const payload={customerId:custId,date,currency:cur,periodStart:ps,periodEnd:document.getElementById('f-pe').value,notes,vatRate:vr,lines:lines.map(l=>({...l})),subtotal:sub,vat,total,isRecurring:false,serviceType};
+  const _pmOO=document.getElementById('f-pm-oo').value;
+  const payload={customerId:custId,date,currency:cur,periodStart:ps,periodEnd:document.getElementById('f-pe').value,notes,vatRate:vr,lines:lines.map(l=>({...l})),subtotal:sub,vat,total,isRecurring:false,serviceType,...(_pmOO?{paymentMethod:_pmOO}:{})};
   if(editInvId){
     const idx=DB.invoices.findIndex(x=>x.id===editInvId);
     Object.assign(DB.invoices[idx],payload);
