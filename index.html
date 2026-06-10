@@ -1896,24 +1896,16 @@ function renderDash(){
   {
     let totalHomes,totalBeds,avgPpb;
     if(!isFutureDash){
-      // Past/current months: derive from actual invoices so stats match the matrix exactly
-      const bedInvs=DB.invoices.filter(i=>{
-        if(mk(i.date)!==key)return false;
-        const _st=(i.serviceType||'').toLowerCase();
-        if(_st&&!_st.includes('bed')&&!_st.includes('room'))return false;
-        return true;
-      });
-      totalHomes=new Set(bedInvs.map(i=>i.customerId)).size;
-      totalBeds=bedInvs.reduce((sum,i)=>{
-        // sum qty across ALL lines in case invoice has multiple lines
+      // Past/current months: match matrix logic exactly — no serviceType filter
+      const mInvs=DB.invoices.filter(i=>mk(i.date)===key);
+      totalHomes=new Set(mInvs.map(i=>i.customerId)).size;
+      totalBeds=mInvs.reduce((sum,i)=>{
         if(!i.lines)return sum;
         return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
       },0);
-      const _rev=bedInvs.reduce((sum,i)=>{
-        if(!i.lines)return sum;
-        return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
-      },0);
-      avgPpb=totalBeds>0?_rev/totalBeds:0;
+      // Avg price: total subtotal ex VAT / total beds (matches matrix Sheet 3)
+      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.subtotal||i.total/(1+(i.vatRate||20)/100)),0);
+      avgPpb=totalBeds>0?_subTotal/totalBeds:0;
     } else {
       // Future months: use active recurring schedules as forecast
       const activeBedScheds=DB.schedules.filter(s=>{
