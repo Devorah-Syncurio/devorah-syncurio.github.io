@@ -1903,8 +1903,8 @@ function renderDash(){
         if(!i.lines||!i.lines[0])return sum;
         return sum+(parseFloat(i.lines[0].qty)||0);
       },0);
-      // Avg price: total ex VAT / total beds. Use i.sub (Supabase field name)
-      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
+      // Avg price: total ex VAT / total beds — same formula as totalEx so beds×avgPpb always equals invoiced total
+      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
       avgPpb=totalBeds>0?_subTotal/totalBeds:0;
     } else {
       // Future months: use active recurring schedules as forecast
