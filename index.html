@@ -284,6 +284,7 @@ tbody tr:hover{background:var(--bg)}
           <div class="exp-dd-item" onclick="openExport();closeExportDd()">📊 Export to Excel</div>
           <div class="exp-dd-item" onclick="exportVarianceReport();closeExportDd()">📈 Variance Report</div>
           <div class="exp-dd-item" onclick="showInvoiceChangesModal();closeExportDd()">🔄 Invoice Changes</div>
+          <div class="exp-dd-item" onclick="openMatrixExport();closeExportDd()">📋 Customer Matrix</div>
         </div>
       </div>
       <button class="btn btn-ghost" onclick="openCustModal()">+ Customer</button>
@@ -371,14 +372,23 @@ tbody tr:hover{background:var(--bg)}
           </div>
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
-        <div class="card" id="mom-card" style="overflow:hidden;align-self:start">
-          <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
-            <span class="card-title" style="font-size:12px">Month on month</span>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card" id="mom-card" style="overflow:hidden">
+            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
+              <span class="card-title" style="font-size:12px">Month on month</span>
+            </div>
+            <div style="display:flex;flex-direction:row">
+              <div id="mom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
+              <div style="width:1px;background:var(--border);align-self:stretch"></div>
+              <div id="tom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
+            </div>
           </div>
-          <div style="display:flex;flex-direction:row">
-            <div id="mom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
-            <div style="width:1px;background:var(--border);align-self:stretch"></div>
-            <div id="tom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
+          <div class="card" id="oneoff-card">
+            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
+              <span class="card-title" style="font-size:12px" id="oneoff-title">One-off invoices</span>
+              <span id="oneoff-month-lbl" style="font-size:11px;color:var(--ink3);font-family:var(--mono)"></span>
+            </div>
+            <div id="oneoff-body" style="padding:14px 16px"></div>
           </div>
         </div>
       </div>
@@ -515,12 +525,10 @@ tbody tr:hover{background:var(--bg)}
           </div>
         </div>
         <table id="comm-table">
-          <thead><tr>
+          <thead id="comm-thead"><tr>
             <th>Description / Customer</th>
-            <th>Salesperson(s)</th>
             <th class="r">Invoice Total (ex VAT)</th>
-            <th class="r">Commission %</th>
-            <th class="r">Commission Amount</th>
+            <th class="r">Total Commission</th>
             <th>Type</th>
             <th>Start Date</th>
             <th>End Date</th>
@@ -594,7 +602,8 @@ tbody tr:hover{background:var(--bg)}
         <div class="fg"><label class="flbl">Schedule ends (optional)</label><input type="date" class="finp" id="f-re"></div>
         <div class="fg"><label class="flbl">Day of month to issue</label><input type="number" class="finp" id="f-rd" min="1" max="28" value="1"></div>
         <div class="fg"><label class="flbl">Schedule name (optional)</label><input type="text" class="finp" id="f-rn" placeholder="e.g. Monthly retainer"></div>
-        <div class="fg"><label class="flbl">Payment method</label><select class="fsel" id="f-pm"><option value="">— Select —</option><option value="Direct Debit">Direct Debit</option><option value="Standing Order">Standing Order</option><option value="Upon Invoice">Upon Invoice</option></select></div>
+        <div class="fg"><label class="flbl">Payment method</label><select class="fsel" id="f-pm" onchange="toggleDdSigned()"><option value="">— Select —</option><option value="Direct Debit">Direct Debit</option><option value="Standing Order">Standing Order</option><option value="Upon Invoice">Upon Invoice</option></select></div>
+        <div class="fg" id="dd-signed-wrap" style="display:none"><label class="flbl">DD contract signed?</label><div style="display:flex;gap:20px;align-items:center;padding:6px 0"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="dd-signed" value="yes" id="dd-signed-yes"> ✓ Yes — signed</label><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px"><input type="radio" name="dd-signed" value="no" id="dd-signed-no"> ✗ Not yet</label></div></div>
       </div>
     </div>
   </div>
@@ -680,7 +689,7 @@ tbody tr:hover{background:var(--bg)}
           <option value="all-cust">All Customers - detailed</option>
           <option value="per-cust">One sheet per customer</option>
           <option value="month">Group by month</option>
-          <option value="matrix">Month × Customer matrix</option>
+
         </select>
       </div>
       <div class="fg">
@@ -1024,6 +1033,11 @@ function selectCust(id){const c=DB.customers.find(x=>x.id===id);document.getElem
 
 // ── Customers ─────────────────────────────────────────────────────────
 let editCustId=null;
+function toggleDdSigned(){
+  const pm=document.getElementById('f-pm')?.value;
+  const wrap=document.getElementById('dd-signed-wrap');
+  if(wrap)wrap.style.display=pm==='Direct Debit'?'':'none';
+}
 function openCustModal(id){
   editCustId=id||null;
   document.getElementById('cust-modal-title').textContent=id?'Edit Customer':'Add Customer';
@@ -1282,9 +1296,15 @@ function openInvModal(id,forceRecur,presetCustId){
     document.getElementById('f-rd').value=sched.dayOfMonth||1;
     document.getElementById('f-rn').value=sched.name||'';
     document.getElementById('f-pm').value=sched.paymentMethod||'';
+    // DD signed
+    const dds=sched.ddSigned;
+    document.getElementById('dd-signed-yes').checked=dds===true||dds==='yes';
+    document.getElementById('dd-signed-no').checked=dds!==true&&dds!=='yes';
+    document.getElementById('dd-signed-wrap').style.display=sched.paymentMethod==='Direct Debit'?'':'none';
   }else{
     document.getElementById('f-rs').value=today().slice(0,7)+'-01';
     document.getElementById('f-re').value='';document.getElementById('f-rd').value=1;document.getElementById('f-rn').value='';document.getElementById('f-pm').value='';
+    document.getElementById('dd-signed-yes').checked=false;document.getElementById('dd-signed-no').checked=true;document.getElementById('dd-signed-wrap').style.display='none';
   }
   lines=inv?inv.lines.map(l=>({...l})):[{desc:'',qty:1,price:0},{desc:'',qty:1,price:0}];
   renderLines();openOverlay('inv-modal');
@@ -1307,6 +1327,7 @@ function openSchedModal(sid){
   document.getElementById('f-rd').value=s.dayOfMonth||1;
   document.getElementById('f-rn').value=s.name||'';
   document.getElementById('f-pm').value=s.paymentMethod||'';
+  {const dds=s.ddSigned;document.getElementById('dd-signed-yes').checked=dds===true||dds==='yes';document.getElementById('dd-signed-no').checked=dds!==true&&dds!=='yes';document.getElementById('dd-signed-wrap').style.display=s.paymentMethod==='Direct Debit'?'':'none';}
   lines=s.lines.map(l=>({...l}));renderLines();openOverlay('inv-modal');
 }
 function addLine(){lines.push({desc:'',qty:1,price:0});renderLines();}
@@ -1354,9 +1375,11 @@ function saveInv(){
     const s=DB.schedules.find(x=>x.id===editSchedId);
     const rs=document.getElementById('f-rs').value;
     if(!rs){showToast('Please set a schedule start date.');return;}
+    const _pm0=document.getElementById('f-pm').value;
+    const _dds0=_pm0==='Direct Debit'?document.getElementById('dd-signed-yes').checked:undefined;
     Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,
       schedStart:rs.slice(0,7),schedEnd:document.getElementById('f-re').value?document.getElementById('f-re').value.slice(0,7):'',
-      dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim(),paymentMethod:document.getElementById('f-pm').value});
+      dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim(),paymentMethod:_pm0,...(_pm0==='Direct Debit'?{ddSigned:_dds0}:{})});
     closeOverlay('inv-modal');
     const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
     if(existingCount>0){
@@ -1386,7 +1409,7 @@ function saveInv(){
       if(inv?.scheduleId){
         const s=DB.schedules.find(x=>x.id===inv.scheduleId);
         if(s){
-          Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:document.getElementById('f-pm').value});
+          {const _pmI=document.getElementById('f-pm').value;Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:_pmI,...(_pmI==='Direct Debit'?{ddSigned:document.getElementById('dd-signed-yes').checked}:{})});}
           closeOverlay('inv-modal');
           const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
           if(existingCount>0){
@@ -1407,7 +1430,8 @@ function saveInv(){
       }
     }else{
       const sid='s'+Date.now();
-      const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType,paymentMethod:document.getElementById('f-pm').value};
+      const _pmN=document.getElementById('f-pm').value;
+      const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType,paymentMethod:_pmN,...(_pmN==='Direct Debit'?{ddSigned:document.getElementById('dd-signed-yes').checked}:{})};
       DB.schedules.push(sched);
       regenSchedule(sched);
     }
@@ -1853,16 +1877,18 @@ function renderDash(){
   // Helper: build customer diff list between two sets of invoices
   function custDiffs(aInvs, bInvs){
     // a = "from" month, b = "to" month
-    const aMap={}, bMap={};
+    const aMap={}, bMap={}, nmToId={};
     aInvs.forEach(i=>{
       const c=DB.customers.find(x=>x.id===i.customerId);
       const nm=c?.name||'Unknown';
       aMap[nm]=(aMap[nm]||0)+(i.sub||i.total/(1+(i.vatRate||20)/100));
+      if(!nmToId[nm])nmToId[nm]=i.customerId;
     });
     bInvs.forEach(i=>{
       const c=DB.customers.find(x=>x.id===i.customerId);
       const nm=c?.name||'Unknown';
       bMap[nm]=(bMap[nm]||0)+(i.sub||i.total/(1+(i.vatRate||20)/100));
+      if(!nmToId[nm])nmToId[nm]=i.customerId;
     });
     const all=new Set([...Object.keys(aMap),...Object.keys(bMap)]);
     const ch=[];
@@ -1871,7 +1897,7 @@ function renderDash(){
       const d=bv-av;
       if(Math.abs(d)<0.005)return;
       const type=!aMap[nm]?'new':!bMap[nm]?'lost':'changed';
-      ch.push({nm,d,type});
+      ch.push({nm,d,type,customerId:nmToId[nm]});
     });
     ch.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
     return ch;
@@ -1935,7 +1961,13 @@ function renderDash(){
         const icon=c.type==='new'?'✦':c.type==='lost'?'✖':'~';
         const cc=c.type==='new'?'#4ecdc4':c.type==='lost'?'#f87171':'#e2b96a';
         const ds=(c.d>=0?'+':'')+fmtGBP(c.d);
-        html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
+        // DD signed indicator for new customers
+        let ddIcon='';
+        if(c.type==='new'&&c.customerId){
+          const ddSched=DB.schedules.find(s=>s.customerId===c.customerId&&s.paymentMethod==='Direct Debit');
+          if(ddSched){ddIcon=ddSched.ddSigned?' <span title="DD contract signed" style="font-size:10px;background:#22c55e22;color:#22c55e;border-radius:3px;padding:0 3px">DD✓</span>':' <span title="DD contract not yet signed" style="font-size:10px;background:#f59e0b22;color:#f59e0b;border-radius:3px;padding:0 3px">DD?</span>';}
+        }
+        html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}${ddIcon}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
       });
       html+=`</div></div>`;
       if(ch.length>7){html+=`<div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:center">Scroll to see all ${ch.length} customers</div>`;}
@@ -2026,6 +2058,62 @@ function renderDash(){
     const body=document.getElementById('tom-body');
     if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs forecast ${nextMonthName} *`,!allScheds.length?'No recurring schedules':null);
     attachMomTooltip('tom-body','_tomDiffs');
+  }
+
+  // ── One-off invoices this month card ─────────────────────────────────
+  {
+    const ooCard=document.getElementById('oneoff-body');
+    const ooTitle=document.getElementById('oneoff-title');
+    const ooLbl=document.getElementById('oneoff-month-lbl');
+    const monthName=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+    if(ooTitle)ooTitle.textContent='One-off invoices';
+    if(ooLbl)ooLbl.textContent=monthName;
+    // One-off = invoices in this month where isRecurring===false or no scheduleId
+    const ooInvs=DB.invoices.filter(i=>mk(i.date)===key&&!i.isRecurring);
+    const ooSub=ooInvs.reduce((s,i)=>s+(i.subtotal||i.total/(1+(i.vatRate||20)/100)),0);
+    const ooTot=ooInvs.reduce((s,i)=>s+i.total,0);
+    const PM_HEX2={'Direct Debit':'#3489A9','Standing Order':'#ED6F3B','Upon Invoice':'#1C2432','Unspecified':'#9CA3AF'};
+    // Build per-payment-method breakdown
+    const ooPM={};
+    ooInvs.forEach(inv=>{
+      const sc=DB.schedules.find(s=>s.id===inv.scheduleId);
+      let pm='Unspecified';
+      if(sc&&['Direct Debit','Standing Order','Upon Invoice'].includes(sc.paymentMethod))pm=sc.paymentMethod;
+      else if(inv.paymentMethod&&['Direct Debit','Standing Order','Upon Invoice'].includes(inv.paymentMethod))pm=inv.paymentMethod;
+      if(!ooPM[pm])ooPM[pm]={sub:0,total:0};
+      ooPM[pm].sub+=(inv.subtotal||inv.total/(1+(inv.vatRate||20)/100));
+      ooPM[pm].total+=inv.total;
+    });
+    if(!ooCard){}
+    else if(!ooInvs.length){
+      ooCard.innerHTML=`<div style="text-align:center;color:var(--ink3);font-size:12px;padding:8px 0">No one-off invoices this month</div>`;
+    }else{
+      // Small donut SVG
+      const r2=36,cx2=44,cy2=44,sw2=11,circ2=2*Math.PI*r2;
+      let cumLen2=0;
+      const pmKeys2=Object.keys(ooPM).filter(p=>ooPM[p].sub>0);
+      const segs2=pmKeys2.map(pm=>{
+        const pct=ooSub?ooPM[pm].sub/ooSub:0;
+        const dash=pct*circ2,gap=circ2-dash,offset=-cumLen2;
+        cumLen2+=dash;
+        return`<circle cx="${cx2}" cy="${cy2}" r="${r2}" fill="none" stroke="${PM_HEX2[pm]||'#9CA3AF'}" stroke-width="${sw2}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx2} ${cy2})" stroke-linecap="butt"/>`;
+      }).join('');
+      const legendItems2=pmKeys2.map(pm=>`<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><svg width="9" height="9" viewBox="0 0 9 9" style="flex-shrink:0"><circle cx="4.5" cy="4.5" r="4" fill="${PM_HEX2[pm]||'#9CA3AF'}"/></svg><span style="font-size:11px;font-family:var(--mono);white-space:nowrap;color:var(--ink)">${pm}</span><span style="font-size:11px;font-family:var(--mono);color:var(--ink);margin-left:auto">${fmtGBP(ooPM[pm].sub)}</span></div>`).join('');
+      ooCard.innerHTML=`<div style="display:flex;align-items:center;gap:16px">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
+          <svg width="88" height="88" viewBox="0 0 88 88">
+            <circle cx="${cx2}" cy="${cy2}" r="${r2}" fill="none" stroke="var(--border)" stroke-width="${sw2}"/>
+            ${segs2||`<circle cx="${cx2}" cy="${cy2}" r="${r2}" fill="none" stroke="var(--border)" stroke-width="${sw2}"/>`}
+          </svg>
+          <div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--ink);text-align:center;margin-top:3px">${fmtGBP(ooSub)}</div>
+          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);text-align:center">inc. ${fmtGBP(ooTot)}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:var(--ink3);margin-bottom:4px">${ooInvs.length} invoice${ooInvs.length!==1?'s':''}</div>
+          ${legendItems2}
+        </div>
+      </div>`;
+    }
   }
 
   // (#4) Monthly trend: configurable start+count, future months = recurring forecast
@@ -2278,10 +2366,9 @@ function renderDash(){
           <svg width="116" height="116" viewBox="0 0 116 116">
             <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>
             ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
-            <text x="${cx}" y="${cy-4}" text-anchor="middle" font-size="11" fill="var(--ink3)" font-family="monospace">${label}</text>
-            <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="13" font-weight="bold" fill="var(--ink)" font-family="monospace">${centerAmt}</text>
           </svg>
-          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);margin-top:2px;text-align:center">inc. ${centerInc}</div>
+          <div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--ink);text-align:center;margin-top:4px;line-height:1.2">${centerAmt}</div>
+          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);text-align:center">inc. VAT ${centerInc}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:2px;min-width:110px">
           ${legendItems}
@@ -2549,6 +2636,103 @@ function doExport(){
   dlXlsx(sheets,`invoices_${from}_to_${to}.xlsx`);closeOverlay('exp-modal');showToast('Excel downloaded!');
 }
 
+// ── Customer Matrix Export ────────────────────────────────────────────
+function openMatrixExport(){
+  const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  const now=new Date();
+  // Default: past 12 months including current
+  const fromDt=new Date(now.getFullYear(),now.getMonth()-11,1);
+  document.getElementById('mx-from').value=fmt(fromDt);
+  document.getElementById('mx-to').value=fmt(now);
+  showOverlay('matrix-modal');
+}
+function doMatrixExport(){try{
+  const fromVal=document.getElementById('mx-from').value;
+  const toVal=document.getElementById('mx-to').value;
+  if(!fromVal||!toVal){showToast('Please select both months.');return;}
+  if(fromVal>toVal){showToast('From must be before To.');return;}
+  const from=fromVal+'-01';
+  const toYM=toVal.split('-');
+  const to=new Date(parseInt(toYM[0]),parseInt(toYM[1]),0).toISOString().split('T')[0];
+  const invs=DB.invoices.filter(i=>i.date>=from&&i.date<=to);
+  if(!invs.length){showToast('No invoices in that range.');return;}
+  const months=[...new Set(invs.map(i=>mk(i.date)))].sort();
+  const custs=[...new Set(invs.map(i=>i.customerId))].map(id=>DB.customers.find(x=>x.id===id)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
+  const monthLabels=months.map(m=>new Date(m+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}));
+  const xn=v=>typeof v==='number'?Math.round(v*100)/100:v;
+  const sheets=[];
+
+  // ── Sheet 1: Amounts (ex VAT) ────────────────────────────────────
+  const amtHdr=['Customer',...monthLabels,'Total Ex VAT','Total Inc VAT'];
+  const amtRows=[amtHdr];
+  const mGrandSub=Object.fromEntries(months.map(m=>[m,0]));
+  const mGrandInc=Object.fromEntries(months.map(m=>[m,0]));
+  let gSub=0,gInc=0;
+  custs.forEach(c=>{
+    const row=[c.name];let cSub=0,cInc=0;
+    months.forEach(m=>{
+      const ci=invs.filter(i=>i.customerId===c.id&&mk(i.date)===m);
+      const sub=ci.reduce((s,i)=>s+(i.subtotal||i.total/(1+(i.vatRate||20)/100)),0);
+      const inc=ci.reduce((s,i)=>s+i.total,0);
+      row.push(xn(sub));cSub+=sub;cInc+=inc;mGrandSub[m]+=sub;mGrandInc[m]+=inc;
+    });
+    row.push(xn(cSub),xn(cInc));gSub+=cSub;gInc+=cInc;amtRows.push(row);
+  });
+  amtRows.push(['Total Ex VAT',...months.map(m=>xn(mGrandSub[m])),xn(gSub),'']);
+  amtRows.push(['Total Inc VAT',...months.map(m=>xn(mGrandInc[m])),'',xn(gInc)]);
+  sheets.push({name:'Amounts (Ex VAT)',rows:amtRows});
+
+  // ── Sheet 2: Beds / Qty ──────────────────────────────────────────
+  const bedsHdr=['Customer',...monthLabels,'Total Beds'];
+  const bedsRows=[bedsHdr];
+  const mGrandBeds=Object.fromEntries(months.map(m=>[m,0]));
+  let gBeds=0;
+  custs.forEach(c=>{
+    const row=[c.name];let cBeds=0;
+    months.forEach(m=>{
+      const ci=invs.filter(i=>i.customerId===c.id&&mk(i.date)===m);
+      const beds=ci.reduce((s,i)=>s+(i.lines||[]).reduce((t,l)=>t+(parseFloat(l.qty)||0),0),0);
+      row.push(xn(beds));cBeds+=beds;mGrandBeds[m]+=beds;
+    });
+    row.push(xn(cBeds));gBeds+=cBeds;bedsRows.push(row);
+  });
+  bedsRows.push(['Total',...months.map(m=>xn(mGrandBeds[m])),xn(gBeds)]);
+  sheets.push({name:'Beds',rows:bedsRows});
+
+  // ── Sheet 3: Price per Bed/Unit ──────────────────────────────────
+  const ppbHdr=['Customer',...monthLabels];
+  const ppbRows=[ppbHdr];
+  custs.forEach(c=>{
+    const row=[c.name];
+    months.forEach(m=>{
+      const ci=invs.filter(i=>i.customerId===c.id&&mk(i.date)===m);
+      const beds=ci.reduce((s,i)=>s+(i.lines||[]).reduce((t,l)=>t+(parseFloat(l.qty)||0),0),0);
+      const sub=ci.reduce((s,i)=>s+(i.subtotal||i.total/(1+(i.vatRate||20)/100)),0);
+      row.push(beds>0?xn(sub/beds):'');
+    });
+    ppbRows.push(row);
+  });
+  sheets.push({name:'Price per Bed',rows:ppbRows});
+
+  // ── Per-month detail sheets ──────────────────────────────────────
+  months.forEach((m,mi)=>{
+    const mInvs=invs.filter(i=>mk(i.date)===m);
+    const detHdr=['Customer','Invoice Date','Period Start','Period End','Description','Beds / Qty','Unit Price','Line Total','Subtotal ex VAT','VAT %','VAT Amount','Total inc VAT','Notes'];
+    const detRows=[detHdr];
+    mInvs.sort((a,b)=>(DB.customers.find(x=>x.id===a.customerId)?.name||'').localeCompare(DB.customers.find(x=>x.id===b.customerId)?.name||'')).forEach(inv=>{
+      const c=DB.customers.find(x=>x.id===inv.customerId);
+      const fmtDfull=d=>{if(!d)return'';const dt=new Date(d+'T12:00:00');return dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});};
+      (inv.lines||[]).filter(l=>l.desc||(l.qty&&l.price)).forEach(l=>{
+        detRows.push([c?.name||'?',fmtDfull(inv.date),fmtDfull(inv.periodStart),inv.periodEnd?fmtDfull(inv.periodEnd):'Open-ended',l.desc||'',xn(l.qty),xn(l.price),xn((l.qty||0)*(l.price||0)),xn(inv.subtotal||inv.total/(1+(inv.vatRate||20)/100)),inv.vatRate,xn(inv.vat||inv.total-inv.subtotal),xn(inv.total),inv.notes||'']);
+      });
+    });
+    const sheetLbl=monthLabels[mi].replace(/[:\\/\?*\[\]]/g,'').slice(0,31);
+    sheets.push({name:sheetLbl,rows:detRows});
+  });
+
+  dlXlsx(sheets,`matrix_${fromVal}_to_${toVal}.xlsx`);closeOverlay('matrix-modal');showToast('Matrix exported!');
+}catch(err){console.error('doMatrixExport error:',err);showToast('Export error: '+err.message);}}
+
 // Forecast export
 function toggleFcExpRange(){const isCustom=document.getElementById('fcexp-range-type').value==='custom';document.getElementById('fcexp-months-wrap').style.display=isCustom?'none':'';document.getElementById('fcexp-from-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-to-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-presets').style.display=isCustom?'flex':'none';}
 function setFcExpPreset(p){const now=new Date();let from,to;if(p==='q1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+3,1);}else if(p==='h1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+6,1);}else if(p==='y1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+12,1);}else if(p==='y2'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+24,1);}document.getElementById('fcexp-from').value=from.toISOString().split('T')[0];document.getElementById('fcexp-to').value=to.toISOString().split('T')[0];}
@@ -2600,24 +2784,20 @@ function buildZip(files){
 // ── Invoice Changes Export ─────────────────────────────────────────
 function showInvoiceChangesModal(){
   // Default: Period A = prev month, Period B = current month
-  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-  const prevStart=new Date(dashY,dashM-1,1);
-  const prevEnd=new Date(dashY,dashM,0);
-  const curStart=new Date(dashY,dashM,1);
-  const curEnd=new Date(dashY,dashM+1,0);
-  document.getElementById('ica-from').value=fmt(prevStart);
-  document.getElementById('ica-to').value=fmt(prevEnd);
-  document.getElementById('icb-from').value=fmt(curStart);
-  document.getElementById('icb-to').value=fmt(curEnd);
+  const fmtM=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('ica-month').value=fmtM(new Date(dashY,dashM-1,1));
+  document.getElementById('icb-month').value=fmtM(new Date(dashY,dashM,1));
   showOverlay('inv-chg-modal');
 }
 
 function exportInvoiceChanges(){try{
-  const aFrom=document.getElementById('ica-from').value;
-  const aTo=document.getElementById('ica-to').value;
-  const bFrom=document.getElementById('icb-from').value;
-  const bTo=document.getElementById('icb-to').value;
-  if(!aFrom||!aTo||!bFrom||!bTo){showToast('Please fill in all four dates');return;}
+  const aMonthVal=document.getElementById('ica-month').value;
+  const bMonthVal=document.getElementById('icb-month').value;
+  if(!aMonthVal||!bMonthVal){showToast('Please select both months');return;}
+  const aFrom=aMonthVal+'-01';
+  const aTo=new Date(parseInt(aMonthVal.slice(0,4)),parseInt(aMonthVal.slice(5,7)),0).toISOString().split('T')[0];
+  const bFrom=bMonthVal+'-01';
+  const bTo=new Date(parseInt(bMonthVal.slice(0,4)),parseInt(bMonthVal.slice(5,7)),0).toISOString().split('T')[0];
 
   const inRange=(date,from,to)=>date>=from&&date<=to;
   const r2=v=>{const n=Number(v);return isNaN(n)?0:Math.round(n*100)/100;};
@@ -3152,20 +3332,51 @@ function renderCommission(){
     return;
   }
   if(em)em.style.display='none';
+
+  // Build ordered list of SPs that appear in these filtered commissions
+  const spColMap={};// spId → {name,idx}
+  const spCols=[];// ordered list
+  comms.forEach(r=>{
+    r.salespersonEntries.forEach(e=>{
+      if(!spColMap[e.spId]){
+        spColMap[e.spId]={name:e.spName,idx:spCols.length};
+        spCols.push({id:e.spId,name:e.spName});
+      }
+    });
+  });
+  spCols.sort((a,b)=>a.name.localeCompare(b.name));
+  spCols.forEach((sp,i)=>spColMap[sp.id].idx=i);
+
+  // Rebuild thead with dynamic SP columns
+  const thead=document.getElementById('comm-thead');
+  if(thead){
+    thead.innerHTML=`<tr>
+      <th>Description / Customer</th>
+      <th class="r">Invoice Total (ex VAT)</th>
+      ${spCols.map(sp=>`<th class="r" style="font-size:12px">${sp.name}<br><span style="font-weight:400;color:var(--ink3)">commission</span></th>`).join('')}
+      <th class="r">Total Commission</th>
+      <th>Type</th>
+      <th>Start Date</th>
+      <th>End Date</th>
+      <th></th>
+    </tr>`;
+  }
+
   if(tb)tb.innerHTML=comms.map(r=>{
-    const spNames=r.salespersonEntries.map(e=>`<div style="font-size:12px">${e.spName}: ${e.pct}% → ${fmtGBP(e.amount)}</div>`).join('');
-    const spPcts=r.salespersonEntries.map(e=>e.pct+'%').join(' / ');
     const typeBadge=r.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
     const linkedBadge=r.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
-    // For recurring show period label, for one-off just show start date
     const periodLabel=r.commissionType==='recurring'&&r.endDate
       ?`<div style="font-size:11px;color:var(--ink3)">${fmtD(r.startDate)} – ${fmtD(r.endDate)}</div>`
       :``;
+    const spCells=spCols.map(sp=>{
+      const e=r.salespersonEntries.find(x=>x.spId===sp.id);
+      if(!e)return`<td class="r muted" style="color:var(--ink3)">—</td>`;
+      return`<td class="r" style="font-family:var(--mono);font-size:12px">${fmtGBP(e.amount)}<br><span style="font-size:10px;color:var(--ink3)">${e.pct}%</span></td>`;
+    }).join('');
     return`<tr>
       <td><div style="font-weight:500">${r.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${r.customer||'—'}</div></td>
-      <td>${spNames}</td>
       <td class="r">${fmtGBP(r.invoiceTotalExVat)}</td>
-      <td class="r" style="font-family:var(--mono);font-size:12px">${spPcts}</td>
+      ${spCells}
       <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(r.totalCommission)}</td>
       <td>${typeBadge}</td>
       <td class="muted" style="font-size:12px"><div>${fmtD(r.startDate)}</div>${periodLabel}</td>
@@ -3176,18 +3387,27 @@ function renderCommission(){
       </div></td>
     </tr>`;
   }).join('');
-  // Footer totals — expand recurring to monthly rows then apply same date filter as export
+
+  // Footer totals — per SP columns + grand total
   let expForFooter=[];
   comms.forEach(c=>expandCommToMonths(c).forEach(r=>expForFooter.push(r)));
   if(fromDate)expForFooter=expForFooter.filter(r=>r._monthDate>=fromDate);
   if(toDate)expForFooter=expForFooter.filter(r=>r._monthDate<=toDate);
   const totalInv=comms.reduce((s,r)=>s+r.invoiceTotalExVat,0);
-  const totalComm=spId
-    ? expForFooter.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===spId)?.amount||0),0)
-    : expForFooter.reduce((s,r)=>s+r.totalCommission,0);
+  const totalComm=expForFooter.reduce((s,r)=>s+r.totalCommission,0);
+  const spTotals=spCols.map(sp=>({
+    id:sp.id,
+    name:sp.name,
+    total:expForFooter.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===sp.id)?.amount||0),0)
+  }));
   if(footer){
-    footer.style.display='flex';
-    footer.innerHTML=`<span>${comms.length} entr${comms.length!==1?'ies':'y'}</span><span>Total invoice value: <strong>${fmtGBP(totalInv)}</strong></span><span>Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>`;
+    footer.style.display='block';
+    footer.innerHTML=`<div style="display:flex;justify-content:flex-end;gap:20px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink2)">
+      <span>${comms.length} entr${comms.length!==1?'ies':'y'}</span>
+      <span>Invoice value: <strong>${fmtGBP(totalInv)}</strong></span>
+      ${spTotals.map(sp=>`<span style="border-left:1px solid var(--border);padding-left:16px">${sp.name}: <strong style="color:var(--accent)">${fmtGBP(sp.total)}</strong></span>`).join('')}
+      <span style="border-left:1px solid var(--border);padding-left:16px">Total: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>
+    </div>`;
   }
 }
 
@@ -3545,6 +3765,33 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 </script>
 
+  <!-- Customer Matrix Export Modal -->
+  <div class="overlay" id="matrix-modal">
+    <div class="modal" style="max-width:440px">
+      <div class="modal-hdr">
+        <div><div class="modal-title">Customer Matrix Export</div><div class="modal-sub">Customers × months — ex VAT per cell + beds + price/bed</div></div>
+        <button class="xbtn" onclick="closeOverlay('matrix-modal')">✕</button>
+      </div>
+      <div style="padding:20px 24px 24px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">From month</div>
+            <input type="month" id="mx-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">To month</div>
+            <input type="month" id="mx-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">Exports 3 summary sheets (amounts, beds, price/bed) plus one detail sheet per month.</div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="closeOverlay('matrix-modal')">Cancel</button>
+          <button class="btn btn-primary" onclick="doMatrixExport()">↓ Export to Excel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Invoice Changes Export Modal -->
   <div class="overlay" id="inv-chg-modal">
     <div class="modal" style="max-width:520px">
@@ -3556,19 +3803,15 @@ document.addEventListener('DOMContentLoaded',function(){
         <button class="xbtn" onclick="closeOverlay('inv-chg-modal')">✕</button>
       </div>
       <div style="padding:20px 24px 24px">
-        <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Date Ranges</div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Select Months to Compare</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
           <div>
-            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period A — From</div>
-            <input type="date" id="ica-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
-            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period A — To</div>
-            <input type="date" id="ica-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period A</div>
+            <input type="month" id="ica-month" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
           </div>
           <div>
-            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period B — From</div>
-            <input type="date" id="icb-from" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
-            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px;margin-top:12px">Period B — To</div>
-            <input type="date" id="icb-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
+            <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">Period B</div>
+            <input type="month" id="icb-month" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
           </div>
         </div>
         <div style="font-size:11px;font-weight:700;color:var(--ink3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">Filters</div>
