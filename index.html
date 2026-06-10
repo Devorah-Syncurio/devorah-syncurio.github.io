@@ -209,6 +209,10 @@ tbody tr:hover{background:var(--bg)}
 /* Dashboard layout */
 .dgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:stretch}
 /* Trend legend */
+.qstat-bar{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;padding:10px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}
+.qstat{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px}
+.qstat-val{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--ink);letter-spacing:-0.5px}
+.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3)}
 .trend-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--ink3)}
 .trend-legend span{display:flex;align-items:center;gap:5px}
 .trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
@@ -301,6 +305,13 @@ tbody tr:hover{background:var(--bg)}
         <div class="mdisp" id="dash-month">—</div>
         <button class="mbtn" onclick="shiftMonth(1)">&#8594;</button>
       </div>
+      <div class="qstat-bar" id="dash-qstats">
+        <div class="qstat"><div class="qstat-val" id="qs-homes">—</div><div class="qstat-lbl">Total Homes</div></div>
+        <div style="width:1px;background:var(--border);margin:4px 4px"></div>
+        <div class="qstat"><div class="qstat-val" id="qs-beds">—</div><div class="qstat-lbl">Total Beds (active)</div></div>
+        <div style="width:1px;background:var(--border);margin:4px 4px"></div>
+        <div class="qstat"><div class="qstat-val" id="qs-avgprice">—</div><div class="qstat-lbl">Avg Price / Bed</div></div>
+      </div>
       <div class="sgrid">
         <div class="stat"><div class="stat-bar"></div><div class="stat-lbl" id="ds-total-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-count">—</div></div>
         <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
@@ -354,6 +365,10 @@ tbody tr:hover{background:var(--bg)}
                 <div style="flex:1;display:flex;gap:4px" id="trend-labels"></div>
               </div>
               <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
+              <div id="trend-beds-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+                <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px">Total Beds per month</div>
+                <div id="trend-beds-row" style="display:flex;gap:4px;align-items:flex-end;min-height:32px"></div>
+              </div>
             </div>
           </div>
           <!-- Right column: 3 cards, same height as trend chart -->
@@ -520,8 +535,8 @@ tbody tr:hover{background:var(--bg)}
           <span class="card-title">Commission Records</span>
           <div class="filters">
             <select class="fltsel" id="comm-sp-filter" onchange="renderCommission()"><option value="">All salespeople</option></select>
-            <input type="date" class="sinp" id="comm-from" onchange="renderCommission()" style="width:140px">
-            <input type="date" class="sinp" id="comm-to" onchange="renderCommission()" style="width:140px">
+            <select class="fltsel" id="comm-month-from" onchange="renderCommission()" style="width:150px"><option value="">From month…</option></select>
+            <select class="fltsel" id="comm-month-to" onchange="renderCommission()" style="width:150px"><option value="">To month…</option></select>
             <button class="btn btn-ghost btn-sm" onclick="clearCommFilters()">✕ Clear Filters</button>
             <button class="btn btn-ghost btn-sm" onclick="exportCommission()">↓ Export to Excel</button>
             <button class="btn btn-primary btn-sm" onclick="openCommModal()">+ Add Commission</button>
@@ -953,8 +968,9 @@ function showCommPin(){
 
 function clearCommFilters(){
   document.getElementById('comm-sp-filter').value='';
-  document.getElementById('comm-from').value='';
-  document.getElementById('comm-to').value='';
+  const cf=document.getElementById('comm-month-from');if(cf)cf.value='';
+  const ct=document.getElementById('comm-month-to');if(ct)ct.value='';
+  const ct2=document.getElementById('comm-month-to');if(ct2)ct2.value='';
   renderCommission();
 }
 
@@ -1846,6 +1862,29 @@ function renderDash(){
   const nowKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const isFutureDash=key>nowKey;
   document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
+  // Quick stats bar
+  {
+    const totalHomes=DB.customers.length;
+    const activeBedScheds=DB.schedules.filter(s=>{
+      if(s.serviceType&&!s.serviceType.toLowerCase().includes('bed'))return false;
+      if(s.schedEnd&&s.schedEnd<key)return false;
+      if(s.schedStart&&s.schedStart>key)return false;
+      return true;
+    });
+    const totalBeds=activeBedScheds.reduce((sum,s)=>{
+      return sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0);
+    },0);
+    const bedSchedsWithQty=activeBedScheds.filter(s=>(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0)>0);
+    const avgPpb=bedSchedsWithQty.length>0?(bedSchedsWithQty.reduce((sum,s)=>{
+      return sum+(parseFloat(s.lines[0].price)||0);
+    },0)/bedSchedsWithQty.length):0;
+    const qh=document.getElementById('qs-homes');
+    const qb=document.getElementById('qs-beds');
+    const qp=document.getElementById('qs-avgprice');
+    if(qh)qh.textContent=totalHomes;
+    if(qb)qb.textContent=totalBeds>0?Math.round(totalBeds).toLocaleString():'—';
+    if(qp)qp.textContent=avgPpb>0?fmtGBP(Math.round(avgPpb*100)/100):'—';
+  }
   const invs=DB.invoices.filter(i=>mk(i.date)===key);
   const total=invs.reduce((s,i)=>s+i.total,0);
   const recurInvs=invs.filter(i=>i.isRecurring);
@@ -1913,7 +1952,22 @@ function renderDash(){
       const d=bv-av;
       if(Math.abs(d)<0.005)return;
       const type=!aMap[nm]?'new':!bMap[nm]?'lost':'changed';
-      ch.push({nm,d,type,customerId:nmToId[nm]});
+      // Pull beds/price from the B-side (or A-side for lost) invoice
+      let beds=0,ppb=0;
+      const srcInvs=type==='lost'?aInvs:bInvs;
+      const cid=nmToId[nm];
+      const cInv=srcInvs.find(i=>i.customerId===cid);
+      if(cInv&&cInv.lines){
+        const firstLine=cInv.lines[0];
+        if(firstLine){beds=parseFloat(firstLine.qty)||0;ppb=parseFloat(firstLine.price)||0;}
+      }
+      // For "changed" also record the before values
+      let bedsB=0,ppbB=0;
+      if(type==='changed'){
+        const aInv=aInvs.find(i=>i.customerId===cid);
+        if(aInv&&aInv.lines&&aInv.lines[0]){bedsB=parseFloat(aInv.lines[0].qty)||0;ppbB=parseFloat(aInv.lines[0].price)||0;}
+      }
+      ch.push({nm,d,type,customerId:nmToId[nm],beds,ppb,bedsB,ppbB});
     });
     ch.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
     return ch;
@@ -1984,7 +2038,16 @@ function renderDash(){
           const ddSched=DB.schedules.find(s=>s.customerId===c.customerId&&s.paymentMethod==='Direct Debit');
           if(ddSched){ddIcon=ddSched.ddSigned?' <span style="font-size:10px;font-weight:700;background:#16a34a;color:#fff;border-radius:4px;padding:1px 6px;letter-spacing:0.02em">✓ DD signed</span>':' <span style="font-size:10px;font-weight:700;background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;letter-spacing:0.02em">⚠ DD pending</span>';}
         }
-        html+=`<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;white-space:nowrap"><span style="color:${cc}">${icon} ${c.nm}${ddIcon}</span><span style="color:${cc};font-family:var(--mono)">${ds}</span></div>`;
+        let bedLine='';
+        if(c.type==='new'&&c.beds>0){bedLine=`<div style="font-size:10px;color:#9CA3AF;font-family:var(--mono);margin-left:14px;margin-top:1px">${Math.round(c.beds)} beds${c.ppb>0?' @ '+fmtGBP(c.ppb)+'/bed':''}</div>`;}
+        else if(c.type==='lost'&&c.beds>0){bedLine=`<div style="font-size:10px;color:#9CA3AF;font-family:var(--mono);margin-left:14px;margin-top:1px">${Math.round(c.beds)} beds${c.ppb>0?' @ '+fmtGBP(c.ppb)+'/bed':''}</div>`;}
+        else if(c.type==='changed'){
+          const parts=[];
+          if(c.bedsB!==c.beds&&(c.bedsB>0||c.beds>0)){parts.push(`${Math.round(c.bedsB)}→${Math.round(c.beds)} beds`);}
+          if(c.ppbB!==c.ppb&&(c.ppbB>0||c.ppb>0)){parts.push(`${fmtGBP(c.ppbB)}→${fmtGBP(c.ppb)}/bed`);}
+          if(parts.length)bedLine=`<div style="font-size:10px;color:#9CA3AF;font-family:var(--mono);margin-left:14px;margin-top:1px">${parts.join(' · ')}</div>`;
+        }
+        html+=`<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;white-space:nowrap"><span style="color:${cc}">${icon} ${c.nm}${ddIcon}</span><span style="color:${cc};font-family:var(--mono)">${ds}</span></div>${bedLine}`;
       });
       html+=`</div></div>`;
       if(ch.length>7){html+=`<div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:center">Scroll to see all ${ch.length} customers</div>`;}
@@ -2233,6 +2296,45 @@ function renderDash(){
   document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>`<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max((b.t-TREND_BASE)/Math.max(maxT-TREND_BASE,1)*85,b.t>0?2:0)}px"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
   const _baseEl=document.getElementById('trend-base-label');if(_baseEl)_baseEl.textContent=TREND_BASE>0?fmtGBP(Math.round(TREND_BASE/1000)*1000).replace('.00',''):'£0';
+  // Beds per month row
+  {
+    const bedsRow=document.getElementById('trend-beds-row');
+    if(bedsRow){
+      // Compute beds for each bar month from actual invoices (Beds/Rooms service type)
+      const barsWithBeds=bars.map(b=>{
+        const monthInvs=DB.invoices.filter(i=>mk(i.date)===b.key);
+        const beds=monthInvs.reduce((sum,inv)=>{
+          if(!inv.serviceType||!inv.serviceType.toLowerCase().includes('bed'))return sum;
+          return sum+(parseFloat(inv.lines&&inv.lines[0]?inv.lines[0].qty:0)||0);
+        },0);
+        // For forecast months use schedule data
+        if(beds===0&&b.isFuture){
+          const schBeds=DB.schedules.filter(s=>{
+            if(!s.serviceType||!s.serviceType.toLowerCase().includes('bed'))return false;
+            if(s.schedEnd&&s.schedEnd<b.key)return false;
+            if(s.schedStart&&s.schedStart>b.key)return false;
+            return true;
+          }).reduce((sum,s)=>sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0),0);
+          return{...b,beds:Math.round(schBeds)};
+        }
+        return{...b,beds:Math.round(beds)};
+      });
+      const maxBeds=Math.max(...barsWithBeds.map(b=>b.beds),1);
+      bedsRow.innerHTML=barsWithBeds.map(b=>{
+        const col=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--accent)';
+        const h=Math.max(b.beds>0?(b.beds/maxBeds*28):0,b.beds>0?2:0);
+        return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div style="font-size:9px;font-family:var(--mono);color:${col};font-weight:${b.type!=='past'?'700':'400'};white-space:nowrap">${b.beds>0?b.beds:''}</div>
+          <div style="width:100%;max-width:28px;background:${col};border-radius:2px 2px 0 0;opacity:${b.type==='forecast'?'0.65':'0.85'};transition:height 0.3s" style="height:${h}px"></div>
+        </div>`;
+      }).join('');
+      // Fix inline height since we can't set it from string in above
+      barsWithBeds.forEach((b,i)=>{
+        const barEl=bedsRow.children[i]?.querySelector('div:last-child');
+        if(barEl){const h=Math.max(b.beds>0?(b.beds/maxBeds*28):0,b.beds>0?2:0);barEl.style.height=h+'px';}
+      });
+    }
+  }
   const projN=trendFutureKeys.length;
   const noteEl=document.getElementById('trend-proj-note');
   if(noteEl)noteEl.textContent=projN>0?`* Forecast from recurring schedules (${projN} month${projN!==1?'s':''})`:'';
@@ -3380,27 +3482,64 @@ function renderCommission(){
     spFilter.innerHTML='<option value="">All salespeople</option>'+DB.salespeople.map(sp=>`<option value="${sp.id}">${sp.name}</option>`).join('');
     spFilter.value=cur;
   }
+  // Populate month dropdowns from commission data
+  const allCommMonths=new Set();
+  DB.commissions.forEach(comm=>{
+    if(comm.startDate){
+      const d=new Date(comm.startDate+'-01');
+      // Add start month
+      allCommMonths.add(comm.startDate.slice(0,7));
+    }
+    if(comm.endDate){allCommMonths.add(comm.endDate.slice(0,7));}
+    // Also add current month & next 12 for recurring
+    if(comm.commissionType==='recurring'){
+      const now=new Date();
+      for(let i=0;i<12;i++){
+        const d=new Date(now.getFullYear(),now.getMonth()+i,1);
+        const mk2=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        allCommMonths.add(mk2);
+      }
+    }
+  });
+  const sortedMonths=[...allCommMonths].sort();
+  const fromSel=document.getElementById('comm-month-from');
+  const toSel=document.getElementById('comm-month-to');
+  if(fromSel){
+    const curFrom=fromSel.value;
+    fromSel.innerHTML='<option value="">From month…</option>'+sortedMonths.map(m=>{
+      const d=new Date(m+'-01');
+      const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
+      return`<option value="${m}"${m===curFrom?' selected':''}>${lbl}</option>`;
+    }).join('');
+    if(curFrom&&sortedMonths.includes(curFrom))fromSel.value=curFrom;
+  }
+  if(toSel){
+    const curTo=toSel.value;
+    toSel.innerHTML='<option value="">To month…</option>'+sortedMonths.map(m=>{
+      const d=new Date(m+'-01');
+      const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
+      return`<option value="${m}"${m===curTo?' selected':''}>${lbl}</option>`;
+    }).join('');
+    if(curTo&&sortedMonths.includes(curTo))toSel.value=curTo;
+  }
   const spId=document.getElementById('comm-sp-filter')?.value||'';
-  const fromDate=document.getElementById('comm-from')?.value||'';
-  const toDate=document.getElementById('comm-to')?.value||'';
+  const fromDate=fromSel?.value?fromSel.value+'-01':'';
+  const toDate=toSel?.value?toSel.value+'-28':'';
   // Filter by salesperson
   let comms=[...DB.commissions];
   if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
-  // Filter by date range using OVERLAP logic:
-  // Recurring: show if commission period overlaps with filter range
-  // One-off: show if startDate falls within filter range
-  if(fromDate||toDate){
+  // Filter by month range using OVERLAP logic
+  if(fromSel?.value||toSel?.value){
+    const fromMk=fromSel?.value||'0000-01';
+    const toMk=toSel?.value||'9999-12';
     comms=comms.filter(c=>{
       if(c.commissionType==='recurring'){
-        const cEnd=c.endDate||'9999-12-31';
-        const rangeEnd=toDate||'9999-12-31';
-        const rangeStart=fromDate||'0000-01-01';
-        return c.startDate<=rangeEnd && cEnd>=rangeStart;
+        const cEnd=(c.endDate||'9999-12-31').slice(0,7);
+        const cStart=c.startDate.slice(0,7);
+        return cStart<=toMk && cEnd>=fromMk;
       }else{
-        // one-off: startDate within range
-        if(fromDate&&c.startDate<fromDate)return false;
-        if(toDate&&c.startDate>toDate)return false;
-        return true;
+        const cMk=c.startDate.slice(0,7);
+        return cMk>=fromMk && cMk<=toMk;
       }
     });
   }
@@ -3453,10 +3592,10 @@ function renderCommission(){
     const spCells=spCols.map(sp=>{
       const e=r.salespersonEntries.find(x=>x.spId===sp.id);
       if(!e)return`<td class="r muted" style="color:var(--ink3)">—</td>`;
-      return`<td class="r" style="font-family:var(--mono);font-size:12px">${fmtGBP(e.amount)}<br><span style="font-size:10px;color:var(--ink3)">${e.pct}%</span></td>`;
+      return`<td class="r" style="font-family:var(--mono);font-size:12px;white-space:nowrap">${fmtGBP(e.amount)} <span style="font-size:10px;color:var(--ink3)">(${e.pct}%)</span></td>`;
     }).join('');
     return`<tr>
-      <td><div style="font-weight:500">${r.description||'—'}${linkedBadge}</div><div style="font-size:11px;color:var(--ink3)">${r.customer||'—'}</div></td>
+      <td style="white-space:nowrap"><span style="font-weight:500">${r.description||'—'}</span>${linkedBadge}<span style="color:var(--ink3);font-size:11px"> · ${r.customer||'—'}</span></td>
       <td class="r">${fmtGBP(r.invoiceTotalExVat)}</td>
       ${spCells}
       <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(r.totalCommission)}</td>
@@ -3506,8 +3645,8 @@ function renderCommission(){
 // ── Commission Excel export ────────────────────────────────────────────
 function exportCommission(){
   const spId=document.getElementById('comm-sp-filter')?.value||'';
-  const fromDate=document.getElementById('comm-from')?.value||'';
-  const toDate=document.getElementById('comm-to')?.value||'';
+  const fromDate=document.getElementById('comm-month-from')?.value?document.getElementById('comm-month-from').value+'-01':'';
+  const toDate=document.getElementById('comm-month-to')?.value?document.getElementById('comm-month-to').value+'-28':'';
   let comms=[...DB.commissions];
   if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
   // Expand recurring to monthly rows
