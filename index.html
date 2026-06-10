@@ -535,6 +535,7 @@ tbody tr:hover{background:var(--bg)}
             <th></th>
           </tr></thead>
           <tbody id="comm-tbody"></tbody>
+          <tfoot id="comm-tfoot"></tfoot>
         </table>
         <div id="comm-empty" class="empty" style="display:none">
           <div class="empty-icon">%</div>
@@ -576,6 +577,10 @@ tbody tr:hover{background:var(--bg)}
           <option value="Residents">Residents</option>
           <option value="Residents and HR">Residents and HR</option>
           <option value="HR and Governance">HR and Governance</option>
+          <option value="Tablets">Tablets</option>
+          <option value="Training">Training</option>
+          <option value="Onboarding">Onboarding</option>
+          <option value="Other">Other</option>
         </select>
       </div>
       <div class="fg" id="inv-date-row"><label class="flbl">Invoice date *</label><input type="date" class="finp" id="f-date"></div>
@@ -1452,6 +1457,10 @@ function saveInv(){
   }
   persist();window._formDirty=false;closeOverlay('inv-modal');showToast(editInvId?'Invoice updated!':'Invoice created!');
   renderDash();renderInvoices();refreshFilters();
+  if(!editInvId){
+    const _newInvId=payload.id;
+    setTimeout(()=>confirm2('Add commission?','Would you like to record a commission entry for this invoice?','Add Commission',()=>openCommForInvoice(_newInvId)),350);
+  }
 }
 
 // (#5) Delete invoice — only removes this one instance, schedule untouched
@@ -1947,6 +1956,7 @@ function renderDash(){
     const col=up?'#4ecdc4':'#f87171';
     const sign=up?'↑':'↓';
     // Only rebuild HTML if data key changed (avoid scroll reset while hovering)
+    tip.style.maxWidth='max-content';tip.style.minWidth='240px';
     if(tip._momKey===diffsKey&&tip.style.display==='block')return;
     tip._momKey=diffsKey;
     let html=`<div style="font-weight:700;font-size:12px;color:#cdd5e0;margin-bottom:4px">${vsLabel}</div>`;
@@ -1965,9 +1975,9 @@ function renderDash(){
         let ddIcon='';
         if(c.type==='new'&&c.customerId){
           const ddSched=DB.schedules.find(s=>s.customerId===c.customerId&&s.paymentMethod==='Direct Debit');
-          if(ddSched){ddIcon=ddSched.ddSigned?' <span title="DD contract signed" style="font-size:10px;background:#22c55e22;color:#22c55e;border-radius:3px;padding:0 3px">DD✓</span>':' <span title="DD contract not yet signed" style="font-size:10px;background:#f59e0b22;color:#f59e0b;border-radius:3px;padding:0 3px">DD?</span>';}
+          if(ddSched){ddIcon=ddSched.ddSigned?' <span style="font-size:10px;font-weight:700;background:#16a34a;color:#fff;border-radius:4px;padding:1px 6px;letter-spacing:0.02em">✓ DD signed</span>':' <span style="font-size:10px;font-weight:700;background:#d97706;color:#fff;border-radius:4px;padding:1px 6px;letter-spacing:0.02em">⚠ DD pending</span>';}
         }
-        html+=`<div style="display:flex;justify-content:space-between;gap:10px;font-size:11px"><span style="color:${cc}">${icon} ${c.nm}${ddIcon}</span><span style="color:${cc};font-family:var(--mono);white-space:nowrap">${ds}</span></div>`;
+        html+=`<div style="display:flex;justify-content:space-between;gap:12px;font-size:11px;white-space:nowrap"><span style="color:${cc}">${icon} ${c.nm}${ddIcon}</span><span style="color:${cc};font-family:var(--mono)">${ds}</span></div>`;
       });
       html+=`</div></div>`;
       if(ch.length>7){html+=`<div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:center">Scroll to see all ${ch.length} customers</div>`;}
@@ -2331,7 +2341,7 @@ function renderDash(){
 
   // SVG donut helper
   function pmDonut(dataObj,grandSub,label,which){
-    const r=44,cx=58,cy=58,sw=14,circ=2*Math.PI*r;
+    const r=44,cx=58,cy=58,sw=22,circ=2*Math.PI*r;
     let cumLen=0;
     const allPMs=[...PM_LABELS,'Unspecified'];
     const incTotal=Object.values(dataObj).reduce((s,v)=>s+v.total,0);
@@ -2368,7 +2378,8 @@ function renderDash(){
             ${segs||`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--border)" stroke-width="${sw}"/>`}
           </svg>
           <div style="font-size:14px;font-weight:700;font-family:var(--mono);color:var(--ink);text-align:center;margin-top:4px;line-height:1.2">${centerAmt}</div>
-          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);text-align:center">inc. VAT ${centerInc}</div>
+          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);text-align:center">VAT ${fmtGBP(grandSub?(incTotal-grandSub):0)}</div>
+          <div style="font-size:10px;color:var(--ink3);font-family:var(--mono);text-align:center">inc. ${centerInc}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:2px;min-width:110px">
           ${legendItems}
@@ -2410,6 +2421,7 @@ function renderDash(){
 
 
   function pmTip(e,name,amt){
+    var tt=document.getElementById('trend-tooltip');if(tt){tt.style.maxWidth='';tt.style.minWidth='';}
     var t=document.getElementById('pm-tip');
     t.textContent=name+': '+amt;
     t.style.display='block';
@@ -2640,11 +2652,23 @@ function doExport(){
 function openMatrixExport(){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
   const now=new Date();
-  // Default: past 12 months including current
-  const fromDt=new Date(now.getFullYear(),now.getMonth()-11,1);
-  document.getElementById('mx-from').value=fmt(fromDt);
-  document.getElementById('mx-to').value=fmt(now);
+  const curM=fmt(now);
+  document.getElementById('mx-from').value=curM;
+  document.getElementById('mx-to').value=curM;
   showOverlay('matrix-modal');
+}
+function mxQuick(range){
+  const now=new Date();
+  const cy=now.getFullYear(),cm=now.getMonth()+1;
+  const toM=`${cy}-${String(cm).padStart(2,'0')}`;
+  let fromM;
+  if(range==='current'){fromM=toM;}
+  else if(range==='year'){fromM=`${cy}-01`;}
+  else if(range==='3m'){const d=new Date(cy,cm-3,1);fromM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  else if(range==='6m'){const d=new Date(cy,cm-6,1);fromM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  else if(range==='12m'){const d=new Date(cy,cm-12,1);fromM=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+  document.getElementById('mx-from').value=fromM;
+  document.getElementById('mx-to').value=toM;
 }
 function doMatrixExport(){try{
   const fromVal=document.getElementById('mx-from').value;
@@ -3198,6 +3222,25 @@ function recalcComm(){
   document.getElementById('comm-preview-total').textContent=fmtGBP(totalComm);
 }
 
+function openCommForInvoice(invId){
+  const inv=DB.invoices.find(x=>x.id===invId);
+  if(!inv)return;
+  const c=DB.customers.find(x=>x.id===inv.customerId);
+  openCommModal(); // open fresh
+  // Pre-fill as linked one-off
+  document.getElementById('comm-type-linked').checked=true;
+  document.getElementById('comm-type-standalone').checked=false;
+  document.getElementById('comm-linked-section').style.display='';
+  populateCommInvSel();
+  document.getElementById('comm-inv-sel').value=invId;
+  document.getElementById('comm-customer').value=c?.name||'';
+  document.getElementById('comm-inv-total').value=f2(inv.subtotal);
+  document.getElementById('comm-desc').value=(c?.name||'')+(inv.serviceType?' — '+inv.serviceType:'');
+  document.getElementById('comm-start').value=inv.date;
+  document.getElementById('comm-type-sel').value='one-off';
+  recalcComm();
+  showTab('commission');
+}
 function openCommModal(id){
   editCommId=id||null;
   const c=id?DB.commissions.find(x=>x.id===id):null;
@@ -3400,13 +3443,23 @@ function renderCommission(){
     name:sp.name,
     total:expForFooter.reduce((s,r)=>s+(r.salespersonEntries.find(e=>e.spId===sp.id)?.amount||0),0)
   }));
+  // Tfoot row — totals under each column
+  const tfoot=document.getElementById('comm-tfoot');
+  if(tfoot){
+    tfoot.innerHTML=`<tr style="border-top:2px solid var(--border);background:var(--bg)">
+      <td style="font-weight:700;font-size:12px;color:var(--ink2);padding:8px 10px">${comms.length} entr${comms.length!==1?'ies':'y'}</td>
+      <td class="r" style="font-family:var(--mono);font-weight:700;font-size:12px;padding:8px 10px">${fmtGBP(totalInv)}</td>
+      ${spTotals.map(sp=>`<td class="r" style="font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);padding:8px 10px">${fmtGBP(sp.total)}</td>`).join('')}
+      <td class="r" style="font-family:var(--mono);font-weight:700;font-size:12px;color:var(--accent);padding:8px 10px">${fmtGBP(totalComm)}</td>
+      <td colspan="4"></td>
+    </tr>`;
+  }
   if(footer){
     footer.style.display='block';
     footer.innerHTML=`<div style="display:flex;justify-content:flex-end;gap:20px;flex-wrap:wrap;align-items:center;font-family:var(--mono);font-size:12px;color:var(--ink2)">
       <span>${comms.length} entr${comms.length!==1?'ies':'y'}</span>
       <span>Invoice value: <strong>${fmtGBP(totalInv)}</strong></span>
-      ${spTotals.map(sp=>`<span style="border-left:1px solid var(--border);padding-left:16px">${sp.name}: <strong style="color:var(--accent)">${fmtGBP(sp.total)}</strong></span>`).join('')}
-      <span style="border-left:1px solid var(--border);padding-left:16px">Total: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>
+      <span style="border-left:1px solid var(--border);padding-left:16px">Total commission: <strong style="color:var(--accent)">${fmtGBP(totalComm)}</strong></span>
     </div>`;
   }
 }
@@ -3782,6 +3835,14 @@ document.addEventListener('DOMContentLoaded',function(){
             <div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:8px">To month</div>
             <input type="month" id="mx-to" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--ink1)">
           </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+          <span style="font-size:11px;color:var(--ink3);align-self:center;margin-right:2px">Quick:</span>
+          <button class="btn btn-ghost btn-xs" onclick="mxQuick('current')">Current month</button>
+          <button class="btn btn-ghost btn-xs" onclick="mxQuick('year')">This year</button>
+          <button class="btn btn-ghost btn-xs" onclick="mxQuick('3m')">Last 3 months</button>
+          <button class="btn btn-ghost btn-xs" onclick="mxQuick('6m')">Last 6 months</button>
+          <button class="btn btn-ghost btn-xs" onclick="mxQuick('12m')">Last 12 months</button>
         </div>
         <div style="font-size:12px;color:var(--ink3);margin-bottom:16px">Exports 3 summary sheets (amounts, beds, price/bed) plus one detail sheet per month.</div>
         <div style="display:flex;gap:10px;justify-content:flex-end">
