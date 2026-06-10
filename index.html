@@ -212,9 +212,12 @@ tbody tr:hover{background:var(--bg)}
 .qstat-bar{display:grid;grid-template-columns:repeat(3,1fr) 2.2fr;gap:12px;margin-bottom:14px;align-items:stretch}
 .qstat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px 14px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06);display:flex;flex-direction:column;gap:2px;min-height:88px}
 .qstat-accent{position:absolute;top:0;left:0;right:0;height:3px}
-.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);line-height:1;font-weight:600;margin-bottom:6px}
-.qstat-val{font-size:40px;font-weight:700;font-family:var(--serif);color:var(--ink);letter-spacing:-2px;line-height:1;margin-top:4px}
-.qstat-sub{font-size:12px;color:var(--ink2);margin-top:3px;font-family:var(--sans)}
+.qstat{display:flex!important;flex-direction:row!important;align-items:center;gap:14px}
+.qstat-icon-wrap{font-size:28px;line-height:1;min-width:36px;text-align:center;flex-shrink:0;opacity:0.85}
+.qstat-text{display:flex;flex-direction:column;gap:4px;flex:1}
+.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);line-height:1;font-weight:500}
+.qstat-val{font-size:32px;font-weight:600;font-family:var(--serif);color:var(--ink);letter-spacing:-1.5px;line-height:1}
+.qstat-sub{font-size:12px;color:var(--ink2);margin-top:2px;font-family:var(--sans)}
 .trend-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--ink3)}
 .trend-legend span{display:flex;align-items:center;gap:5px}
 .trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
@@ -310,18 +313,27 @@ tbody tr:hover{background:var(--bg)}
       <div class="qstat-bar" id="dash-qstats">
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--accent)"></div>
-          <div class="qstat-lbl">Care Homes</div>
-          <div class="qstat-val" id="qs-homes">—</div>
+          <div class="qstat-icon-wrap">🏠</div>
+          <div class="qstat-text">
+            <div class="qstat-lbl">Care Homes</div>
+            <div class="qstat-val" id="qs-homes">—</div>
+          </div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--teal)"></div>
-          <div class="qstat-lbl">Active Beds</div>
-          <div class="qstat-val" id="qs-beds">—</div>
+          <div class="qstat-icon-wrap">🛏</div>
+          <div class="qstat-text">
+            <div class="qstat-lbl">Active Beds</div>
+            <div class="qstat-val" id="qs-beds">—</div>
+          </div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--gold)"></div>
-          <div class="qstat-lbl">Avg £ / Bed</div>
-          <div class="qstat-val" id="qs-avgprice">—</div>
+          <div class="qstat-icon-wrap">💷</div>
+          <div class="qstat-text">
+            <div class="qstat-lbl">Avg £ / Bed</div>
+            <div class="qstat-val" id="qs-avgprice">—</div>
+          </div>
         </div>
         <!-- MoM card inline in top bar -->
         <div class="qstat" id="mom-inline-card" style="border:1px solid var(--border);padding:10px 14px;overflow:visible">
@@ -343,7 +355,7 @@ tbody tr:hover{background:var(--bg)}
       <div class="dgrid">
           <!-- Monthly trend with 6 past + forecast -->
           <div class="card">
-            <div class="card-hdr"><span class="card-title">Monthly trend</span>
+            <div class="card-hdr"><span class="card-title">Monthly Trends</span>
               <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
                 <div style="display:flex;align-items:center;gap:6px">
                   <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Last</label>
@@ -387,9 +399,9 @@ tbody tr:hover{background:var(--bg)}
                 <div style="flex:1;display:flex;gap:4px" id="trend-labels"></div>
               </div>
               <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
-              <div id="trend-beds-section" style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">
+              <div id="trend-beds-section" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
                 <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px">Total Beds per month</div>
-                <div id="trend-beds-row" style="display:flex;gap:4px;align-items:flex-end;min-height:32px"></div>
+                <div id="trend-beds-row" style="display:flex;gap:4px;align-items:flex-end;min-height:80px"></div>
               </div>
             </div>
           </div>
@@ -2334,14 +2346,17 @@ function renderDash(){
         return{...b,beds:Math.round(schBeds)};
       });
       const maxBeds=Math.max(...barsWithBeds.map(b=>b.beds),1);
+      const MAX_BED_H=64; // px tall for the tallest bar
       bedsRow.innerHTML=barsWithBeds.map(b=>{
         const col=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--accent)';
-        const h=Math.max(b.beds>0?(b.beds/maxBeds*28):0,b.beds>0?2:0);
-        const lblCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)';
-        return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
-          <div style="font-size:9px;font-family:var(--mono);color:${col};font-weight:${b.type!=='past'?'700':'400'};white-space:nowrap">${b.beds>0?b.beds:''}</div>
-          <div style="width:100%;max-width:28px;height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:${b.type==='forecast'?'0.65':'0.85'};transition:height 0.3s"></div>
-          <div style="font-size:10px;font-family:var(--mono);color:${lblCol};font-weight:${b.type!=='past'?'700':'500'};text-align:center;margin-top:1px">${b.lbl}${b.isFuture?'*':''}</div>
+        const h=Math.max(b.beds>0?Math.round(b.beds/maxBeds*MAX_BED_H):0,b.beds>0?4:0);
+        const lblCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)';
+        const valCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink)';
+        return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">
+          <div style="font-size:10px;font-family:var(--mono);color:${valCol};font-weight:600;white-space:nowrap;margin-bottom:3px">${b.beds>0?b.beds:''}</div>
+          <div style="width:100%;height:${h}px;background:${col};border-radius:3px 3px 0 0;opacity:${b.type==='forecast'?'0.65':'1'};transition:height 0.3s"></div>
+          <div style="width:100%;height:1px;background:var(--border)"></div>
+          <div style="font-size:10px;font-family:var(--mono);color:${lblCol};font-weight:${b.type!=='past'?'600':'400'};text-align:center;margin-top:4px">${b.lbl}${b.isFuture?'*':''}</div>
         </div>`;
       }).join('');
 
