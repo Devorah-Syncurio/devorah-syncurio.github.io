@@ -2130,7 +2130,7 @@ function renderDash(){
         else if(inv.paymentMethod&&['Direct Debit','Standing Order','Upon Invoice'].includes(inv.paymentMethod))pm=inv.paymentMethod;
         const pmDot=`<svg width="8" height="8" viewBox="0 0 8 8" style="flex-shrink:0;margin-right:3px"><circle cx="4" cy="4" r="3.5" fill="${PM_HEX2[pm]||'#9CA3AF'}"/></svg>`;
         const notesHtml=inv.notes?`<div style="font-size:10px;color:var(--ink3);margin-top:2px;font-style:italic">${inv.notes}</div>`:'';
-        return`<div onclick="viewInvoice('${inv.id}')" style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+        return`<div onclick="viewInv('${inv.id}')" style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
           <div style="min-width:0;flex:1">
             <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
               <span style="font-size:12px;font-weight:600;color:var(--ink)">${custLabel}</span>${custSub}${svcBadge}
