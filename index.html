@@ -2276,8 +2276,19 @@ function renderDash(){
       }
       const prev=fromEl.value;
       fromEl.innerHTML=opts.map(o=>`<option value="${o.k}"${o.k===prev?'selected':''}>${o.lbl}</option>`).join('');
-      // Default: 5 months back (or earliest if less data)
-      if(!fromEl.value||!opts.find(o=>o.k===fromEl.value)){
+      // Auto-anchor: whenever the selected month changes, reset to sel-5 → sel+1 (7 bars)
+      if(window._lastTrendAnchor!==key){
+        window._lastTrendAnchor=key;
+        const anchorD=new Date(dashY,dashM-5,1);
+        const anchorK=`${anchorD.getFullYear()}-${String(anchorD.getMonth()+1).padStart(2,'0')}`;
+        // Ensure anchorK option exists (data may not go that far back)
+        if(!opts.find(o=>o.k===anchorK)&&opts.length){fromEl.value=opts[0].k;}
+        else{fromEl.value=anchorK;}
+        const countEl2=document.getElementById('trend-count');
+        if(countEl2)countEl2.value='7';
+        const quickEl=document.getElementById('trend-quick');
+        if(quickEl)quickEl.value='';
+      } else if(!fromEl.value||!opts.find(o=>o.k===fromEl.value)){
         const def=opts.length>5?opts[opts.length-6]:opts[0];
         if(def)fromEl.value=def.k;
       }
