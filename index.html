@@ -2112,7 +2112,36 @@ function renderDash(){
         return`<circle cx="${cx2}" cy="${cy2}" r="${r2}" fill="none" stroke="${PM_HEX2[pm]||'#9CA3AF'}" stroke-width="${sw2}" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}" transform="rotate(-90 ${cx2} ${cy2})" stroke-linecap="butt"/>`;
       }).join('');
       const legendItems2=pmKeys2.map(pm=>`<div style="display:flex;align-items:center;gap:6px;padding:2px 0"><svg width="9" height="9" viewBox="0 0 9 9" style="flex-shrink:0"><circle cx="4.5" cy="4.5" r="4" fill="${PM_HEX2[pm]||'#9CA3AF'}"/></svg><span style="font-size:11px;font-family:var(--mono);white-space:nowrap;color:var(--ink)">${pm}</span><span style="font-size:11px;font-family:var(--mono);color:var(--ink);margin-left:auto">${fmtGBP(ooPM[pm].sub)}</span></div>`).join('');
-      ooCard.innerHTML=`<div style="display:flex;align-items:center;gap:16px">
+      // Per-invoice detail rows
+      const ooRows=ooInvs.map(inv=>{
+        const c=DB.customers.find(x=>x.id===inv.customerId);
+        const custLabel=(c?.company||c?.name||'Unknown');
+        const custSub=c?.company&&c?.name&&c.name!==c.company?`<span style="font-size:10px;color:var(--ink3);margin-left:4px">${c.name}</span>`:'';
+        const svcBadge=inv.serviceType?`<span style="display:inline-block;font-size:9px;font-family:var(--mono);background:var(--bg2);color:var(--ink3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle">${inv.serviceType}</span>`:'';
+        const lineDescs=(inv.lines||[]).filter(l=>l.desc).map(l=>`${l.desc}${l.qty&&l.qty!==1?' ×'+l.qty:''}`).join(' · ');
+        const invSub=inv.subtotal||inv.total/(1+(inv.vatRate||20)/100);
+        const sc=DB.schedules.find(s=>s.id===inv.scheduleId);
+        let pm='Unspecified';
+        if(sc&&['Direct Debit','Standing Order','Upon Invoice'].includes(sc.paymentMethod))pm=sc.paymentMethod;
+        else if(inv.paymentMethod&&['Direct Debit','Standing Order','Upon Invoice'].includes(inv.paymentMethod))pm=inv.paymentMethod;
+        const pmDot=`<svg width="8" height="8" viewBox="0 0 8 8" style="flex-shrink:0;margin-right:3px"><circle cx="4" cy="4" r="3.5" fill="${PM_HEX2[pm]||'#9CA3AF'}"/></svg>`;
+        const notesHtml=inv.notes?`<div style="font-size:10px;color:var(--ink3);margin-top:2px;font-style:italic">${inv.notes}</div>`:'';
+        return`<div onclick="viewInvoice('${inv.id}')" style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;gap:8px" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+          <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
+              <span style="font-size:12px;font-weight:600;color:var(--ink)">${custLabel}</span>${custSub}${svcBadge}
+            </div>
+            ${lineDescs?`<div style="font-size:11px;color:var(--ink2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lineDescs}</div>`:''}
+            <div style="display:flex;align-items:center;margin-top:2px">${pmDot}<span style="font-size:10px;color:var(--ink3)">${pm}</span></div>
+            ${notesHtml}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:12px;font-weight:700;font-family:var(--mono);color:var(--ink)">${fmtGBP(invSub)}</div>
+            <div style="font-size:10px;color:var(--ink3);font-family:var(--mono)">inc. ${fmtGBP(inv.total)}</div>
+          </div>
+        </div>`;
+      }).join('');
+      ooCard.innerHTML=`<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
         <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0">
           <svg width="88" height="88" viewBox="0 0 88 88">
             <circle cx="${cx2}" cy="${cy2}" r="${r2}" fill="none" stroke="var(--border)" stroke-width="${sw2}"/>
@@ -2125,7 +2154,8 @@ function renderDash(){
           <div style="font-size:11px;color:var(--ink3);margin-bottom:4px">${ooInvs.length} invoice${ooInvs.length!==1?'s':''}</div>
           ${legendItems2}
         </div>
-      </div>`;
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:4px;max-height:240px;overflow-y:auto">${ooRows}</div>`;
     }
   }
 
