@@ -1900,8 +1900,8 @@ function renderDash(){
       const mInvs=DB.invoices.filter(i=>mk(i.date)===key);
       totalHomes=new Set(mInvs.map(i=>i.customerId)).size;
       totalBeds=mInvs.reduce((sum,i)=>{
-        if(!i.lines)return sum;
-        return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+        if(!i.lines||!i.lines[0])return sum;
+        return sum+(parseFloat(i.lines[0].qty)||0);
       },0);
       // Avg price: total ex VAT / total beds. Use i.sub (Supabase field name)
       const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
