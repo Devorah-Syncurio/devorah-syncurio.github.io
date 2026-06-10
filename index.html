@@ -2363,18 +2363,28 @@ function renderDash(){
   {
     const bedsRow=document.getElementById('trend-beds-row');
     if(bedsRow){
-      // Compute beds for each bar month from schedules (reliable for past + future)
+      // Compute beds: actuals from invoices for past/current, schedules for future (matches qstat)
       const barsWithBeds=bars.map(b=>{
-        const schBeds=DB.schedules.filter(s=>{
-          if(s.active===false)return false;
-          const st=(s.serviceType||'').toLowerCase();
-          // Include schedules with beds/rooms type OR with no serviceType set (treat as bed-based)
-          if(st&&!st.includes('bed')&&!st.includes('room'))return false;
-          const start=s.schedStart||'0000-01';
-          const end=s.schedEnd||'9999-12';
-          return start<=b.k&&b.k<=end;
-        }).reduce((sum,s)=>sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0),0);
-        return{...b,beds:Math.round(schBeds)};
+        let bedCount=0;
+        if(!b.isFuture){
+          // Use actual invoices — sum ALL lines, no serviceType filter (matches matrix logic)
+          bedCount=DB.invoices.filter(i=>mk(i.date)===b.k).reduce((sum,i)=>{
+            if(!i.lines)return sum;
+            return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+          },0);
+        } else {
+          // Future: derive from active schedules (forecast)
+          bedCount=DB.schedules.filter(s=>{
+            if(s.active===false)return false;
+            const start=s.schedStart||'0000-01';
+            const end=s.schedEnd||'9999-12';
+            return start<=b.k&&b.k<=end;
+          }).reduce((sum,s)=>{
+            if(!s.lines)return sum;
+            return sum+s.lines.reduce((a,l)=>a+(parseFloat(l.qty)||0),0);
+          },0);
+        }
+        return{...b,beds:Math.round(bedCount)};
       });
       const maxBeds=Math.max(...barsWithBeds.map(b=>b.beds),1);
       const minBeds=Math.min(...barsWithBeds.filter(b=>b.beds>0).map(b=>b.beds),maxBeds);
