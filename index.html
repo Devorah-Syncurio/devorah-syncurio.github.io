@@ -349,7 +349,10 @@ tbody tr:hover{background:var(--bg)}
             </div>
             <div class="card-body">
               <div class="mbars" id="trend-bars"></div>
-              <div style="display:flex;gap:4px;margin-top:6px" id="trend-labels"></div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;border-top:1px dashed var(--border);padding-top:2px">
+                <span style="font-size:9px;font-family:var(--mono);color:var(--ink3);white-space:nowrap">£50k</span>
+                <div style="flex:1;display:flex;gap:4px" id="trend-labels"></div>
+              </div>
               <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
             </div>
           </div>
@@ -2166,7 +2169,8 @@ function renderDash(){
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
     }
   window._trendBars=bars;
-  const maxT=Math.max(...bars.map(b=>b.t),1);
+  const TREND_BASE=50000;
+  const maxT=Math.max(...bars.map(b=>b.t),TREND_BASE+1);
 
   // Compute per-bar customer diffs for tooltip
   window._trendDiffs=bars.map((b,i)=>{
@@ -2192,7 +2196,7 @@ function renderDash(){
     return{prevLbl:pb.fullLbl,delta:b.t-pb.t,ch};
   });
 
-  document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>`<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max(b.t/maxT*85,2)}px"></div></div>`).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>`<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max((b.t-TREND_BASE)/Math.max(maxT-TREND_BASE,1)*85,b.t>0?2:0)}px"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
   const projN=trendFutureKeys.length;
   const noteEl=document.getElementById('trend-proj-note');
