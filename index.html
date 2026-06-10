@@ -209,12 +209,13 @@ tbody tr:hover{background:var(--bg)}
 /* Dashboard layout */
 .dgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:stretch}
 /* Trend legend */
-.qstat-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
-.qstat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px 16px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06);display:flex;flex-direction:column;gap:3px}
+.qstat-bar{display:grid;grid-template-columns:repeat(3,1fr) 2fr;gap:12px;margin-bottom:14px;align-items:stretch}
+.qstat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px 10px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06);display:flex;flex-direction:column;gap:2px}
 .qstat-accent{position:absolute;top:0;left:0;right:0;height:3px}
-.qstat-icon{font-size:18px;margin-bottom:4px;opacity:0.75}
-.qstat-val{font-size:26px;font-weight:700;font-family:var(--serif);color:var(--ink);letter-spacing:-0.5px;line-height:1.1}
-.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.9px;color:var(--ink3);margin-top:2px}
+.qstat-icon-row{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+.qstat-icon{font-size:14px;opacity:0.8;line-height:1}
+.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3);line-height:1}
+.qstat-val{font-size:22px;font-weight:700;font-family:var(--serif);color:var(--ink);letter-spacing:-0.5px;line-height:1.1}
 .trend-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--ink3)}
 .trend-legend span{display:flex;align-items:center;gap:5px}
 .trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
@@ -310,21 +311,28 @@ tbody tr:hover{background:var(--bg)}
       <div class="qstat-bar" id="dash-qstats">
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--accent)"></div>
-          <div class="qstat-icon">🏠</div>
+          <div class="qstat-icon-row"><span class="qstat-icon">🏠</span><span class="qstat-lbl">Care Homes</span></div>
           <div class="qstat-val" id="qs-homes">—</div>
-          <div class="qstat-lbl">Care Homes</div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--teal)"></div>
-          <div class="qstat-icon">🛏</div>
+          <div class="qstat-icon-row"><span class="qstat-icon">🛏</span><span class="qstat-lbl">Active Beds</span></div>
           <div class="qstat-val" id="qs-beds">—</div>
-          <div class="qstat-lbl">Active Beds</div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--gold)"></div>
-          <div class="qstat-icon">💷</div>
+          <div class="qstat-icon-row"><span class="qstat-icon">💷</span><span class="qstat-lbl">Avg £ / Bed</span></div>
           <div class="qstat-val" id="qs-avgprice">—</div>
-          <div class="qstat-lbl">Avg £ / Bed</div>
+        </div>
+        <!-- MoM card inline in top bar -->
+        <div class="qstat" id="mom-inline-card" style="border:1px solid var(--border);padding:10px 14px;overflow:visible">
+          <div class="qstat-accent" style="background:var(--border2)"></div>
+          <div class="qstat-icon-row"><span class="qstat-icon">↕</span><span class="qstat-lbl">Month on Month</span></div>
+          <div style="display:flex;gap:0;flex:1;min-height:0;align-items:stretch">
+            <div id="mom-inline-left" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;justify-content:center;font-size:0.88em;cursor:default"></div>
+            <div style="width:1px;background:var(--border);margin:0 8px;align-self:stretch"></div>
+            <div id="mom-inline-right" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;justify-content:center;font-size:0.88em;cursor:default"></div>
+          </div>
         </div>
       </div>
       <div class="sgrid">
@@ -386,7 +394,7 @@ tbody tr:hover{background:var(--bg)}
               </div>
             </div>
           </div>
-          <!-- Right column: 3 cards, same height as trend chart -->
+          <!-- Right column: 4 cards -->
           <div style="display:flex;flex-direction:column;gap:8px">
             <!-- Next month forecast breakdown -->
             <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
@@ -394,10 +402,18 @@ tbody tr:hover{background:var(--bg)}
             <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('cust-month-list')"><span class="card-title">All customers — this month</span><span class="card-total-pill" id="cust-month-list-total"></span><button class="card-toggle" id="cust-month-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="cust-month-list"></div></div>
             <!-- Revenue by company -->
             <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('rev-bars')"><span class="card-title">This month — revenue by company</span><span class="card-total-pill" id="rev-bars-total"></span><button class="card-toggle" id="rev-bars-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="rev-bars"></div></div>
+            <!-- One-off invoices (below revenue by company) -->
+            <div class="card" id="oneoff-card">
+              <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
+                <span class="card-title" style="font-size:12px" id="oneoff-title">One-off invoices</span>
+                <span id="oneoff-month-lbl" style="font-size:11px;color:var(--ink3);font-family:var(--mono)"></span>
+              </div>
+              <div id="oneoff-body" style="padding:14px 16px"></div>
+            </div>
           </div>
       </div>
-      <!-- Payment methods + MoM: below trend chart -->
-      <div style="margin-top:20px;display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:start">
+      <!-- Payment methods: below trend chart, full width -->
+      <div style="margin-top:20px">
         <div class="card" id="pay-method-face-card">
           <div class="card-hdr" style="background:var(--bg)">
             <span class="card-title">Payment methods</span>
@@ -405,24 +421,10 @@ tbody tr:hover{background:var(--bg)}
           </div>
           <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:16px">
-          <div class="card" id="mom-card" style="overflow:hidden">
-            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
-              <span class="card-title" style="font-size:12px">Month on month</span>
-            </div>
-            <div style="display:flex;flex-direction:row">
-              <div id="mom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
-              <div style="width:1px;background:var(--border);align-self:stretch"></div>
-              <div id="tom-body" style="flex:1;min-width:0;padding:10px 16px 14px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;cursor:default"></div>
-            </div>
-          </div>
-          <div class="card" id="oneoff-card">
-            <div class="card-hdr" style="background:var(--bg);padding:10px 16px">
-              <span class="card-title" style="font-size:12px" id="oneoff-title">One-off invoices</span>
-              <span id="oneoff-month-lbl" style="font-size:11px;color:var(--ink3);font-family:var(--mono)"></span>
-            </div>
-            <div id="oneoff-body" style="padding:14px 16px"></div>
-          </div>
+        <!-- hidden MoM bodies — JS writes here, synced to top inline card -->
+        <div style="display:none">
+          <div id="mom-body"></div>
+          <div id="tom-body"></div>
         </div>
       </div>
 
@@ -2094,6 +2096,7 @@ function renderDash(){
     const body=document.getElementById('mom-body');
     if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs ${prevMonthName}`,prevInvs.length===0?'No data last month':null);
     attachMomTooltip('mom-body','_momDiffs');
+    {const il=document.getElementById('mom-inline-left');if(il&&body)il.innerHTML=body.innerHTML;attachMomTooltip('mom-inline-left','_momDiffs');}
   }
 
   // This vs next month: compare what's expected to bill THIS month vs NEXT month
@@ -2153,6 +2156,7 @@ function renderDash(){
     const body=document.getElementById('tom-body');
     if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs forecast ${nextMonthName} *`,!allScheds.length?'No recurring schedules':null);
     attachMomTooltip('tom-body','_tomDiffs');
+    {const ir=document.getElementById('mom-inline-right');if(ir&&body)ir.innerHTML=body.innerHTML;attachMomTooltip('mom-inline-right','_tomDiffs');}
   }
 
   // ── One-off invoices this month card ─────────────────────────────────
@@ -2320,7 +2324,8 @@ function renderDash(){
         const schBeds=DB.schedules.filter(s=>{
           if(s.active===false)return false;
           const st=(s.serviceType||'').toLowerCase();
-          if(!st.includes('bed'))return false;
+          // Include schedules with beds/rooms type OR with no serviceType set (treat as bed-based)
+          if(st&&!st.includes('bed')&&!st.includes('room'))return false;
           const start=s.schedStart||'0000-01';
           const end=s.schedEnd||'9999-12';
           return start<=b.key&&b.key<=end;
