@@ -312,19 +312,19 @@ tbody tr:hover{background:var(--bg)}
           <div class="qstat-accent" style="background:var(--accent)"></div>
           <div class="qstat-icon">🏠</div>
           <div class="qstat-val" id="qs-homes">—</div>
-          <div class="qstat-lbl">Total Homes</div>
+          <div class="qstat-lbl">Care Homes</div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--teal)"></div>
           <div class="qstat-icon">🛏</div>
           <div class="qstat-val" id="qs-beds">—</div>
-          <div class="qstat-lbl">Total Beds (active)</div>
+          <div class="qstat-lbl">Active Beds</div>
         </div>
         <div class="qstat">
           <div class="qstat-accent" style="background:var(--gold)"></div>
           <div class="qstat-icon">💷</div>
           <div class="qstat-val" id="qs-avgprice">—</div>
-          <div class="qstat-lbl">Avg Price / Bed</div>
+          <div class="qstat-lbl">Avg £ / Bed</div>
         </div>
       </div>
       <div class="sgrid">
@@ -387,7 +387,7 @@ tbody tr:hover{background:var(--bg)}
             </div>
           </div>
           <!-- Right column: 3 cards, same height as trend chart -->
-          <div style="display:flex;flex-direction:column;justify-content:space-between">
+          <div style="display:flex;flex-direction:column;gap:8px">
             <!-- Next month forecast breakdown -->
             <div class="card"><div class="card-hdr" style="cursor:pointer" onclick="toggleCard('dash-fc-list')"><span class="card-title">Next month forecast</span><span class="card-total-pill" id="dash-fc-list-total"></span><button class="card-toggle" id="dash-fc-list-arrow" aria-label="Toggle">▼</button></div><div class="card-body" id="dash-fc-list"></div></div>
             <!-- All customers this month -->
@@ -2315,24 +2315,17 @@ function renderDash(){
   {
     const bedsRow=document.getElementById('trend-beds-row');
     if(bedsRow){
-      // Compute beds for each bar month from actual invoices (Beds/Rooms service type)
+      // Compute beds for each bar month from schedules (reliable for past + future)
       const barsWithBeds=bars.map(b=>{
-        const monthInvs=DB.invoices.filter(i=>mk(i.date)===b.key);
-        const beds=monthInvs.reduce((sum,inv)=>{
-          if(!inv.serviceType||!inv.serviceType.toLowerCase().includes('bed'))return sum;
-          return sum+(parseFloat(inv.lines&&inv.lines[0]?inv.lines[0].qty:0)||0);
-        },0);
-        // For forecast months use schedule data
-        if(beds===0&&b.isFuture){
-          const schBeds=DB.schedules.filter(s=>{
-            if(!s.serviceType||!s.serviceType.toLowerCase().includes('bed'))return false;
-            if(s.schedEnd&&s.schedEnd<b.key)return false;
-            if(s.schedStart&&s.schedStart>b.key)return false;
-            return true;
-          }).reduce((sum,s)=>sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0),0);
-          return{...b,beds:Math.round(schBeds)};
-        }
-        return{...b,beds:Math.round(beds)};
+        const schBeds=DB.schedules.filter(s=>{
+          if(s.active===false)return false;
+          const st=(s.serviceType||'').toLowerCase();
+          if(!st.includes('bed'))return false;
+          const start=s.schedStart||'0000-01';
+          const end=s.schedEnd||'9999-12';
+          return start<=b.key&&b.key<=end;
+        }).reduce((sum,s)=>sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0),0);
+        return{...b,beds:Math.round(schBeds)};
       });
       const maxBeds=Math.max(...barsWithBeds.map(b=>b.beds),1);
       bedsRow.innerHTML=barsWithBeds.map(b=>{
@@ -3783,7 +3776,7 @@ function showPMBreakdown(pm,which){
           +'</tr></thead><tbody>';
         allScheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(function(s){
           const c=DB.customers.find(x=>x.id===s.customerId);
-          const sub=s.amount||0;const total=sub*(1+(s.vatRate||20)/100);
+          const sub=(s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);const total=sub*(1+(s.vatRate||20)/100);
           totalSub+=sub;totalVAT+=total;
           rows+='<tr style="border-bottom:1px solid var(--border)">'
             +'<td style="padding:8px 12px;font-size:13px;font-weight:600">'+(c?c.name:(s.custName||'Unknown'))+'</td>'
@@ -3850,7 +3843,7 @@ function showPMBreakdown(pm,which){
         </tr></thead><tbody>`;
       scheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
         const c=DB.customers.find(x=>x.id===s.customerId);
-        const sub=s.amount||0;
+        const sub=(s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0);
         const total=sub*(1+(s.vatRate||20)/100);
         totalSub+=sub; totalVAT+=total;
         rows+=`<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseenter="this.style.background='var(--bg)'" onmouseleave="this.style.background=''">
@@ -3894,7 +3887,7 @@ function exportPMBreakdown(){
     let totSub=0,totTotal=0;
     scheds.sort((a,b)=>(a.custName||'').localeCompare(b.custName||'')).forEach(s=>{
       const c=DB.customers.find(x=>x.id===s.customerId);
-      const sub=r2(s.amount||0);
+      const sub=r2((s.lines||[]).reduce((t,l)=>t+(l.qty||1)*(l.price||0),0));
       const total=r2(sub*(1+(s.vatRate||20)/100));
       totSub+=sub; totTotal+=total;
       rows.push([c?.name||s.custName||'Unknown',c?.company||'',s.description||'',(s.schedStart||'')+' – '+(s.schedEnd||'ongoing'),sub,total]);
