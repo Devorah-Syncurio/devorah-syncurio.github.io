@@ -1894,30 +1894,48 @@ function renderDash(){
   document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
   // Quick stats bar
   {
-    // Active bed/room schedules for the selected month
-    const activeBedScheds=DB.schedules.filter(s=>{
-      if(s.active===false)return false;
-      const _st=(s.serviceType||'').toLowerCase();
-      // treat blank as bed-type; skip anything explicitly non-bed/non-room
-      if(_st&&!_st.includes('bed')&&!_st.includes('room'))return false;
-      // must overlap the selected month (schedStart<=key and schedEnd>=key or absent)
-      if(s.schedStart&&s.schedStart>key)return false;
-      if(s.schedEnd&&s.schedEnd<key)return false;
-      return true;
-    });
-    // Care Homes = distinct customers with at least one active bed schedule this month
-    const totalHomes=new Set(activeBedScheds.map(s=>s.customerId)).size;
-    const totalBeds=activeBedScheds.reduce((sum,s)=>{
-      return sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0);
-    },0);
-    // Weighted avg price per bed: sum(qty*price) / sum(qty)
-    const bedSchedsWithQty=activeBedScheds.filter(s=>(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0)>0);
-    const _totalRevenue=bedSchedsWithQty.reduce((sum,s)=>{
-      const qty=parseFloat(s.lines[0].qty)||0;
-      const price=parseFloat(s.lines[0].price)||0;
-      return sum+qty*price;
-    },0);
-    const avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
+    let totalHomes,totalBeds,avgPpb;
+    if(!isFutureDash){
+      // Past/current months: derive from actual invoices so stats match the matrix exactly
+      const bedInvs=DB.invoices.filter(i=>{
+        if(mk(i.date)!==key)return false;
+        const _st=(i.serviceType||'').toLowerCase();
+        if(_st&&!_st.includes('bed')&&!_st.includes('room'))return false;
+        return true;
+      });
+      totalHomes=new Set(bedInvs.map(i=>i.customerId)).size;
+      totalBeds=bedInvs.reduce((sum,i)=>{
+        // sum qty across ALL lines in case invoice has multiple lines
+        if(!i.lines)return sum;
+        return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+      },0);
+      const _rev=bedInvs.reduce((sum,i)=>{
+        if(!i.lines)return sum;
+        return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
+      },0);
+      avgPpb=totalBeds>0?_rev/totalBeds:0;
+    } else {
+      // Future months: use active recurring schedules as forecast
+      const activeBedScheds=DB.schedules.filter(s=>{
+        if(s.active===false)return false;
+        const _st=(s.serviceType||'').toLowerCase();
+        if(_st&&!_st.includes('bed')&&!_st.includes('room'))return false;
+        if(s.schedStart&&s.schedStart>key)return false;
+        if(s.schedEnd&&s.schedEnd<key)return false;
+        return true;
+      });
+      totalHomes=new Set(activeBedScheds.map(s=>s.customerId)).size;
+      totalBeds=activeBedScheds.reduce((sum,s)=>{
+        return sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0);
+      },0);
+      const bedSchedsWithQty=activeBedScheds.filter(s=>(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0)>0);
+      const _totalRevenue=bedSchedsWithQty.reduce((sum,s)=>{
+        const qty=parseFloat(s.lines[0].qty)||0;
+        const price=parseFloat(s.lines[0].price)||0;
+        return sum+qty*price;
+      },0);
+      avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
+    }
     const qh=document.getElementById('qs-homes');
     const qb=document.getElementById('qs-beds');
     const qp=document.getElementById('qs-avgprice');
