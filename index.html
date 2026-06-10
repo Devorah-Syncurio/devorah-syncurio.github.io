@@ -2369,8 +2369,8 @@ function renderDash(){
         if(!b.isFuture){
           // Use actual invoices — sum ALL lines, no serviceType filter (matches matrix logic)
           bedCount=DB.invoices.filter(i=>mk(i.date)===b.k).reduce((sum,i)=>{
-            if(!i.lines)return sum;
-            return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+            if(!i.lines||!i.lines[0])return sum;
+            return sum+(parseFloat(i.lines[0].qty)||0);
           },0);
         } else {
           // Future: derive from active schedules (forecast)
@@ -2380,8 +2380,8 @@ function renderDash(){
             const end=s.schedEnd||'9999-12';
             return start<=b.k&&b.k<=end;
           }).reduce((sum,s)=>{
-            if(!s.lines)return sum;
-            return sum+s.lines.reduce((a,l)=>a+(parseFloat(l.qty)||0),0);
+            if(!s.lines||!s.lines[0])return sum;
+            return sum+(parseFloat(s.lines[0].qty)||0);
           },0);
         }
         return{...b,beds:Math.round(bedCount)};
@@ -2926,7 +2926,7 @@ function doMatrixExport(){try{
     const row=[c.name];let cBeds=0;
     months.forEach(m=>{
       const ci=invs.filter(i=>i.customerId===c.id&&mk(i.date)===m);
-      const beds=ci.reduce((s,i)=>s+(i.lines||[]).reduce((t,l)=>t+(parseFloat(l.qty)||0),0),0);
+      const beds=ci.reduce((s,i)=>s+(parseFloat((i.lines&&i.lines[0])?i.lines[0].qty:0)||0),0);
       row.push(xn(beds));cBeds+=beds;mGrandBeds[m]+=beds;
     });
     row.push(xn(cBeds));gBeds+=cBeds;bedsRows.push(row);
