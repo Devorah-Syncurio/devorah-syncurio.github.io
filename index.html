@@ -209,10 +209,12 @@ tbody tr:hover{background:var(--bg)}
 /* Dashboard layout */
 .dgrid{display:grid;grid-template-columns:1.3fr 1fr;gap:20px;align-items:stretch}
 /* Trend legend */
-.qstat-bar{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;padding:10px 16px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}
-.qstat{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:120px}
-.qstat-val{font-size:22px;font-weight:700;font-family:var(--mono);color:var(--ink);letter-spacing:-0.5px}
-.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.8px;color:var(--ink3)}
+.qstat-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
+.qstat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px 16px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(28,43,58,0.06);display:flex;flex-direction:column;gap:3px}
+.qstat-accent{position:absolute;top:0;left:0;right:0;height:3px}
+.qstat-icon{font-size:18px;margin-bottom:4px;opacity:0.75}
+.qstat-val{font-size:26px;font-weight:700;font-family:var(--serif);color:var(--ink);letter-spacing:-0.5px;line-height:1.1}
+.qstat-lbl{font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.9px;color:var(--ink3);margin-top:2px}
 .trend-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--ink3)}
 .trend-legend span{display:flex;align-items:center;gap:5px}
 .trend-legend i{width:10px;height:10px;border-radius:2px;flex-shrink:0;display:inline-block}
@@ -306,11 +308,24 @@ tbody tr:hover{background:var(--bg)}
         <button class="mbtn" onclick="shiftMonth(1)">&#8594;</button>
       </div>
       <div class="qstat-bar" id="dash-qstats">
-        <div class="qstat"><div class="qstat-val" id="qs-homes">—</div><div class="qstat-lbl">Total Homes</div></div>
-        <div style="width:1px;background:var(--border);margin:4px 4px"></div>
-        <div class="qstat"><div class="qstat-val" id="qs-beds">—</div><div class="qstat-lbl">Total Beds (active)</div></div>
-        <div style="width:1px;background:var(--border);margin:4px 4px"></div>
-        <div class="qstat"><div class="qstat-val" id="qs-avgprice">—</div><div class="qstat-lbl">Avg Price / Bed</div></div>
+        <div class="qstat">
+          <div class="qstat-accent" style="background:var(--accent)"></div>
+          <div class="qstat-icon">🏠</div>
+          <div class="qstat-val" id="qs-homes">—</div>
+          <div class="qstat-lbl">Total Homes</div>
+        </div>
+        <div class="qstat">
+          <div class="qstat-accent" style="background:var(--teal)"></div>
+          <div class="qstat-icon">🛏</div>
+          <div class="qstat-val" id="qs-beds">—</div>
+          <div class="qstat-lbl">Total Beds (active)</div>
+        </div>
+        <div class="qstat">
+          <div class="qstat-accent" style="background:var(--gold)"></div>
+          <div class="qstat-icon">💷</div>
+          <div class="qstat-val" id="qs-avgprice">—</div>
+          <div class="qstat-lbl">Avg Price / Bed</div>
+        </div>
       </div>
       <div class="sgrid">
         <div class="stat"><div class="stat-bar"></div><div class="stat-lbl" id="ds-total-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-count">—</div></div>
@@ -2325,14 +2340,10 @@ function renderDash(){
         const h=Math.max(b.beds>0?(b.beds/maxBeds*28):0,b.beds>0?2:0);
         return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
           <div style="font-size:9px;font-family:var(--mono);color:${col};font-weight:${b.type!=='past'?'700':'400'};white-space:nowrap">${b.beds>0?b.beds:''}</div>
-          <div style="width:100%;max-width:28px;background:${col};border-radius:2px 2px 0 0;opacity:${b.type==='forecast'?'0.65':'0.85'};transition:height 0.3s" style="height:${h}px"></div>
+          <div style="width:100%;max-width:28px;height:${h}px;background:${col};border-radius:2px 2px 0 0;opacity:${b.type==='forecast'?'0.65':'0.85'};transition:height 0.3s"></div>
         </div>`;
       }).join('');
-      // Fix inline height since we can't set it from string in above
-      barsWithBeds.forEach((b,i)=>{
-        const barEl=bedsRow.children[i]?.querySelector('div:last-child');
-        if(barEl){const h=Math.max(b.beds>0?(b.beds/maxBeds*28):0,b.beds>0?2:0);barEl.style.height=h+'px';}
-      });
+
     }
   }
   const projN=trendFutureKeys.length;
@@ -3504,23 +3515,24 @@ function renderCommission(){
   const sortedMonths=[...allCommMonths].sort();
   const fromSel=document.getElementById('comm-month-from');
   const toSel=document.getElementById('comm-month-to');
+  const nowMk=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0');})();
   if(fromSel){
-    const curFrom=fromSel.value;
+    const curFrom=fromSel.value||nowMk;
     fromSel.innerHTML='<option value="">From month…</option>'+sortedMonths.map(m=>{
       const d=new Date(m+'-01');
       const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
       return`<option value="${m}"${m===curFrom?' selected':''}>${lbl}</option>`;
     }).join('');
-    if(curFrom&&sortedMonths.includes(curFrom))fromSel.value=curFrom;
+    if(sortedMonths.includes(curFrom))fromSel.value=curFrom;
   }
   if(toSel){
-    const curTo=toSel.value;
+    const curTo=toSel.value||nowMk;
     toSel.innerHTML='<option value="">To month…</option>'+sortedMonths.map(m=>{
       const d=new Date(m+'-01');
       const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
       return`<option value="${m}"${m===curTo?' selected':''}>${lbl}</option>`;
     }).join('');
-    if(curTo&&sortedMonths.includes(curTo))toSel.value=curTo;
+    if(sortedMonths.includes(curTo))toSel.value=curTo;
   }
   const spId=document.getElementById('comm-sp-filter')?.value||'';
   const fromDate=fromSel?.value?fromSel.value+'-01':'';
