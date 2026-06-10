@@ -339,7 +339,7 @@ tbody tr:hover{background:var(--bg)}
         <!-- MoM card inline in top bar -->
         <div class="qstat" id="mom-inline-card" style="border:1px solid var(--border);padding:10px 14px;overflow:visible">
           <div class="qstat-accent" style="background:var(--border2)"></div>
-          <div class="qstat-icon-row"><span class="qstat-icon">↕</span><span class="qstat-lbl">Month on Month</span></div>
+          <div style="font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:0.9px;color:var(--ink3);font-weight:500;margin-bottom:6px">Month on Month</div>
           <div style="display:flex;gap:0;flex:1;min-height:0;align-items:stretch">
             <div id="mom-inline-left" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;justify-content:center;font-size:0.88em;cursor:default"></div>
             <div style="width:1px;background:var(--border);margin:0 8px;align-self:stretch"></div>
@@ -1903,8 +1903,8 @@ function renderDash(){
         if(!i.lines)return sum;
         return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
       },0);
-      // Avg price: total subtotal ex VAT / total beds (matches matrix Sheet 3)
-      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.subtotal||i.total/(1+(i.vatRate||20)/100)),0);
+      // Avg price: total ex VAT / total beds. Use i.sub (Supabase field name)
+      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
       avgPpb=totalBeds>0?_subTotal/totalBeds:0;
     } else {
       // Future months: use active recurring schedules as forecast
