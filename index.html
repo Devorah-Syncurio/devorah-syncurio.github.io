@@ -898,7 +898,7 @@ tbody tr:hover{background:var(--bg)}
     </button>
     <button class="regen-choice-btn" id="regen-btn-fromdate">
       <div class="rcb-title">✂️ Apply from month forward</div>
-      <div class="rcb-sub">Keep all invoices before your chosen month exactly as they are. Regenerate invoices from that month onward with the new settings.</div>
+      <div class="rcb-sub">Ends this template at the chosen month. Creates a new template with the updated settings from that month onward. Old invoices stay untouched.</div>
     </button>
     <div id="regen-fromdate-row" style="display:none;margin-top:4px;padding:12px 14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
       <label style="font-size:12px;color:var(--ink3);display:block;margin-bottom:6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.04em">Apply changes from month:</label>
@@ -1238,28 +1238,47 @@ function keepRegenSchedule(s){
 
 // Regenerate invoices for a schedule from a given YYYY-MM onward, leaving earlier ones intact
 function regenFromDate(s, fromYYYYMM){
-  // Remove only invoices on/after fromYYYYMM for this schedule
+  // s already has the NEW settings applied. Restore old schedule, cap it, create new one.
+  const old=window._regenOldSched||{...s};
+  // Compute prev month (end of old schedule)
+  const[fy,fm]=fromYYYYMM.split('-').map(Number);
+  const prevDate=new Date(fy,fm-2,1);
+  const prevMon=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+  // Save new settings before restoring old ones onto s
+  const newSettings={...s,lines:s.lines.map(l=>({...l}))};
+  // Restore original settings to old schedule and set its end date
+  Object.assign(s,old);
+  s.schedEnd=prevMon;
+  // Remove invoices >= fromYYYYMM from old schedule (keep history before split)
   DB.invoices=DB.invoices.filter(i=>{
     if(i.scheduleId!==s.id)return true;
     const m=(i.periodStart||i.date||'').slice(0,7);
     return m<fromYYYYMM;
   });
-  // Regenerate months >= fromYYYYMM
+  // Create new schedule with new settings starting at fromYYYYMM
+  const newSched={
+    ...newSettings,
+    id:'ss'+Date.now(),
+    schedStart:fromYYYYMM,
+    // schedEnd carries through from what user set (newSettings.schedEnd)
+  };
+  DB.schedules.push(newSched);
+  // Generate invoices for the new schedule
   let seq=0;
-  schedMonths(s).filter(m=>m>=fromYYYYMM).forEach(mKey=>{
+  schedMonths(newSched).forEach(mKey=>{
     const[yr,mo]=mKey.split('-').map(Number);
-    const day=Math.min(s.dayOfMonth||1,28);
-    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
+    const day=Math.min(newSched.dayOfMonth||1,28);
+    const sub=newSched.lines.reduce((t,l)=>t+l.qty*l.price,0);
     const inv={
       id:'ri'+Date.now()+'_'+(seq++),
-      scheduleId:s.id,customerId:s.customerId,
+      scheduleId:newSched.id,customerId:newSched.customerId,
       date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
-      currency:s.currency,
+      currency:newSched.currency,
       periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
       periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
-      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
-      serviceType:s.serviceType||'',
-      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
+      notes:newSched.notes||'',vatRate:newSched.vatRate,lines:newSched.lines.map(l=>({...l})),
+      serviceType:newSched.serviceType||'',
+      subtotal:sub,vat:sub*(newSched.vatRate/100),total:0,isRecurring:true,
     };
     inv.total=inv.subtotal+inv.vat;
     DB.invoices.unshift(inv);DB.seq++;
@@ -1434,6 +1453,7 @@ function saveInv(){
     if(!rs){showToast('Please set a schedule start date.');return;}
     const _pm0=document.getElementById('f-pm').value;
     const _dds0=_pm0==='Direct Debit'?document.getElementById('dd-signed-yes').checked:undefined;
+    window._regenOldSched={...s,lines:s.lines.map(l=>({...l}))};
     Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,
       schedStart:rs.slice(0,7),schedEnd:document.getElementById('f-re').value?document.getElementById('f-re').value.slice(0,7):'',
       dayOfMonth:parseInt(document.getElementById('f-rd').value)||1,name:document.getElementById('f-rn').value.trim(),paymentMethod:_pm0,...(_pm0==='Direct Debit'?{ddSigned:_dds0}:{})});
@@ -1442,7 +1462,7 @@ function saveInv(){
     if(existingCount>0){
       showRegenChoice(s,(mode)=>{
         persist();
-        const msg=mode==='updated'?'Schedule updated — invoices regenerated.':mode==='fromdate'?'Schedule updated — invoices from chosen month regenerated.':'Schedule updated — existing invoices kept.';
+        const msg=mode==='updated'?'Schedule updated — invoices regenerated.':mode==='fromdate'?'Old template ended; new template created from chosen month.':'Schedule updated — existing invoices kept.';
         showToast(msg);renderRecurring();renderDash();renderInvoices();refreshFilters();
       });
     }else{
@@ -1466,7 +1486,7 @@ function saveInv(){
       if(inv?.scheduleId){
         const s=DB.schedules.find(x=>x.id===inv.scheduleId);
         if(s){
-          {const _pmI=document.getElementById('f-pm').value;Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:_pmI,...(_pmI==='Direct Debit'?{ddSigned:document.getElementById('dd-signed-yes').checked}:{})});}
+          {const _pmI=document.getElementById('f-pm').value;window._regenOldSched={...s,lines:s.lines.map(l=>({...l}))};Object.assign(s,{customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,serviceType,schedStart,schedEnd,dayOfMonth,name,paymentMethod:_pmI,...(_pmI==='Direct Debit'?{ddSigned:document.getElementById('dd-signed-yes').checked}:{})});}
           closeOverlay('inv-modal');
           const existingCount=DB.invoices.filter(i=>i.scheduleId===s.id).length;
           if(existingCount>0){
