@@ -1932,8 +1932,6 @@ function renderDash(){
       // Future months: use active recurring schedules as forecast
       const activeBedScheds=DB.schedules.filter(s=>{
         if(s.active===false)return false;
-        const _st=(s.serviceType||'').toLowerCase();
-        if(_st&&!_st.includes('bed')&&!_st.includes('room'))return false;
         if(s.schedStart&&s.schedStart>key)return false;
         if(s.schedEnd&&s.schedEnd<key)return false;
         return true;
@@ -2183,8 +2181,8 @@ function renderDash(){
       return{customerId:s.customerId,sub,total,vatRate:vr,date:k+'-01',lines:s.lines?s.lines.map(l=>({...l})):[],_fromRecurring:true};
     });
 
-    // For this month: use actual invoices if they exist, fill gaps with forecast
-    const thisActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(thisKey));
+    // For this month: use actual recurring invoices if they exist, fill gaps with forecast
+    const thisActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(thisKey)&&i.isRecurring);
     const thisForecast=tomBuildForecast(thisKey);
     const thisActualCustIds=new Set(thisActual.map(i=>i.customerId));
     const thisMerged=[
@@ -2192,8 +2190,8 @@ function renderDash(){
       ...thisForecast.filter(i=>!thisActualCustIds.has(i.customerId))
     ];
 
-    // For next month: actual if already raised, otherwise forecast
-    const nextActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(nextKey));
+    // For next month: actual recurring if already raised, otherwise forecast
+    const nextActual=DB.invoices.filter(i=>i.date&&i.date.startsWith(nextKey)&&i.isRecurring);
     const nextForecast=tomBuildForecast(nextKey);
     const nextActualCustIds=new Set(nextActual.map(i=>i.customerId));
     const nextMerged=[
