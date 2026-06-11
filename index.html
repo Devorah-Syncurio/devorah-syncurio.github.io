@@ -1923,9 +1923,13 @@ function renderDash(){
         if(!i.lines||!i.lines[0])return sum;
         return sum+(parseFloat(i.lines[0].qty)||0);
       },0);
-      // Avg price: total ex VAT / total beds — same formula as totalEx so beds×avgPpb always equals invoiced total
+      // Avg price: total ex VAT / sum of ALL line quantities (weighted avg across all room/bed types)
       const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
-      avgPpb=totalBeds>0?_subTotal/totalBeds:0;
+      const _allLinesBeds=mInvs.reduce((sum,i)=>{
+        if(!i.lines)return sum;
+        return sum+i.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+      },0);
+      avgPpb=_allLinesBeds>0?_subTotal/_allLinesBeds:0;
     } else {
       // Future months: use active recurring schedules as forecast
       const activeBedScheds=DB.schedules.filter(s=>{
@@ -1940,13 +1944,16 @@ function renderDash(){
       totalBeds=activeBedScheds.reduce((sum,s)=>{
         return sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0);
       },0);
-      const bedSchedsWithQty=activeBedScheds.filter(s=>(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0)>0);
-      const _totalRevenue=bedSchedsWithQty.reduce((sum,s)=>{
-        const qty=parseFloat(s.lines[0].qty)||0;
-        const price=parseFloat(s.lines[0].price)||0;
-        return sum+qty*price;
+      // Avg price: total revenue across all lines / total qty across all lines (weighted avg)
+      const _totalRevenue=activeBedScheds.reduce((sum,s)=>{
+        if(!s.lines)return sum;
+        return sum+s.lines.reduce((t,l)=>t+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
       },0);
-      avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
+      const _allLinesBedsF=activeBedScheds.reduce((sum,s)=>{
+        if(!s.lines)return sum;
+        return sum+s.lines.reduce((t,l)=>t+(parseFloat(l.qty)||0),0);
+      },0);
+      avgPpb=_allLinesBedsF>0?_totalRevenue/_allLinesBedsF:0;
     }
     const qh=document.getElementById('qs-homes');
     const qb=document.getElementById('qs-beds');
