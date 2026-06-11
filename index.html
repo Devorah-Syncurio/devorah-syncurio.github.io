@@ -564,6 +564,7 @@ tbody tr:hover{background:var(--bg)}
         <div class="card-hdr">
           <span class="card-title">Commission Records</span>
           <div class="filters">
+            <input id="comm-search" class="fltsel" type="search" placeholder="🔍 Search description or customer…" style="width:240px" oninput="debouncedCommSearch()">
             <select class="fltsel" id="comm-sp-filter" onchange="renderCommission()"><option value="">All salespeople</option></select>
             <select class="fltsel" id="comm-month-from" onchange="renderCommission()" style="width:150px"><option value="">From month…</option></select>
             <select class="fltsel" id="comm-month-to" onchange="renderCommission()" style="width:150px"><option value="">To month…</option></select>
@@ -996,11 +997,14 @@ function showCommPin(){
   setTimeout(()=>{var el=document.getElementById('comm-pin-input');if(el){el.value='';el.focus();}},100);
 }
 
+let _commSearchTimer=null;
+function debouncedCommSearch(){clearTimeout(_commSearchTimer);_commSearchTimer=setTimeout(renderCommission,250);}
+
 function clearCommFilters(){
   document.getElementById('comm-sp-filter').value='';
   const cf=document.getElementById('comm-month-from');if(cf)cf.value='';
   const ct=document.getElementById('comm-month-to');if(ct)ct.value='';
-  const ct2=document.getElementById('comm-month-to');if(ct2)ct2.value='';
+  const cs=document.getElementById('comm-search');if(cs)cs.value='';
   renderCommission();
 }
 
@@ -3621,11 +3625,17 @@ function renderCommission(){
     if(sortedMonths.includes(curTo))toSel.value=curTo;
   }
   const spId=document.getElementById('comm-sp-filter')?.value||'';
+  const commSearch=(document.getElementById('comm-search')?.value||'').toLowerCase().trim();
   const fromDate=fromSel?.value?fromSel.value+'-01':'';
   const toDate=toSel?.value?toSel.value+'-28':'';
   // Filter by salesperson
   let comms=[...DB.commissions];
   if(spId)comms=comms.filter(c=>c.salespersonEntries.some(e=>e.spId===spId));
+  // Filter by search term (description or customer)
+  if(commSearch)comms=comms.filter(c=>
+    (c.description||'').toLowerCase().includes(commSearch)||
+    (c.customer||'').toLowerCase().includes(commSearch)
+  );
   // Filter by month range using OVERLAP logic
   if(fromSel?.value||toSel?.value){
     const fromMk=fromSel?.value||'0000-01';
