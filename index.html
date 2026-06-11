@@ -349,8 +349,8 @@ tbody tr:hover{background:var(--bg)}
       </div>
       <div class="sgrid">
         <div class="stat"><div class="stat-bar"></div><div class="stat-lbl" id="ds-total-lbl">This month invoiced</div><div class="stat-val" id="ds-total">—</div><div class="stat-sub" id="ds-total-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-count">—</div></div>
-        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
         <div class="stat"><div class="stat-bar gold"></div><div class="stat-lbl">Recurring income</div><div class="stat-val" id="ds-recur">—</div><div class="stat-sub" id="ds-recur-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-recur-sub">—</div></div>
+        <div class="stat"><div class="stat-bar teal"></div><div class="stat-lbl">Next month forecast</div><div class="stat-val" id="ds-next">—</div><div class="stat-sub" id="ds-next-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-next-sub">from recurring</div></div>
         <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
       <div class="dgrid">
@@ -390,7 +390,6 @@ tbody tr:hover{background:var(--bg)}
                   <span><i style="background:var(--accent)"></i> Actual</span>
                   <span><i style="background:var(--gold)"></i> Current</span>
                   <span><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
-                  <span><i style="background:#A78BFA"></i> One-off</span>
                 </div>
               </div>
             </div>
@@ -1917,8 +1916,8 @@ function renderDash(){
   {
     let totalHomes,totalBeds,avgPpb;
     if(!isFutureDash){
-      // Past/current months: match matrix logic exactly — no serviceType filter
-      const mInvs=DB.invoices.filter(i=>mk(i.date)===key);
+      // Past/current months: recurring invoices only for beds/price stats
+      const mInvs=DB.invoices.filter(i=>mk(i.date)===key && i.isRecurring);
       totalHomes=new Set(mInvs.map(i=>i.customerId)).size;
       totalBeds=mInvs.reduce((sum,i)=>{
         if(!i.lines||!i.lines[0])return sum;
@@ -2141,13 +2140,15 @@ function renderDash(){
   {
     const prevMDate=new Date(dashY,dashM-1,1);
     const prevKey=`${prevMDate.getFullYear()}-${String(prevMDate.getMonth()+1).padStart(2,'0')}`;
-    const prevInvs=DB.invoices.filter(i=>mk(i.date)===prevKey);
+    const prevInvs=DB.invoices.filter(i=>mk(i.date)===prevKey && i.isRecurring);
     const prevEx=prevInvs.reduce((s,i)=>s+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
     const prevInc=prevInvs.reduce((s,i)=>s+i.total,0);
     const prevMonthName=prevMDate.toLocaleString('en-GB',{month:'long',year:'numeric'});
-    const deltaEx=thisMonthEx-prevEx;
-    const deltaInc=thisMonthInc-prevInc;
-    const ch=custDiffs(prevInvs,invs);
+    const momCurEx=isFutureDash?(thisFcMonth?thisFcMonth.recurSub:0):recurEx;
+    const momCurInc=isFutureDash?(thisFcMonth?thisFcMonth.recurTotal:0):recurTotal;
+    const deltaEx=momCurEx-prevEx;
+    const deltaInc=momCurInc-prevInc;
+    const ch=custDiffs(prevInvs,recurInvs);
     window._momDiffs={deltaEx,deltaInc,vsLabel:`vs ${prevMonthName}`,ch,isForecast:false};
     const body=document.getElementById('mom-body');
     if(body)body.innerHTML=momCardHTML(deltaEx,deltaInc,`vs ${prevMonthName}`,prevInvs.length===0?'No data last month':null);
@@ -2344,16 +2345,14 @@ function renderDash(){
       const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
       const isFuture=k>nowKey;
       if(isFuture){trendFutureKeys.push(k);}
-      let recurAmt=0,oneOffAmt=0;
+      let recurAmt=0;
       if(isFuture){
         const fc=buildForecast(0,k,k);
         recurAmt=fc.length?fc[0].recurTotal:0;
       } else {
-        const mInvs=DB.invoices.filter(x=>mk(x.date)===k);
-        recurAmt=mInvs.filter(x=>x.isRecurring).reduce((s,x)=>s+x.total,0);
-        oneOffAmt=mInvs.filter(x=>!x.isRecurring).reduce((s,x)=>s+x.total,0);
+        recurAmt=DB.invoices.filter(x=>mk(x.date)===k&&x.isRecurring).reduce((s,x)=>s+x.total,0);
       }
-      const t=recurAmt+oneOffAmt;
+      const t=recurAmt;
       const fullLbl=td.toLocaleString('en-GB',{month:'long',year:'numeric'});
       bars.push({k,t,recurAmt,oneOffAmt,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),fullLbl,isFuture});
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
@@ -2386,17 +2385,7 @@ function renderDash(){
     return{prevLbl:pb.fullLbl,delta:b.t-pb.t,ch};
   });
 
-  document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>{
-    const _rng=Math.max(maxT-TREND_BASE,1);
-    const lblCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)';
-    const stackH=Math.max((b.t-TREND_BASE)/_rng*85,b.t>0?2:0);
-    const hasOneOff=b.oneOffAmt>0;
-    const recurH=hasOneOff?(b.t>0?stackH*(b.recurAmt/b.t):0):stackH;
-    const oneOffH=hasOneOff?(b.t>0?stackH*(b.oneOffAmt/b.t):0):0;
-    const oneOffEl=hasOneOff?`<div style="width:100%;height:${oneOffH}px;background:#A78BFA;border-radius:3px 3px 0 0;transition:height 0.3s"></div>`:'';
-    const recurRadius=hasOneOff?'0':'3px 3px 0 0';
-    return `<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${lblCol};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div>${oneOffEl}<div class="mbar ${b.type}" style="height:${recurH}px;border-radius:${recurRadius}"></div></div>`;
-  }).join('');
+  document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>`<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max((b.t-TREND_BASE)/Math.max(maxT-TREND_BASE,1)*85,b.t>0?2:0)}px"></div></div>`).join('');
   document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
   const _baseEl=document.getElementById('trend-base-label');if(_baseEl)_baseEl.textContent=TREND_BASE>0?fmtGBP(Math.round(TREND_BASE/1000)*1000).replace('.00',''):'£0';
   // Beds per month row
