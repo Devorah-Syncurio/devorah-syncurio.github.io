@@ -2354,7 +2354,7 @@ function renderDash(){
       }
       const t=recurAmt;
       const fullLbl=td.toLocaleString('en-GB',{month:'long',year:'numeric'});
-      bars.push({k,t,recurAmt,oneOffAmt,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),fullLbl,isFuture});
+      bars.push({k,t,recurAmt,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),fullLbl,isFuture});
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
     }
   window._trendBars=bars;
