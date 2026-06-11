@@ -2175,7 +2175,7 @@ function renderDash(){
       const vr=s.vatRate??20;
       const sub=tomSchedSub(s);
       const total=+(sub*(1+vr/100)).toFixed(2);
-      return{customerId:s.customerId,sub,total,vatRate:vr,date:k+'-01',_fromRecurring:true};
+      return{customerId:s.customerId,sub,total,vatRate:vr,date:k+'-01',lines:s.lines?s.lines.map(l=>({...l})):[],_fromRecurring:true};
     });
 
     // For this month: use actual invoices if they exist, fill gaps with forecast
