@@ -464,6 +464,8 @@ tbody tr:hover{background:var(--bg)}
             <th onclick="sortTable('inv','cust',this)">Customer <span class="sort-icon">⇅</span></th>
             <th onclick="sortTable('inv','date',this)">Invoice date <span class="sort-icon">⇅</span></th>
             <th>Period covered</th>
+            <th class="r" onclick="sortTable('inv','beds',this)">Beds <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="sortTable('inv','ppb',this)">£/bed <span class="sort-icon">⇅</span></th>
             <th class="r" onclick="sortTable('inv','subtotal',this)">Subtotal <span class="sort-icon">⇅</span></th>
             <th class="r">VAT</th>
             <th class="r" onclick="sortTable('inv','total',this)">Total <span class="sort-icon">⇅</span></th>
@@ -1730,6 +1732,10 @@ function renderInvoices(){
     if(invSort.col==='date')return invSort.dir*a.date.localeCompare(b.date);
     if(invSort.col==='subtotal')return invSort.dir*(a.subtotal-b.subtotal);
     if(invSort.col==='total')return invSort.dir*(a.total-b.total);
+    const bedsA=(a.lines&&a.lines[0])?a.lines[0].qty:0;
+    const bedsB=(b.lines&&b.lines[0])?b.lines[0].qty:0;
+    if(invSort.col==='beds')return invSort.dir*(bedsA-bedsB);
+    if(invSort.col==='ppb'){const ppA=bedsA?a.subtotal/bedsA:0;const ppB=bedsB?b.subtotal/bedsB:0;return invSort.dir*(ppA-ppB);}
     return 0;
   });
   const tb=document.getElementById('inv-tbody'),em=document.getElementById('inv-empty');
@@ -1764,6 +1770,7 @@ function renderInvoices(){
       <td>${dot}<strong>${c?.name||'?'}</strong>${c?.company?` <span class="muted" style="font-size:11px">· ${c.company}</span>`:''}${rb}</td>
       <td class="muted" style="font-size:12px">${fmtD(inv.date)}</td>
       <td class="muted" style="font-size:12px;white-space:nowrap">${per}</td>
+      ${(()=>{const beds=(inv.lines&&inv.lines[0])?inv.lines[0].qty:null;const ppb=beds?inv.subtotal/beds:null;return`<td class="r muted" style="font-size:12px">${beds!=null?beds:'—'}</td><td class="r muted" style="font-size:12px">${ppb!=null?fmtGBP(ppb):'—'}</td>`;})()}
       <td class="r">${fmtGBP(inv.subtotal)}</td>
       <td class="r muted">${inv.vatRate>0?fmtGBP(inv.vat):'—'}</td>
       <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(inv.total)}</td>
