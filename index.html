@@ -540,7 +540,9 @@ tbody tr:hover{background:var(--bg)}
             <th></th>
             <th onclick="setCustSort('name-az','name-za',this)">Name <span class="sort-icon">⇅</span></th>
             <th onclick="setCustSort('company-az','company-az',this)">Company <span class="sort-icon">⇅</span></th>
-            <th>Email</th>
+            <th class="r" onclick="setCustSort('beds-desc','beds-asc',this)">Beds <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('ppb-desc','ppb-asc',this)">£/bed <span class="sort-icon">⇅</span></th>
+            <th>Latest month</th>
             <th class="r">Invoices</th>
             <th class="r" onclick="setCustSort('total-desc','total-asc',this)">Total billed <span class="sort-icon">⇅</span></th>
             <th></th>
@@ -1166,14 +1168,31 @@ function renderCustomers(){
   else if(sort==='total-desc'||sort==='total-asc'){
     custs.sort((a,b)=>{const ta=DB.invoices.filter(i=>i.customerId===a.id).reduce((s,i)=>s+i.total,0);const tb2=DB.invoices.filter(i=>i.customerId===b.id).reduce((s,i)=>s+i.total,0);return sort==='total-desc'?tb2-ta:ta-tb2;});
   }
+  else if(sort==='beds-desc'||sort==='beds-asc'){
+    const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const ba=(ia?.lines?.[0]?.qty)||0,bb=(ib?.lines?.[0]?.qty)||0;return sort==='beds-desc'?bb-ba:ba-bb;});
+  }
+  else if(sort==='ppb-desc'||sort==='ppb-asc'){
+    const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const ba=(ia?.lines?.[0]?.qty)||0,bb=(ib?.lines?.[0]?.qty)||0;const pa=ba?(ia.subtotal||0)/ba:0,pb=bb?(ib.subtotal||0)/bb:0;return sort==='ppb-desc'?pb-pa:pa-pb;});
+  }
   tb.innerHTML=custs.map(c=>{
     const invs=DB.invoices.filter(i=>i.customerId===c.id);
     const tot=invs.reduce((s,i)=>s+i.total,0);
     const sc=DB.schedules.filter(s=>s.customerId===c.id&&s.active).length;
+    // Latest recurring invoice for beds / £/bed
+    const latestRecur=DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const beds=latestRecur?.lines?.[0]?.qty||null;
+    const ppb=beds?(latestRecur.subtotal||0)/beds:null;
+    const latestMo=latestRecur?latestRecur.date.slice(0,7):'';
+    const latestMoFmt=latestMo?new Date(latestMo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
     return`<tr>
       <td><span style="width:10px;height:10px;border-radius:50%;background:${COLS[c.ci||0]};display:inline-block"></span></td>
       <td class="cp-name-cell" style="font-weight:600" onclick="openCustProfile('${c.id}')">⊡ ${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
-      <td class="muted">${c.company||'—'}</td><td class="muted">${c.email||'—'}</td>
+      <td class="muted">${c.company||'—'}</td>
+      <td class="r">${beds??'—'}</td>
+      <td class="r">${ppb?fmtGBP(ppb):'—'}</td>
+      <td class="muted" style="font-size:12px">${latestMoFmt}</td>
       <td class="r">${invs.length}</td><td class="r">${tot?fmtGBP(tot):'—'}</td>
       <td><div style="display:flex;gap:6px">
         <button class="btn btn-ghost btn-xs" onclick="openInvModal(null,false,'${c.id}')">+ Invoice</button>
