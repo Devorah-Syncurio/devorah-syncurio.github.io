@@ -925,6 +925,16 @@ const _supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
 const SESSION_ID=Math.random().toString(36).slice(2);
 let _saveTimer=null;
 let DB={"customers":[],"invoices":[],"schedules":[],"seq":1001,"salespeople":[],"commissions":[]};
+let _idSeq=0;
+function uid(prefix){return prefix+Date.now()+'_'+(++_idSeq)+'_'+Math.random().toString(36).slice(2,7);}
+function dedupIds(){
+  const seen=new Set();let fixed=0;
+  DB.invoices.forEach(inv=>{
+    if(!inv.id||seen.has(inv.id)){inv.id=uid('ri');fixed++;}
+    seen.add(inv.id);
+  });
+  if(fixed>0){console.warn('dedupIds: fixed '+fixed+' duplicate invoice IDs');persist();}
+}
 if(!DB.schedules)DB.schedules=[];
 
 function persist(){
@@ -1202,7 +1212,7 @@ function regenSchedule(s){
     const day=Math.min(s.dayOfMonth||1,28);
     const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
     const inv={
-      id:'ri'+Date.now()+'_'+(seq++),
+      id:uid('ri'),
       scheduleId:s.id,customerId:s.customerId,
       date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
       currency:s.currency,
@@ -1228,7 +1238,7 @@ function keepRegenSchedule(s){
     const day=Math.min(s.dayOfMonth||1,28);
     const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
     const inv={
-      id:'ri'+Date.now()+'_'+(seq++),scheduleId:s.id,customerId:s.customerId,
+      id:uid('ri'),scheduleId:s.id,customerId:s.customerId,
       date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
       currency:s.currency,
       periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
@@ -1264,7 +1274,7 @@ function regenFromDate(s, fromYYYYMM){
   // Create new schedule with new settings starting at fromYYYYMM
   const newSched={
     ...newSettings,
-    id:'ss'+Date.now(),
+    id:uid('ss'),
     schedStart:fromYYYYMM,
     // schedEnd carries through from what user set (newSettings.schedEnd)
   };
@@ -1276,7 +1286,7 @@ function regenFromDate(s, fromYYYYMM){
     const day=Math.min(newSched.dayOfMonth||1,28);
     const sub=newSched.lines.reduce((t,l)=>t+l.qty*l.price,0);
     const inv={
-      id:'ri'+Date.now()+'_'+(seq++),
+      id:uid('ri'),
       scheduleId:newSched.id,customerId:newSched.customerId,
       date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
       currency:newSched.currency,
@@ -1333,7 +1343,7 @@ function genRecurring(){
       const day=Math.min(s.dayOfMonth||1,28);
       const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
       const inv={
-        id:'ri'+Date.now()+'_'+(seq++),
+        id:uid('ri'),
         scheduleId:s.id,customerId:s.customerId,
         date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
         currency:s.currency,
@@ -1532,7 +1542,7 @@ function saveInv(){
     const idx=DB.invoices.findIndex(x=>x.id===editInvId);
     Object.assign(DB.invoices[idx],payload);
   }else{
-    payload.id='i'+Date.now();DB.seq++;DB.invoices.unshift(payload);
+    payload.id=uid('i');DB.seq++;DB.invoices.unshift(payload);
   }
   persist();window._formDirty=false;closeOverlay('inv-modal');showToast(editInvId?'Invoice updated!':'Invoice created!');
   renderDash();renderInvoices();refreshFilters();
@@ -3820,6 +3830,7 @@ function exportCommission(){
     const{data,error}=await _supa.from('app_state').select('data').eq('id',1).single();
     if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];if(!DB.salespeople)DB.salespeople=[];if(!DB.commissions)DB.commissions=[];}
   }catch(e){console.warn('Supabase load failed, starting empty.',e);}
+  dedupIds();
   document.getElementById('loading-overlay').style.display='none';
   genRecurring();
   renderDash();
@@ -3833,6 +3844,7 @@ function exportCommission(){
         if(!DB.schedules)DB.schedules=[];
         if(!DB.salespeople)DB.salespeople=[];
         if(!DB.commissions)DB.commissions=[];
+        dedupIds();
         genRecurring();
         renderDash();
         fillCustDd('');
