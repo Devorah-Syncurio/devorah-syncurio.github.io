@@ -354,48 +354,64 @@ tbody tr:hover{background:var(--bg)}
         <div class="stat"><div class="stat-bar rust"></div><div class="stat-lbl">Largest invoice</div><div class="stat-val" id="ds-max">—</div><div class="stat-sub" id="ds-max-ex" style="font-size:13px;color:var(--ink3);margin-top:3px;font-family:var(--mono);">—</div><div class="stat-sub" id="ds-max-cust">—</div></div>
       </div>
       <div class="dgrid">
-          <!-- Monthly trend with 6 past + forecast -->
-          <div class="card">
-            <div class="card-hdr"><span class="card-title">Monthly Trends</span>
-              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-                <div style="display:flex;align-items:center;gap:6px">
-                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Last</label>
-                  <select class="fltsel" id="trend-quick" onchange="applyTrendQuick(this.value)" style="font-size:12px;padding:3px 8px">
-                    <option value="">Custom</option>
-                    <option value="3">3 months</option>
-                    <option value="6">6 months</option>
-                    <option value="9">9 months</option>
-                    <option value="12">12 months</option>
-                    <option value="18">18 months</option>
-                    <option value="24">24 months</option>
-                  </select>
-                </div>
-                <div style="display:flex;align-items:center;gap:6px">
-                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">From</label>
-                  <select class="fltsel" id="trend-from" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:12px;padding:3px 8px"></select>
-                </div>
-                <div style="display:flex;align-items:center;gap:6px">
-                  <label style="font-size:12px;color:var(--ink3);white-space:nowrap">Show</label>
-                  <select class="fltsel" id="trend-count" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:12px;padding:3px 8px">
-                    <option value="3">3 months</option>
-                    <option value="6">6 months</option>
-                    <option value="7" selected>7 months</option>
-                    <option value="9">9 months</option>
-                    <option value="12">12 months</option>
-                    <option value="18">18 months</option>
-                    <option value="24">24 months</option>
-                  </select>
-                </div>
-                <div class="trend-legend">
-                  <span><i style="background:var(--accent)"></i> Actual</span>
-                  <span><i style="background:var(--gold)"></i> Current</span>
-                  <span><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
+          <!-- Left column: trend + payment methods stacked -->
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <!-- Monthly trend table (compact) -->
+            <div class="card">
+              <div class="card-hdr" style="padding:8px 14px"><span class="card-title">Monthly Trends</span>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <label style="font-size:11px;color:var(--ink3);white-space:nowrap">Last</label>
+                    <select class="fltsel" id="trend-quick" onchange="applyTrendQuick(this.value)" style="font-size:11px;padding:2px 6px">
+                      <option value="">Custom</option>
+                      <option value="3">3 months</option>
+                      <option value="6">6 months</option>
+                      <option value="9">9 months</option>
+                      <option value="12">12 months</option>
+                      <option value="18">18 months</option>
+                      <option value="24">24 months</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <label style="font-size:11px;color:var(--ink3);white-space:nowrap">From</label>
+                    <select class="fltsel" id="trend-from" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:11px;padding:2px 6px"></select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px">
+                    <label style="font-size:11px;color:var(--ink3);white-space:nowrap">Show</label>
+                    <select class="fltsel" id="trend-count" onchange="document.getElementById('trend-quick').value='';renderDash()" style="font-size:11px;padding:2px 6px">
+                      <option value="3">3 months</option>
+                      <option value="6">6 months</option>
+                      <option value="7" selected>7 months</option>
+                      <option value="9">9 months</option>
+                      <option value="12">12 months</option>
+                      <option value="18">18 months</option>
+                      <option value="24">24 months</option>
+                    </select>
+                  </div>
+                  <div class="trend-legend" style="gap:8px">
+                    <span style="font-size:10px"><i style="background:var(--accent)"></i> Actual</span>
+                    <span style="font-size:10px"><i style="background:var(--gold)"></i> Current</span>
+                    <span style="font-size:10px"><i style="background:var(--teal);opacity:0.7"></i> Forecast</span>
+                  </div>
                 </div>
               </div>
+              <div style="padding:0">
+                <div id="trend-table" style="overflow-x:auto"></div>
+                <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);padding:4px 14px 6px;"></div>
+              </div>
             </div>
-            <div class="card-body" style="padding:0">
-              <div id="trend-table" style="overflow-x:auto"></div>
-              <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);padding:6px 14px 8px;"></div>
+            <!-- Payment methods card -->
+            <div class="card" id="pay-method-face-card">
+              <div class="card-hdr" style="background:var(--bg)">
+                <span class="card-title">Payment methods</span>
+                <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a segment or method to see breakdown</span>
+              </div>
+              <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
+            </div>
+            <!-- hidden MoM bodies — JS writes here, synced to top inline card -->
+            <div style="display:none">
+              <div id="mom-body"></div>
+              <div id="tom-body"></div>
             </div>
           </div>
           <!-- Right column: 4 cards -->
@@ -415,21 +431,6 @@ tbody tr:hover{background:var(--bg)}
               <div id="oneoff-body" style="padding:14px 16px"></div>
             </div>
           </div>
-      </div>
-      <!-- Payment methods: below trend chart, full width -->
-      <div style="margin-top:20px">
-        <div class="card" id="pay-method-face-card">
-          <div class="card-hdr" style="background:var(--bg)">
-            <span class="card-title">Payment methods</span>
-            <span style="font-size:11px;color:var(--ink3);font-family:var(--mono)">Click a segment or method to see breakdown</span>
-          </div>
-          <div class="card-body" id="pay-method-face" style="padding:16px 22px"></div>
-        </div>
-        <!-- hidden MoM bodies — JS writes here, synced to top inline card -->
-        <div style="display:none">
-          <div id="mom-body"></div>
-          <div id="tom-body"></div>
-        </div>
       </div>
 
     </div>
@@ -2456,18 +2457,18 @@ function renderDash(){
 
       let html = `<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px">
         <thead><tr>
-          <th style="text-align:left;padding:7px 14px 5px;color:var(--ink3);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--border);white-space:nowrap;width:72px"></th>`;
+          <th style="text-align:left;padding:4px 12px 3px;color:var(--ink3);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--border);white-space:nowrap;width:72px"></th>`;
       cols.forEach(b=>{
-        html+=`<th style="text-align:right;padding:7px 10px 5px;border-bottom:1px solid var(--border);white-space:nowrap;${thStyle(b)}">${b.lbl}${b.isFuture?'<span style=\'color:var(--teal)\'>*</span>':''}</th>`;
+        html+=`<th style="text-align:right;padding:4px 8px 3px;border-bottom:1px solid var(--border);white-space:nowrap;${thStyle(b)}">${b.lbl}${b.isFuture?'<span style=\'color:var(--teal)\'>*</span>':''}</th>`;
       });
       html+=`</tr></thead><tbody>`;
 
       rows.forEach((row,ri)=>{
         const borderTop = ri>0?'border-top:1px solid var(--border)':'';
         html+=`<tr>
-          <td style="padding:7px 14px;color:var(--ink3);font-size:10px;text-transform:uppercase;letter-spacing:0.6px;font-weight:600;${borderTop};white-space:nowrap">${row.label}</td>`;
+          <td style="padding:4px 12px;color:var(--ink3);font-size:10px;text-transform:uppercase;letter-spacing:0.6px;font-weight:600;${borderTop};white-space:nowrap">${row.label}</td>`;
         cols.forEach((b,ci)=>{
-          html+=`<td style="text-align:right;padding:7px 10px;${borderTop};${tdStyle(b,row.vals[ci])}">${row.fmt(row.vals[ci])}</td>`;
+          html+=`<td style="text-align:right;padding:4px 8px;${borderTop};${tdStyle(b,row.vals[ci])}">${row.fmt(row.vals[ci])}</td>`;
         });
         html+=`</tr>`;
       });
