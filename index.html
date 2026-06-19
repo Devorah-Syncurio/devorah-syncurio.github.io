@@ -395,15 +395,15 @@ tbody tr:hover{background:var(--bg)}
             </div>
             <div class="card-body">
               <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Monthly Revenue</div>
-              <div class="mbars" id="trend-bars"></div>
-              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;border-top:1px dashed var(--border);padding-top:2px">
-                <span id="trend-base-label" style="font-size:9px;font-family:var(--mono);color:var(--ink3);white-space:nowrap"></span>
-                <div style="flex:1;display:flex;gap:4px" id="trend-labels"></div>
-              </div>
-              <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:4px"></div>
+              <div id="trend-chart-revenue"></div>
+              <div id="trend-proj-note" style="font-size:10px;color:var(--teal);font-family:var(--mono);text-align:center;margin-top:2px"></div>
               <div id="trend-beds-section" style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
-                <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.8px">Total Beds per month</div>
-                <div id="trend-beds-row" style="display:flex;gap:4px;align-items:flex-end;min-height:80px"></div>
+                <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px">Total Beds per month</div>
+                <div id="trend-chart-beds"></div>
+              </div>
+              <div id="trend-homes-section" style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+                <div style="font-size:10px;font-family:var(--mono);color:var(--ink3);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px">Care Homes per month</div>
+                <div id="trend-chart-homes"></div>
               </div>
             </div>
           </div>
@@ -2423,54 +2423,69 @@ function renderDash(){
     return{prevLbl:pb.fullLbl,delta:b.t-pb.t,ch};
   });
 
-  document.getElementById('trend-bars').innerHTML=bars.map((b,i)=>`<div class="mbar-wrap" data-bidx="${i}" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;cursor:default"><div style="font-size:9px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)'};font-weight:${b.type!=='past'?'700':'500'};margin-bottom:2px;white-space:nowrap">${b.t>0?fmtGBP(b.t):''}</div><div class="mbar ${b.type}" style="height:${Math.max((b.t-TREND_BASE)/Math.max(maxT-TREND_BASE,1)*85,b.t>0?2:0)}px"></div></div>`).join('');
-  document.getElementById('trend-labels').innerHTML=bars.map(b=>`<div style="flex:1;text-align:center;font-size:10px;font-family:var(--mono);color:${b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)'};font-weight:${b.type!=='past'?'700':'500'}">${b.lbl}${b.isFuture?'*':''}</div>`).join('');
-  const _baseEl=document.getElementById('trend-base-label');if(_baseEl)_baseEl.textContent=TREND_BASE>0?fmtGBP(Math.round(TREND_BASE/1000)*1000).replace('.00',''):'£0';
-  // Beds per month row
+  // SVG line charts — revenue, beds, homes
   {
-    const bedsRow=document.getElementById('trend-beds-row');
-    if(bedsRow){
-      // Compute beds: actuals from invoices for past/current, schedules for future (matches qstat)
-      const barsWithBeds=bars.map(b=>{
-        let bedCount=0;
-        if(!b.isFuture){
-          // Use actual invoices — sum ALL lines, no serviceType filter (matches matrix logic)
-          bedCount=DB.invoices.filter(i=>mk(i.date)===b.k).reduce((sum,i)=>{
-            if(!i.lines||!i.lines[0])return sum;
-            return sum+(parseFloat(i.lines[0].qty)||0);
-          },0);
-        } else {
-          // Future: derive from active schedules (forecast)
-          bedCount=DB.schedules.filter(s=>{
-            if(s.active===false)return false;
-            const start=s.schedStart||'0000-01';
-            const end=s.schedEnd||'9999-12';
-            return start<=b.k&&b.k<=end;
-          }).reduce((sum,s)=>{
-            if(!s.lines||!s.lines[0])return sum;
-            return sum+(parseFloat(s.lines[0].qty)||0);
-          },0);
+    function _mkTrendSVG(pts,opts){
+      opts=opts||{};
+      const VW=600,H=opts.H||120;
+      const PT=opts.H>=130?30:26,PB=24,PL=8,PR=8;
+      const plotW=VW-PL-PR,plotH=H-PT-PB,N=pts.length;
+      const vals=pts.map(p=>p.v).filter(v=>v>0);
+      const vMax=vals.length?Math.max(...vals):1,vMin=vals.length?Math.min(...vals):0;
+      const vRange=vMax-vMin||1;
+      const floor=Math.max(0,vMin-vRange*0.15),ceil=vMax+vRange*0.12;
+      const xFor=i=>PL+(N<=1?plotW/2:i/(N-1)*plotW);
+      const yFor=v=>PT+plotH-Math.max(0,(v-floor)/Math.max(ceil-floor,1)*plotH);
+      const coords=pts.map((p,i)=>({...p,cx:xFor(i),cy:p.v>0?yFor(p.v):PT+plotH}));
+      const tCol=t=>t==='current'?'var(--gold)':t==='forecast'?'var(--teal)':'var(--accent)';
+      let o=[];
+      const by=PT+plotH;
+      o.push(`<line x1="${PL}" y1="${by}" x2="${VW-PR}" y2="${by}" stroke="var(--border)" stroke-width="1"/>`);
+      const gy=(PT+plotH*0.45).toFixed(1);
+      o.push(`<line x1="${PL}" y1="${gy}" x2="${VW-PR}" y2="${gy}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>`);
+      for(let i=0;i<coords.length-1;i++){
+        const c1=coords[i],c2=coords[i+1],col=tCol(c2.type);
+        const dash=c2.type==='forecast'?'stroke-dasharray="6,4"':'';
+        o.push(`<line x1="${c1.cx.toFixed(1)}" y1="${c1.cy.toFixed(1)}" x2="${c2.cx.toFixed(1)}" y2="${c2.cy.toFixed(1)}" stroke="${col}" stroke-width="2.5" stroke-linecap="round" ${dash}/>`);
+      }
+      coords.forEach((c,i)=>{
+        const col=tCol(c.type),sp=c.type!=='past';
+        if(c.v>0){
+          const lbl=opts.fmt?opts.fmt(c.v):c.v;
+          o.push(`<text x="${c.cx.toFixed(1)}" y="${(c.cy-11).toFixed(1)}" text-anchor="middle" font-size="9" font-family="var(--mono)" fill="${col}" font-weight="${sp?'700':'400'}">${lbl}</text>`);
         }
-        return{...b,beds:Math.round(bedCount)};
+        o.push(`<circle cx="${c.cx.toFixed(1)}" cy="${c.cy.toFixed(1)}" r="${sp?5:3.5}" fill="${col}" stroke="var(--surface)" stroke-width="${sp?2:1.5}"/>`);
+        o.push(`<text x="${c.cx.toFixed(1)}" y="${H-3}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="${col}" font-weight="${sp?'700':'400'}">${c.lbl}${c.isFuture?'*':''}</text>`);
       });
-      const maxBeds=Math.max(...barsWithBeds.map(b=>b.beds),1);
-      const minBeds=Math.min(...barsWithBeds.filter(b=>b.beds>0).map(b=>b.beds),maxBeds);
-      const BEDS_BASE=Math.max(0,minBeds-Math.max(Math.ceil((maxBeds-minBeds)*0.15),1));
-      const MAX_BED_H=64;
-      bedsRow.innerHTML=barsWithBeds.map(b=>{
-        const col=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--accent)';
-        const h=Math.max(b.beds>0?Math.round((b.beds-BEDS_BASE)/Math.max(maxBeds-BEDS_BASE,1)*MAX_BED_H):0,b.beds>0?4:0);
-        const lblCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)';
-        const valCol=b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)';
-        return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:0">
-          <div style="font-size:10px;font-family:var(--mono);color:${valCol};font-weight:400;white-space:nowrap;margin-bottom:3px">${b.beds>0?b.beds:''}</div>
-          <div style="width:100%;height:${h}px;background:${col};border-radius:3px 3px 0 0;opacity:${b.type==='forecast'?'0.65':'1'};transition:height 0.3s"></div>
-          <div style="width:100%;height:1px;background:var(--border)"></div>
-          <div style="font-size:10px;font-family:var(--mono);color:${lblCol};font-weight:${b.type!=='past'?'500':'400'};text-align:center;margin-top:4px">${b.lbl}${b.isFuture?'*':''}</div>
-        </div>`;
-      }).join('');
-
+      return`<svg viewBox="0 0 ${VW} ${H}" width="100%" style="overflow:visible;display:block;margin-bottom:4px">${o.join('')}</svg>`;
     }
+    // Revenue
+    const rcEl=document.getElementById('trend-chart-revenue');
+    if(rcEl)rcEl.innerHTML=_mkTrendSVG(bars.map(b=>({v:b.t,type:b.type,lbl:b.lbl,isFuture:b.isFuture})),{H:165,fmt:v=>fmtShort(v)});
+    // Beds (recurring invoices only; future from schedules)
+    const bPts=bars.map(b=>{
+      let v=0;
+      if(!b.isFuture){
+        v=Math.round(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&i.lines&&i.lines.length).reduce((s,i)=>s+(parseFloat(i.lines[0].qty)||0),0));
+      } else {
+        v=Math.round(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).reduce((s,sc)=>s+(parseFloat(sc.lines?.[0]?.qty)||0),0));
+      }
+      return{v,type:b.type,lbl:b.lbl,isFuture:b.isFuture};
+    });
+    const bedsEl=document.getElementById('trend-chart-beds');
+    if(bedsEl)bedsEl.innerHTML=_mkTrendSVG(bPts,{H:110,fmt:v=>v});
+    // Homes (distinct care homes per month)
+    const hPts=bars.map(b=>{
+      let v=0;
+      if(!b.isFuture){
+        v=new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring).map(i=>i.customerId)).size;
+      } else {
+        v=new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId)).size;
+      }
+      return{v,type:b.type,lbl:b.lbl,isFuture:b.isFuture};
+    });
+    const homesEl=document.getElementById('trend-chart-homes');
+    if(homesEl)homesEl.innerHTML=_mkTrendSVG(hPts,{H:110,fmt:v=>v});
   }
   const projN=trendFutureKeys.length;
   const noteEl=document.getElementById('trend-proj-note');
