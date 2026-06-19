@@ -2421,7 +2421,7 @@ function renderDash(){
     if(tEl){
       const cols = bars;
       const thStyle = (b) => {
-        const c = b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink3)';
+        const c = b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--accent)';
         const fw = b.type!=='past'?'700':'500';
         return `color:${c};font-weight:${fw};`;
       };
@@ -2444,15 +2444,21 @@ function renderDash(){
 
       const tdStyle = (b,val) => {
         if(!val&&val!==0) return 'color:var(--ink3)';
-        const c = b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--ink2)';
+        const c = b.type==='current'?'var(--gold)':b.type==='forecast'?'var(--teal)':'var(--accent)';
         const fw = b.type!=='past'?'700':'400';
         return `color:${c};font-weight:${fw};`;
       };
 
+      const avgPpbVals = bars.map((b,bi)=>{
+        const rev = bars[bi].t;
+        const beds = bedVals[bi];
+        return (beds>0) ? (rev/beds) : null;
+      });
       const rows = [
         { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtGBP(v) },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
+        { label:'Avg £/Bed',vals: avgPpbVals,         fmt: v=>(v!=null)?'£'+Math.round(v).toLocaleString('en-GB'):'—' },
       ];
 
       let html = `<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px">
