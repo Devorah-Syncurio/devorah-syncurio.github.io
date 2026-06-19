@@ -2472,7 +2472,7 @@ function renderDash(){
         { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtGBP(v) },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
-        { label:'Avg £/Bed',vals: avgPpbVals,         fmt: v=>(v!=null)?'£'+Math.round(v).toLocaleString('en-GB'):'—' },
+        { label:'Avg £/Bed',vals: avgPpbVals,         fmt: v=>(v!=null)?fmtGBP(v):'—' },
       ];
 
       let html = `<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px">
