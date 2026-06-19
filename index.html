@@ -2449,7 +2449,7 @@ function renderDash(){
       };
 
       const rows = [
-        { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtShort(v) },
+        { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtGBP(v) },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
       ];
