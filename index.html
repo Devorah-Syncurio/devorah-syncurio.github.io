@@ -3194,19 +3194,11 @@ function exportUnitsXlsx(){
   const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>hasInvInMo2(x,m)||hasDataInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
 
   // Sheet 1: Units by Month
-  const hdr=['Customer','Unit Name',...monthLabels2,'Current Beds'];
+  const hdr=['Customer','Unit Name',...monthLabels2];
   const rows=[hdr];
   let gBeds=Object.fromEntries(months2.map(m=>[m,0]));
   custs2.forEach(c=>{
     const curU=uLatest2(c);
-    // Gather all unit names from history across ALL months (not just invoice months)
-    // Only include units that have a real name or at least one month with beds recorded
-    // Helper: get beds from invoice for a month (fallback when no unit history)
-    const invBedsForMo=(m)=>{
-      const inv=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring&&(i.lines||[]).length)
-        .sort((a,b)=>b.date.localeCompare(a.date))[0];
-      return inv?inv.lines[0].qty:null;
-    };
     const hasUnitHist=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
     const allNames=hasUnitHist?[...new Set([
       ...curU.filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
@@ -3215,10 +3207,11 @@ function exportUnitsXlsx(){
     ])].filter(Boolean):null;
     if(hasUnitHist&&!allNames.length)return;
     if(hasUnitHist){
-      // Use named unit breakdown from history
       allNames.forEach((uName,ui)=>{
         const row=[ui===0?c.name:'',uName];
         months2.forEach(m=>{
+          // Only show beds if customer had an invoice this month
+          if(!hasInvInMo2(c,m)){row.push('');return;}
           const snap=uForMo2(c,m);
           if(!snap||!snap.length){row.push('');return;}
           const unit=snap.find(u=>(u.name||'Unnamed')===uName);
@@ -3226,60 +3219,51 @@ function exportUnitsXlsx(){
           if(typeof beds==='number')gBeds[m]+=beds;
           row.push(beds);
         });
-        const cu=curU.find(u=>(u.name||'Unnamed')===uName);
-        row.push(cu?.beds!=null?cu.beds:'—');
         rows.push(row);
       });
     } else {
-      // No unit history — use effective current units (pre-filled from invoice if empty)
       const fallbackUnits=effectiveCurU(c);
       fallbackUnits.forEach((u,ui)=>{
         const uName=u.name||'Unit 1';
         const row=[ui===0?c.name:'',uName];
         months2.forEach(m=>{
+          if(!hasInvInMo2(c,m)){row.push('');return;}
           if(u.beds!=null)gBeds[m]+=u.beds;
           row.push(u.beds!=null?u.beds:'—');
         });
-        row.push(u.beds!=null?u.beds:'—');
         rows.push(row);
       });
     }
-    // Subtotal per customer
-    const effCurSub=effectiveCurU(c);
-    const sub=['','↳ Total ('+c.name+')'];
-    months2.forEach(m=>{
-      if(hasUnitHist){
-        const snap=uForMo2(c,m);
-        if(!snap||!snap.length){sub.push('');return;}
-        const t=snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
-        sub.push(t>0?t:'—');
-      } else {
-        const t=effCurSub.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
-        sub.push(t>0?t:'—');
-      }
-    });
-    const subCurTot=effCurSub.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
-    sub.push(subCurTot>0?subCurTot:'—');
-    rows.push(sub);
-    rows.push(Array(hdr.length).fill(''));
   });
-  rows.push(['Grand Total','', ...months2.map(m=>gBeds[m]||'—'),'']);
+  rows.push(['Grand Total','', ...months2.map(m=>gBeds[m]||'—')]);
 
-  // Sheet 2: Current snapshot
-  const snap2Hdr=['Customer','Unit Name','Current Beds'];
+  // Sheet 2: Clean unit breakdown for selected months — no blank rows, no subtotals, just a total
+  const snap2Hdr=['Customer','Unit Name',...monthLabels2,'Total Beds'];
   const snap2Rows=[snap2Hdr];
-  let snapTot=0;
+  let snapGrandBeds=Object.fromEntries(months2.map(m=>[m,0]));
   custs2.forEach(c=>{
-    const effU=effectiveCurU(c);
-    effU.forEach((u,ui)=>{
-      snap2Rows.push([ui===0?c.name:'',u.name||'Unnamed',u.beds!=null?u.beds:'—']);
-      if(u.beds!=null)snapTot+=u.beds;
+    const hasUnitHist2=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
+    const unitsToShow=hasUnitHist2?[...new Set([
+      ...uLatest2(c).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
+      ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'))
+    ])].filter(Boolean):effectiveCurU(c).map(u=>u.name||'Unit 1');
+    unitsToShow.forEach((uName,ui)=>{
+      const row=[ui===0?c.name:'',uName];
+      let rowTotal=0;
+      months2.forEach(m=>{
+        if(!hasInvInMo2(c,m)){row.push('');return;}
+        const snap=hasUnitHist2?uForMo2(c,m):effectiveCurU(c);
+        const unit=Array.isArray(snap)?snap.find(u=>(u.name||'Unit 1')===uName):null;
+        const beds=unit?.beds!=null?unit.beds:null;
+        if(beds!=null){snapGrandBeds[m]+=beds;rowTotal+=beds;}
+        row.push(beds!=null?beds:'—');
+      });
+      row.push(rowTotal||'—');
+      snap2Rows.push(row);
     });
-    const cTot=effU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
-    snap2Rows.push(['','↳ Total',cTot||'—']);
-    snap2Rows.push(['','','']);
   });
-  snap2Rows.push(['Grand Total','',snapTot||'—']);
+  const grandTotRow=['Grand Total','',...months2.map(m=>snapGrandBeds[m]||'—'),months2.reduce((s,m)=>s+(snapGrandBeds[m]||0),0)||'—'];
+  snap2Rows.push(grandTotRow);
 
   dlXlsx([
     {name:'Units by Month',rows},
