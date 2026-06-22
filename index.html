@@ -3133,10 +3133,11 @@ function exportUnitsXlsx(){
   custs2.forEach(c=>{
     const curU=uLatest2(c);
     // Gather all unit names from history across ALL months (not just invoice months)
+    // Only include units that have a real name or at least one month with beds recorded
     const allNames=[...new Set([
-      ...curU.map(u=>u.name||'Unnamed'),
-      ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).map(u=>u.name||'Unnamed')),
-      ...months2.flatMap(m=>{const u=uForMo2(c,m);return u?u.map(x=>x.name||'Unnamed'):[];})
+      ...curU.filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
+      ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed')),
+      ...months2.flatMap(m=>{const u=uForMo2(c,m);return u?u.filter(x=>x.name||(x.beds>0)).map(x=>x.name||'Unnamed'):[];})
     ])].filter(Boolean);
     if(!allNames.length)return;
     allNames.forEach((uName,ui)=>{
