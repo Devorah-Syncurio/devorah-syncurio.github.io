@@ -3199,17 +3199,21 @@ function exportUnitsXlsx(){
       });
     }
     // Subtotal per customer
+    const effCurSub=effectiveCurU(c);
     const sub=['','↳ Total ('+c.name+')'];
     months2.forEach(m=>{
       if(hasUnitHist){
         const snap=uForMo2(c,m);
         if(!snap||!snap.length){sub.push('');return;}
-        sub.push(snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+        const t=snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+        sub.push(t>0?t:'—');
       } else {
-        sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+        const t=effCurSub.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+        sub.push(t>0?t:'—');
       }
     });
-    sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+    const subCurTot=effCurSub.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+    sub.push(subCurTot>0?subCurTot:'—');
     rows.push(sub);
     rows.push(Array(hdr.length).fill(''));
   });
