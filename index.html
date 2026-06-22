@@ -3146,32 +3146,59 @@ function exportUnitsXlsx(){
     const curU=uLatest2(c);
     // Gather all unit names from history across ALL months (not just invoice months)
     // Only include units that have a real name or at least one month with beds recorded
-    const allNames=[...new Set([
+    // Helper: get beds from invoice for a month (fallback when no unit history)
+    const invBedsForMo=(m)=>{
+      const inv=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring&&(i.lines||[]).length)
+        .sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return inv?inv.lines[0].qty:null;
+    };
+    const hasUnitHist=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
+    const allNames=hasUnitHist?[...new Set([
       ...curU.filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
       ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed')),
       ...months2.flatMap(m=>{const u=uForMo2(c,m);return u?u.filter(x=>x.name||(x.beds>0)).map(x=>x.name||'Unnamed'):[];})
-    ])].filter(Boolean);
-    if(!allNames.length)return;
-    allNames.forEach((uName,ui)=>{
-      const row=[ui===0?c.name:'',uName];
-      months2.forEach(m=>{
-        const snap=uForMo2(c,m);
-        if(!snap||!snap.length){row.push('');return;}
-        const unit=snap.find(u=>(u.name||'Unnamed')===uName);
-        const beds=unit?.beds!=null?unit.beds:'—';
-        if(typeof beds==='number')gBeds[m]+=beds;
-        row.push(beds);
+    ])].filter(Boolean):null;
+    if(hasUnitHist&&!allNames.length)return;
+    if(hasUnitHist){
+      // Use named unit breakdown from history
+      allNames.forEach((uName,ui)=>{
+        const row=[ui===0?c.name:'',uName];
+        months2.forEach(m=>{
+          const snap=uForMo2(c,m);
+          if(!snap||!snap.length){row.push('');return;}
+          const unit=snap.find(u=>(u.name||'Unnamed')===uName);
+          const beds=unit?.beds!=null?unit.beds:'—';
+          if(typeof beds==='number')gBeds[m]+=beds;
+          row.push(beds);
+        });
+        const cu=curU.find(u=>(u.name||'Unnamed')===uName);
+        row.push(cu?.beds!=null?cu.beds:'—');
+        rows.push(row);
       });
-      const cu=curU.find(u=>(u.name||'Unnamed')===uName);
-      row.push(cu?.beds!=null?cu.beds:'—');
+    } else {
+      // No unit history — fall back to invoice first-line qty for each month
+      const uName=c.company||c.name||'Unit 1';
+      const row=[c.name,uName];
+      let latestBeds='—';
+      months2.forEach(m=>{
+        const beds=invBedsForMo(m);
+        if(beds!=null){gBeds[m]+=beds;latestBeds=beds;}
+        row.push(beds!=null?beds:'—');
+      });
+      row.push(latestBeds);
       rows.push(row);
-    });
+    }
     // Subtotal per customer
     const sub=['','↳ Total ('+c.name+')'];
     months2.forEach(m=>{
-      const snap=uForMo2(c,m);
-      if(!snap||!snap.length){sub.push('');return;}
-      sub.push(snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+      if(hasUnitHist){
+        const snap=uForMo2(c,m);
+        if(!snap||!snap.length){sub.push('');return;}
+        sub.push(snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+      } else {
+        const beds=invBedsForMo(m);
+        sub.push(beds!=null?beds:'—');
+      }
     });
     sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
     rows.push(sub);
