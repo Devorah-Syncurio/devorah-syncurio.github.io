@@ -3210,7 +3210,6 @@ function exportUnitsXlsx(){
       allNames.forEach((uName,ui)=>{
         const row=[ui===0?c.name:'',uName];
         months2.forEach(m=>{
-          // Only show beds if customer had an invoice this month
           if(!hasInvInMo2(c,m)){row.push('');return;}
           const snap=uForMo2(c,m);
           if(!snap||!snap.length){row.push('');return;}
@@ -3234,6 +3233,16 @@ function exportUnitsXlsx(){
         rows.push(row);
       });
     }
+    // Subtotal row per customer
+    const sub=['','↳ Total ('+c.name+')'];
+    months2.forEach(m=>{
+      if(!hasInvInMo2(c,m)){sub.push('');return;}
+      const snap=hasUnitHist?uForMo2(c,m):effectiveCurU(c);
+      const t=(snap||[]).reduce((s,u)=>s+(typeof u.beds==='number'?u.beds:0),0);
+      sub.push(t>0?t:'—');
+    });
+    rows.push(sub);
+    rows.push(Array(hdr.length).fill(''));
   });
   rows.push(['Grand Total','', ...months2.map(m=>gBeds[m]||'—')]);
 
@@ -3262,8 +3271,9 @@ function exportUnitsXlsx(){
       snap2Rows.push(row);
     });
   });
-  const grandTotRow=['Grand Total','',...months2.map(m=>snapGrandBeds[m]||'—'),months2.reduce((s,m)=>s+(snapGrandBeds[m]||0),0)||'—'];
-  snap2Rows.push(grandTotRow);
+  const snap2UnitCount=snap2Rows.length-1; // rows added so far minus header
+  const snap2TotalBeds=months2.reduce((s,m)=>s+(snapGrandBeds[m]||0),0);
+  snap2Rows.push(['Grand Total ('+snap2UnitCount+' units)','', ...months2.map(m=>snapGrandBeds[m]||'—'), snap2TotalBeds||'—']);
 
   dlXlsx([
     {name:'Units by Month',rows},
