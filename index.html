@@ -689,6 +689,11 @@ tbody tr:hover{background:var(--bg)}
       <label class="flbl" style="margin-bottom:6px">Units <span style="font-weight:400;color:var(--ink3)">(name &amp; beds)</span></label>
       <div id="c-units-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
       <button type="button" class="btn btn-ghost btn-sm" onclick="addUnitRow()">+ Add Unit</button>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+        <label class="flbl" style="margin:0;white-space:nowrap">Effective from</label>
+        <input type="month" class="finp" id="c-units-effective" style="width:160px">
+        <span style="font-size:11px;color:var(--ink3)">(month these unit details took effect)</span>
+      </div>
     </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
@@ -1160,6 +1165,8 @@ function openCustModal(id){
   document.getElementById('c-co').value=c?.company||'';
   document.getElementById('c-email').value=c?.email||'';
   initUnitRows(normalizeUnits(c?.units));
+  const _ef=document.getElementById('c-units-effective');
+  if(_ef){const _n=new Date();_ef.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');}
   openOverlay('cust-modal');
 }
 function saveCust(thenAction){
@@ -1169,19 +1176,24 @@ function saveCust(thenAction){
   const newUnits=readUnits();
   if(!newUnits.length)newUnits.push({name:'',beds:null});
   const today=new Date().toISOString().slice(0,10);
+  const _efEl=document.getElementById('c-units-effective');
+  const _efVal=_efEl&&_efEl.value?_efEl.value+'-01':today;
   if(editCustId){
     const c=DB.customers.find(x=>x.id===editCustId);
     c.name=name;c.company=document.getElementById('c-co').value.trim();c.email=document.getElementById('c-email').value.trim();
     if(JSON.stringify(normalizeUnits(c.units))!==JSON.stringify(newUnits)){
       if(!c.unitsHistory)c.unitsHistory=[];
-      c.unitsHistory.push({date:today,snapshot:newUnits});
+      // remove any existing entry for the same month to avoid duplicates
+      const _efMo=_efVal.slice(0,7);
+      c.unitsHistory=c.unitsHistory.filter(h=>h.date.slice(0,7)!==_efMo);
+      c.unitsHistory.push({date:_efVal,snapshot:newUnits});
     }
     c.units=newUnits;
   }else{
     newId='c'+Date.now();
     const newCust={id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8};
     newCust.units=newUnits;
-    newCust.unitsHistory=[{date:today,snapshot:newUnits}];
+    newCust.unitsHistory=[{date:_efVal,snapshot:newUnits}];
     DB.customers.push(newCust);
   }
   persist();window._formDirty=false;closeOverlay('cust-modal');showToast(editCustId?'Customer updated.':'Customer added!');
