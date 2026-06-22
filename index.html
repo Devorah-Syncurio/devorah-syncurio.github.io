@@ -3176,17 +3176,19 @@ function exportUnitsXlsx(){
         rows.push(row);
       });
     } else {
-      // No unit history — fall back to invoice first-line qty for each month
-      const uName=c.company||c.name||'Unit 1';
-      const row=[c.name,uName];
-      let latestBeds='—';
-      months2.forEach(m=>{
-        const beds=invBedsForMo(m);
-        if(beds!=null){gBeds[m]+=beds;latestBeds=beds;}
-        row.push(beds!=null?beds:'—');
+      // No unit history — use current units (curU)
+      const validCurU=curU.filter(u=>u.name||(u.beds>0));
+      const fallbackUnits=validCurU.length?validCurU:[{name:c.company||c.name||'Unit 1',beds:null}];
+      fallbackUnits.forEach((u,ui)=>{
+        const uName=u.name||'Unit 1';
+        const row=[ui===0?c.name:'',uName];
+        months2.forEach(m=>{
+          if(u.beds!=null)gBeds[m]+=u.beds;
+          row.push(u.beds!=null?u.beds:'—');
+        });
+        row.push(u.beds!=null?u.beds:'—');
+        rows.push(row);
       });
-      row.push(latestBeds);
-      rows.push(row);
     }
     // Subtotal per customer
     const sub=['','↳ Total ('+c.name+')'];
@@ -3196,8 +3198,7 @@ function exportUnitsXlsx(){
         if(!snap||!snap.length){sub.push('');return;}
         sub.push(snap.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
       } else {
-        const beds=invBedsForMo(m);
-        sub.push(beds!=null?beds:'—');
+        sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
       }
     });
     sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
