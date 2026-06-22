@@ -322,6 +322,14 @@ tbody tr:hover{background:var(--bg)}
           </div>
         </div>
         <div class="qstat">
+          <div class="qstat-accent" style="background:var(--ink2)"></div>
+          <div class="qstat-icon-wrap">🏘</div>
+          <div class="qstat-text">
+            <div class="qstat-lbl">Total Units</div>
+            <div class="qstat-val" id="qs-units">—</div>
+          </div>
+        </div>
+        <div class="qstat">
           <div class="qstat-accent" style="background:var(--teal)"></div>
           <div class="qstat-icon-wrap lg">🛏</div>
           <div class="qstat-text">
@@ -1122,6 +1130,27 @@ function normalizeUnits(raw){
   if(Array.isArray(raw))return raw;
   if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));
   return [{name:'',beds:null}];
+}
+// Global unit snapshot helpers
+function uLatestSnap(c){
+  const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>b.date.localeCompare(a.date));
+  if(hist.length)return hist[0].snapshot;
+  return normalizeUnits(c.units).filter(u=>u.name||(u.beds>0));
+}
+function uForMoSnap(c,mo){
+  const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!hist.length)return normalizeUnits(c.units).filter(u=>u.name||(u.beds>0));
+  const last=mo+'-31';let snap=null;
+  for(const h of hist){if(h.date<=last)snap=h.snapshot;else break;}
+  return (snap||hist[0].snapshot).filter(u=>u.name||(u.beds>0));
+}
+function effectiveCurUnits(c){
+  const cur=uLatestSnap(c);
+  if(cur.length)return cur;
+  const latestInv=(DB.invoices||[]).filter(i=>i.customerId===c.id&&i.isRecurring&&!i.deleted&&(i.lines||[]).length)
+    .sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const beds=latestInv?latestInv.lines[0].qty:null;
+  return [{name:c.company||c.name||'Unit 1',beds:beds}];
 }
 function addUnitRow(name,beds){
   name=name||'';beds=(beds!=null&&beds!=='')?beds:'';
@@ -2107,10 +2136,27 @@ function renderDash(){
       },0);
       avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
     }
+    // Total named units across active customers for selected month
+    const activeCustomerIds=[...new Set(
+      (isFutureDash
+        ? (buildForecast(0,key,key)[0]?.items||[]).map(x=>x.customerId)
+        : DB.invoices.filter(i=>mk(i.date)===key&&i.isRecurring&&!i.deleted).map(i=>i.customerId)
+      )
+    )];
+    let totalUnits=0;
+    activeCustomerIds.forEach(cid=>{
+      const cust=DB.customers.find(x=>x.id===cid);
+      if(!cust)return;
+        const snap=uForMoSnap(cust,key);
+      const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+      totalUnits+=units.filter(u=>u.name||(u.beds>0)).length||1;
+    });
     const qh=document.getElementById('qs-homes');
+    const qu=document.getElementById('qs-units');
     const qb=document.getElementById('qs-beds');
     const qp=document.getElementById('qs-avgprice');
     if(qh)qh.textContent=totalHomes;
+    if(qu)qu.textContent=totalUnits>0?totalUnits:'—';
     if(qb)qb.textContent=totalBeds>0?Math.round(totalBeds).toLocaleString():'—';
     if(qp)qp.textContent=avgPpb>0?fmtGBP(Math.round(avgPpb*100)/100):'—';
   }
