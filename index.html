@@ -2137,10 +2137,11 @@ function renderDash(){
       avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
     }
     // Total named units across active customers for selected month
+    const recurringCustIds=new Set((DB.recurring||[]).map(r=>r.customerId));
     const activeCustomerIds=[...new Set(
       (isFutureDash
         ? (buildForecast(0,key,key)[0]?.items||[]).map(x=>x.customerId)
-        : DB.invoices.filter(i=>mk(i.date)===key&&i.isRecurring&&!i.deleted).map(i=>i.customerId)
+        : DB.invoices.filter(i=>mk(i.date)===key&&!i.deleted&&(i.isRecurring||recurringCustIds.has(i.customerId))).map(i=>i.customerId)
       )
     )];
     let totalUnits=0;
@@ -3185,7 +3186,8 @@ function exportUnitsXlsx(){
     const beds=latestInv?latestInv.lines[0].qty:null;
     return [{name:c.company||c.name||'Unit 1',beds:beds}];
   }
-  const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m);
+  const recurringCustIds2=new Set((DB.recurring||[]).map(r=>r.customerId));
+  const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m&&(i.isRecurring||recurringCustIds2.has(c.id)));
   const hasDataInMo2=(c,m)=>{
     const u=uForMo2(c,m);
     return u&&u.length>0&&u.some(x=>x.name||x.beds!=null);
