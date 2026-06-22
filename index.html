@@ -685,7 +685,11 @@ tbody tr:hover{background:var(--bg)}
     <div class="fg"><label class="flbl">Name *</label><input type="text" class="finp" id="c-name" placeholder="Full name"></div>
     <div class="fg"><label class="flbl">Company</label><input type="text" class="finp" id="c-co" placeholder="Company Ltd"></div>
     <div class="fg full"><label class="flbl">Email</label><input type="email" class="finp" id="c-email" placeholder="name@company.com"></div>
-    <div class="fg"><label class="flbl">Number of Units</label><input type="number" class="finp" id="c-units" placeholder="e.g. 1" min="0" step="1"></div>
+    <div class="fg full" style="margin-top:2px">
+      <label class="flbl" style="margin-bottom:6px">Units <span style="font-weight:400;color:var(--ink3)">(name &amp; beds)</span></label>
+      <div id="c-units-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="addUnitRow()">+ Add Unit</button>
+    </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
     <div style="font-size:12px;color:var(--ink3);margin-bottom:10px;font-weight:600">Quick action after saving:</div>
@@ -1106,6 +1110,48 @@ function toggleDdSigned(){
   const wrap=document.getElementById('dd-signed-wrap');
   if(wrap)wrap.style.display=pm==='Direct Debit'?'':'none';
 }
+// ── Units editor helpers ─────────────────────────────────────────────
+function normalizeUnits(raw){
+  if(Array.isArray(raw))return raw;
+  if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));
+  return [{name:'',beds:null}];
+}
+function addUnitRow(name,beds){
+  name=name||'';beds=(beds!=null&&beds!=='')?beds:'';
+  const list=document.getElementById('c-units-list');
+  if(!list)return;
+  const row=document.createElement('div');
+  row.className='unit-editor-row';
+  row.style.cssText='display:flex;gap:6px;align-items:center';
+  const safeN=name.replace(/"/g,'&quot;');
+  row.innerHTML=`<input type="text" class="finp" style="flex:1" placeholder="Unit name (e.g. Dementia Wing)" value="${safeN}">
+    <input type="number" class="finp" style="width:72px;text-align:right" placeholder="Beds" min="0" step="1" value="${beds}">
+    <button type="button" onclick="this.closest('.unit-editor-row').remove()" style="background:none;border:none;cursor:pointer;color:var(--ink3);font-size:16px;padding:0 4px;flex-shrink:0" title="Remove">✕</button>`;
+  list.appendChild(row);
+}
+function initUnitRows(units){
+  const list=document.getElementById('c-units-list');
+  if(!list)return;
+  list.innerHTML='';
+  if(!units||!units.length){addUnitRow('',null);return;}
+  units.forEach(u=>addUnitRow(u.name||'',u.beds!=null?u.beds:''));
+}
+function readUnits(){
+  const rows=document.querySelectorAll('.unit-editor-row');
+  return Array.from(rows).map(row=>{
+    const ins=row.querySelectorAll('input');
+    const name=(ins[0]?.value||'').trim();
+    const bRaw=(ins[1]?.value||'').trim();
+    const beds=bRaw===''?null:Math.max(0,parseInt(bRaw)||0);
+    return{name,beds};
+  }).filter(u=>u.name||u.beds!=null);
+}
+function unitsForMonth(c,monthKey){
+  const hist=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>a.date.localeCompare(b.date));
+  const lastDay=monthKey+'-31';let snap=null;
+  for(const h of hist){if(h.date<=lastDay)snap=h.snapshot;else break;}
+  return snap||normalizeUnits(c.units);
+}
 function openCustModal(id){
   editCustId=id||null;
   document.getElementById('cust-modal-title').textContent=id?'Edit Customer':'Add Customer';
@@ -1113,27 +1159,29 @@ function openCustModal(id){
   document.getElementById('c-name').value=c?.name||'';
   document.getElementById('c-co').value=c?.company||'';
   document.getElementById('c-email').value=c?.email||'';
-  document.getElementById('c-units').value=c?.units!=null?c.units:'';
+  initUnitRows(normalizeUnits(c?.units));
   openOverlay('cust-modal');
 }
 function saveCust(thenAction){
   const name=document.getElementById('c-name').value.trim();
   if(!name){showToast('Name is required.');return null;}
   let newId=null;
-  const unitsRaw=document.getElementById('c-units').value.trim();
-  const unitsVal=unitsRaw===''?null:Math.max(0,parseInt(unitsRaw)||0);
+  const newUnits=readUnits();
+  if(!newUnits.length)newUnits.push({name:'',beds:null});
+  const today=new Date().toISOString().slice(0,10);
   if(editCustId){
     const c=DB.customers.find(x=>x.id===editCustId);
     c.name=name;c.company=document.getElementById('c-co').value.trim();c.email=document.getElementById('c-email').value.trim();
-    if(unitsVal!==null && unitsVal!==(c.units??null)){
+    if(JSON.stringify(normalizeUnits(c.units))!==JSON.stringify(newUnits)){
       if(!c.unitsHistory)c.unitsHistory=[];
-      c.unitsHistory.push({date:new Date().toISOString().slice(0,10),from:c.units??null,to:unitsVal});
+      c.unitsHistory.push({date:today,snapshot:newUnits});
     }
-    c.units=unitsVal;
+    c.units=newUnits;
   }else{
     newId='c'+Date.now();
     const newCust={id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8};
-    if(unitsVal!==null){newCust.units=unitsVal;newCust.unitsHistory=[{date:new Date().toISOString().slice(0,10),from:null,to:unitsVal}];}
+    newCust.units=newUnits;
+    newCust.unitsHistory=[{date:today,snapshot:newUnits}];
     DB.customers.push(newCust);
   }
   persist();window._formDirty=false;closeOverlay('cust-modal');showToast(editCustId?'Customer updated.':'Customer added!');
@@ -1177,7 +1225,8 @@ function renderCustomers(){
     custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const ba=(ia?.lines?.[0]?.qty)||0,bb=(ib?.lines?.[0]?.qty)||0;return sort==='beds-desc'?bb-ba:ba-bb;});
   }
   else if(sort==='units-desc'||sort==='units-asc'){
-    custs.sort((a,b)=>{const ua=a.units??-1,ub=b.units??-1;return sort==='units-desc'?ub-ua:ua-ub;});
+    const uCnt=c=>Array.isArray(c.units)?c.units.length:(typeof c.units==='number'?c.units:1);
+    custs.sort((a,b)=>sort==='units-desc'?uCnt(b)-uCnt(a):uCnt(a)-uCnt(b));
   }
   else if(sort==='ppb-desc'||sort==='ppb-asc'){
     const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
@@ -1198,7 +1247,7 @@ function renderCustomers(){
       <td class="cp-name-cell" style="font-weight:600" onclick="openCustProfile('${c.id}')">⊡ ${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
       <td class="muted">${c.company||'—'}</td>
       <td class="r">${beds??'—'}</td>
-      <td class="r">${c.units!=null?c.units:'—'}</td>
+      <td class="r">${Array.isArray(c.units)?c.units.length:(c.units!=null?c.units:'1')}</td>
       <td class="r">${ppb?fmtGBP(ppb):'—'}</td>
       <td class="muted" style="font-size:12px">${latestMoFmt}</td>
       <td class="r">${invs.length}</td><td class="r">${tot?fmtGBP(tot):'—'}</td>
@@ -2968,6 +3017,110 @@ function doExport(){
 }
 
 // ── Customer Matrix Export ────────────────────────────────────────────
+function openUnitsExport(){
+  // Populate month pickers same as matrix
+  const mos=[];
+  const now=new Date();
+  for(let i=0;i<24;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);mos.push(d.toISOString().slice(0,7));}
+  mos.reverse();
+  const fromEl=document.getElementById('units-from');
+  const toEl=document.getElementById('units-to');
+  [fromEl,toEl].forEach(sel=>{sel.innerHTML=mos.map(m=>{const d=new Date(m+'-01');return`<option value="${m}">${d.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</option>`;}).join('');});
+  const curMo=now.toISOString().slice(0,7);
+  fromEl.value=mos[0];
+  toEl.value=curMo;
+  showOverlay('units-modal');
+}
+function exportUnitsXlsx(){
+  const fromVal=document.getElementById('units-from').value;
+  const toVal=document.getElementById('units-to').value;
+  if(!fromVal||!toVal){showToast('Select a date range.');return;}
+  // Build month list
+  const months2=[];
+  let [fy,fm]=fromVal.split('-').map(Number);
+  const [ty,tm]=toVal.split('-').map(Number);
+  while(fy<ty||(fy===ty&&fm<=tm)){
+    months2.push(`${fy}-${String(fm).padStart(2,'0')}`);
+    fm++;if(fm>12){fm=1;fy++;}
+  }
+  const monthLabels2=months2.map(m=>{const d=new Date(m+'-01');return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});});
+  const mk2=d=>{if(!d)return'';return d.slice(0,7);};
+  const invs2=DB.invoices.filter(i=>i.isRecurring&&!i.deleted);
+  function uNorm2(raw){if(Array.isArray(raw))return raw;if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));return [{name:'',beds:null}];}
+  function uForMo2(c,mo){
+    const hist=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const last=mo+'-31';let snap=null;
+    for(const h of hist){if(h.date<=last)snap=h.snapshot;else break;}
+    return snap||uNorm2(c.units);
+  }
+  const activeInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m);
+  const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>activeInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Sheet 1: Units by Month
+  const hdr=['Customer','Unit Name',...monthLabels2,'Current Beds'];
+  const rows=[hdr];
+  let gBeds=Object.fromEntries(months2.map(m=>[m,0]));
+  custs2.forEach(c=>{
+    const curU=uNorm2(c.units);
+    const allNames=[...new Set([...curU.map(u=>u.name||'Unnamed'),...months2.flatMap(m=>activeInMo2(c,m)?uForMo2(c,m).map(u=>u.name||'Unnamed'):[])])];
+    allNames.forEach((uName,ui)=>{
+      const row=[ui===0?c.name:'',uName];
+      months2.forEach(m=>{
+        if(!activeInMo2(c,m)){row.push('');return;}
+        const snap=uForMo2(c,m);
+        const unit=snap.find(u=>(u.name||'Unnamed')===uName);
+        const beds=unit?.beds!=null?unit.beds:'—';
+        if(typeof beds==='number')gBeds[m]+=beds;
+        row.push(beds);
+      });
+      const cu=curU.find(u=>(u.name||'Unnamed')===uName);
+      row.push(cu?.beds!=null?cu.beds:'—');
+      rows.push(row);
+    });
+    // Subtotal per customer
+    const sub=['','↳ Total ('+c.name+')'];
+    months2.forEach(m=>{
+      if(!activeInMo2(c,m)){sub.push('');return;}
+      sub.push(uForMo2(c,m).reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+    });
+    sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+    rows.push(sub);
+    rows.push(Array(hdr.length).fill(''));
+  });
+  rows.push(['Grand Total','', ...months2.map(m=>gBeds[m]||'—'),'']);
+
+  // Sheet 2: Current snapshot
+  const snap2Hdr=['Customer','Unit Name','Current Beds'];
+  const snap2Rows=[snap2Hdr];
+  let snapTot=0;
+  custs2.forEach(c=>{
+    const curU=uNorm2(c.units);
+    curU.forEach((u,ui)=>{
+      snap2Rows.push([ui===0?c.name:'',u.name||'Unnamed',u.beds!=null?u.beds:'—']);
+      if(u.beds!=null)snapTot+=u.beds;
+    });
+    const cTot=curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+    snap2Rows.push(['','↳ Total',cTot||'—']);
+    snap2Rows.push(['','','']);
+  });
+  snap2Rows.push(['Grand Total','',snapTot||'—']);
+
+  dlXlsx([
+    {name:'Units by Month',rows},
+    {name:'Current Units',rows:snap2Rows}
+  ],`units_${fromVal}_to_${toVal}.xlsx`);
+  closeOverlay('units-modal');
+  showToast('Units exported!');
+}
+function setUnitsChip(nBefore){
+  const fromEl=document.getElementById('units-from');
+  const toEl=document.getElementById('units-to');
+  const now=new Date();
+  const cur=now.toISOString().slice(0,7);
+  toEl.value=cur;
+  const d=new Date(now.getFullYear(),now.getMonth()-nBefore,1);
+  fromEl.value=d.toISOString().slice(0,7);
+}
 function openMatrixExport(){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
   const now=new Date();
@@ -3057,32 +3210,47 @@ function doMatrixExport(){try{
   });
   sheets.push({name:'Price per Bed',rows:ppbRows});
 
-  // ── Sheet 4: Units per Home ──────────────────────────────────
-  // Reconstruct historical unit count by replaying unitsHistory up to last day of month
-  function unitsInMonth(c,monthKey){
-    const hist=(c.unitsHistory||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
-    const lastDay=monthKey+'-31';
-    let val=null;
-    for(const h of hist){if(h.date<=lastDay)val=h.to;else break;}
-    return val;
+  // ── Sheet 4: Units per Home (summary in matrix export) ──────────────
+  function _uNorm(raw){if(Array.isArray(raw))return raw;if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));return [{name:'',beds:null}];}
+  function _uForMo(c,mk2){
+    const hist2=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const last=mk2+'-31';let snap=null;
+    for(const h of hist2){if(h.date<=last)snap=h.snapshot;else break;}
+    return snap||_uNorm(c.units);
   }
-  const allCusts=DB.customers.filter(x=>x.active!==false);
-  const unitsCusts=allCusts.filter(c=>c.units!=null||(c.unitsHistory||[]).length>0).sort((a,b)=>a.name.localeCompare(b.name));
-  const unitsHdr=['Customer',...monthLabels,'Current Units'];
+  const allCusts2=DB.customers.filter(x=>x.active!==false);
+  const activeInMo=(c,m)=>invs.some(i=>i.customerId===c.id&&i.isRecurring&&mk(i.date)===m);
+  const unitsCusts2=allCusts2.filter(c=>months.some(m=>activeInMo(c,m))).sort((a,b)=>a.name.localeCompare(b.name));
+  const unitsHdr=['Customer','Unit Name',...monthLabels,'Current Beds'];
   const unitsRows=[unitsHdr];
-  const mGrandUnits=Object.fromEntries(months.map(m=>[m,0]));
-  const mHasData=Object.fromEntries(months.map(m=>[m,false]));
-  unitsCusts.forEach(c=>{
-    const row=[c.name];
-    months.forEach(m=>{
-      const u=unitsInMonth(c,m);
-      if(u!=null){mGrandUnits[m]+=u;mHasData[m]=true;}
-      row.push(u!=null?u:'—');
+  let grandBeds2=Object.fromEntries(months.map(m=>[m,0]));
+  unitsCusts2.forEach(c=>{
+    const curU=_uNorm(c.units);
+    const allNames=[...new Set([...curU.map(u=>u.name||'Unnamed'),...months.flatMap(m=>activeInMo(c,m)?_uForMo(c,m).map(u=>u.name||'Unnamed'):[])])];
+    allNames.forEach((uName,ui)=>{
+      const row=[ui===0?c.name:'',uName];
+      months.forEach(m=>{
+        if(!activeInMo(c,m)){row.push('');return;}
+        const snap=_uForMo(c,m);
+        const unit=snap.find(u=>(u.name||'Unnamed')===uName);
+        const beds=unit?.beds!=null?unit.beds:'—';
+        if(typeof beds==='number')grandBeds2[m]+=beds;
+        row.push(beds);
+      });
+      const cu=curU.find(u=>(u.name||'Unnamed')===uName);
+      row.push(cu?.beds!=null?cu.beds:'—');
+      unitsRows.push(row);
     });
-    row.push(c.units!=null?c.units:'—');
-    unitsRows.push(row);
+    const sub=['','↳ Total ('+c.name+')'];
+    months.forEach(m=>{
+      if(!activeInMo(c,m)){sub.push('');return;}
+      sub.push(_uForMo(c,m).reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+    });
+    sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
+    unitsRows.push(sub);
+    unitsRows.push(Array(unitsHdr.length).fill(''));
   });
-  unitsRows.push(['Total',...months.map(m=>mHasData[m]?mGrandUnits[m]:'—'),'']);
+  unitsRows.push(['Grand Total','',...months.map(m=>grandBeds2[m]||'—'),'']);
   sheets.push({name:'Units per Home',rows:unitsRows});
 
   // ── Per-month detail sheets ──────────────────────────────────────
@@ -4173,26 +4341,51 @@ function openCustProfile(id){
   }
 
   // Units section
-  const unitsSec=document.getElementById('cp-units-section')||document.createElement('div');
-  unitsSec.id='cp-units-section';
-  const unitsWrap=document.getElementById('cp-units-wrap');
-  if(unitsWrap){
-    const u=c.units!=null?c.units:null;
-    const hist=(c.unitsHistory||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
-    unitsWrap.innerHTML=`<div style="display:flex;align-items:center;gap:14px;margin-bottom:${hist.length?'10px':'0'}">
-      <div style="font-size:24px;font-weight:300;color:var(--ink1);font-family:var(--serif)">${u!=null?u:'—'}</div>
-      <div style="font-size:12px;color:var(--ink3)">current unit${u!==1?'s':''}</div>
-      ${hist.length?`<button onclick="document.getElementById('cp-units-hist').style.display=document.getElementById('cp-units-hist').style.display==='none'?'block':'none'" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:12px;color:var(--teal)">History ▾</button>`:''}
-    </div>
-    ${hist.length?`<div id="cp-units-hist" style="display:none;background:var(--surface2,var(--bg2));border-radius:8px;padding:10px 12px;font-size:12px;font-family:var(--mono)">
-      ${hist.map(h=>`<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
-        <span style="color:var(--ink3);min-width:90px">${h.date}</span>
-        <span style="color:var(--ink2)">${h.from!=null?h.from:'—'} → ${h.to!=null?h.to:'—'} units</span>
-      </div>`).join('')}
-    </div>`:''}`;
+  // Units section
+  const unitsWrap2=document.getElementById('cp-units-wrap');
+  if(unitsWrap2){
+    const selMo2=(typeof selMo!=='undefined'?selMo:null)||new Date().toISOString().slice(0,7);
+    const uArr=unitsForMonth(c,selMo2);
+    const hist=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>b.date.localeCompare(a.date));
+    const totalBeds=uArr.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+    let htmUnits='';
+    if(uArr.length){
+      htmUnits+=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:${hist.length?'10px':'0'}">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:4px 8px 4px 0;color:var(--ink3);font-weight:500">Unit Name</th>
+          <th style="text-align:right;padding:4px 0;color:var(--ink3);font-weight:500">Beds</th>
+        </tr></thead><tbody>`;
+      uArr.forEach(u=>{
+        htmUnits+=`<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:5px 8px 5px 0">${u.name||'<span style=\'color:var(--ink3)\'>Unnamed unit</span>'}</td>
+          <td style="text-align:right;font-family:var(--mono)">${u.beds!=null?u.beds:'—'}</td>
+        </tr>`;
+      });
+      htmUnits+=`<tr style="font-weight:600;border-top:2px solid var(--border2)">
+        <td style="padding:5px 8px 5px 0">Total</td>
+        <td style="text-align:right;font-family:var(--mono)">${totalBeds||'—'}</td>
+      </tr></tbody></table>`;
+    }else{
+      htmUnits='<div style="color:var(--ink3);font-size:13px">No units defined</div>';
+    }
+    if(hist.length){
+      htmUnits+=`<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--teal);list-style:none">History ▾</summary>
+        <div style="margin-top:6px;background:var(--surface2,var(--bg2));border-radius:8px;padding:10px 12px;font-size:12px;font-family:var(--mono)">
+        ${hist.map(h=>{
+          const snap=h.snapshot||[];
+          return `<div style="padding:4px 0;border-bottom:1px solid var(--border)">
+            <div style="color:var(--ink3);margin-bottom:2px">${h.date}</div>
+            ${snap.map(u=>`<div style="display:flex;justify-content:space-between">
+              <span>${u.name||'Unnamed'}</span><span style="color:var(--ink2)">${u.beds!=null?u.beds+' beds':'—'}</span>
+            </div>`).join('')}
+          </div>`;
+        }).join('')}
+        </div></details>`;
+    }
+    unitsWrap2.innerHTML=htmUnits;
   }
 
-  // Schedules section
+    // Schedules section
   const schedSec=document.getElementById('cp-schedules-section');
   const schedList=document.getElementById('cp-schedules-list');
   if(scheds.length){
@@ -4341,6 +4534,31 @@ document.addEventListener('DOMContentLoaded',function(){
       </div>
     </div>
   </div>
+</div>
+
+<!-- UNITS EXPORT MODAL -->
+<div class="overlay" id="units-modal">
+<div class="modal" style="width:480px">
+  <div class="modal-hdr">
+    <div><div class="modal-title">📦 Units Export</div><div style="font-size:12px;color:var(--ink3);margin-top:3px">Exports unit names &amp; bed counts per home, by month</div></div>
+    <button class="xbtn" onclick="closeOverlay('units-modal')">✕</button>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">
+    <div><label class="flbl">From</label><select class="finp" id="units-from"></select></div>
+    <div><label class="flbl">To</label><select class="finp" id="units-to"></select></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" id="units-chips">
+    <button class="chip" onclick="setUnitsChip(0)">Current month</button>
+    <button class="chip" onclick="setUnitsChip(11)">Last 12 months</button>
+    <button class="chip" onclick="setUnitsChip(5)">Last 6 months</button>
+    <button class="chip" onclick="setUnitsChip(2)">Last 3 months</button>
+  </div>
+  <div style="margin-top:6px;font-size:12px;color:var(--ink3)">Only includes customers active (with recurring invoices) in each month. Exports two sheets: <em>Units by Month</em> &amp; <em>Current Units</em>.</div>
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
+    <button class="btn btn-ghost" onclick="closeOverlay('units-modal')">Cancel</button>
+    <button class="btn btn-primary" onclick="exportUnitsXlsx()">↓ Export to Excel</button>
+  </div>
+</div>
 </div>
 
 
