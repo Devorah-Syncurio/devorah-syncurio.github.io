@@ -1162,7 +1162,7 @@ function unitsForMonth(c,monthKey){
 function renderCustEditHistory(c){
   const el=document.getElementById('c-units-history');
   if(!el)return;
-  const hist=(c?.unitsHistory||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const hist=(c?.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).slice().sort((a,b)=>b.date.localeCompare(a.date));
   if(!hist.length){el.innerHTML='';return;}
   let rows=hist.map(h=>{
     const mo=h.date.slice(0,7);
