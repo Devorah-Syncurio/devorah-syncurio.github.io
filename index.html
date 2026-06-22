@@ -3100,7 +3100,7 @@ function exportUnitsXlsx(){
   }
   const monthLabels2=months2.map(m=>{const d=new Date(m+'-01');return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});});
   const mk2=d=>{if(!d)return'';return d.slice(0,7);};
-  const invs2=DB.invoices.filter(i=>i.isRecurring&&!i.deleted);
+  const invs2=DB.invoices.filter(i=>!i.deleted);
   function uNorm2(raw){if(Array.isArray(raw)&&raw.some(u=>u.name||u.beds))return raw;if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));return [];}
   function uLatest2(c){
     const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>b.date.localeCompare(a.date));
