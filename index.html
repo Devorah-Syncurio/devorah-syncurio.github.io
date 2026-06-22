@@ -695,6 +695,7 @@ tbody tr:hover{background:var(--bg)}
         <input type="month" class="finp" id="c-units-effective" style="width:160px">
         <span style="font-size:11px;color:var(--ink3)">(month these unit details took effect)</span>
       </div>
+      <div id="c-units-history" style="margin-top:12px"></div>
     </div>
   </div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border)">
@@ -1158,6 +1159,40 @@ function unitsForMonth(c,monthKey){
   for(const h of hist){if(h.date<=lastDay)snap=h.snapshot;else break;}
   return snap||normalizeUnits(c.units);
 }
+function renderCustEditHistory(c){
+  const el=document.getElementById('c-units-history');
+  if(!el)return;
+  const hist=(c?.unitsHistory||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(!hist.length){el.innerHTML='';return;}
+  let rows=hist.map(h=>{
+    const mo=h.date.slice(0,7);
+    const d=new Date(mo+'-01');
+    const label=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    const units=(h.snapshot||[]).filter(u=>u.name||u.beds);
+    const summary=units.length?units.map(u=>`${u.name||'Unnamed'} (${u.beds||0} beds)`).join(', '):'—';
+    return `<tr style="font-size:12px">
+      <td style="padding:4px 8px;color:var(--ink2);white-space:nowrap">${label}</td>
+      <td style="padding:4px 8px;color:var(--ink1)">${summary}</td>
+      <td style="padding:4px 8px;text-align:right">
+        <button class="btn btn-ghost btn-xs" onclick="loadUnitSnapshot('${mo}')">Load</button>
+      </td>
+    </tr>`;
+  }).join('');
+  el.innerHTML=`<details style="margin-top:2px"><summary style="font-size:12px;font-weight:600;color:var(--ink2);cursor:pointer;user-select:none">History ▾ (${hist.length} entries)</summary>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px;border:1px solid var(--border);border-radius:4px">
+      <thead><tr style="font-size:11px;color:var(--ink3)"><th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Month</th><th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Units</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></details>`;
+}
+window.loadUnitSnapshot=function(mo){
+  const c=DB.customers.find(x=>x.id===editCustId);
+  if(!c)return;
+  const entry=(c.unitsHistory||[]).find(h=>h.date.slice(0,7)===mo);
+  if(!entry)return;
+  initUnitRows(normalizeUnits(entry.snapshot));
+  document.getElementById('c-units-effective').value=mo;
+  showToast('Units loaded from '+new Date(mo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}));
+};
 function openCustModal(id){
   editCustId=id||null;
   document.getElementById('cust-modal-title').textContent=id?'Edit Customer':'Add Customer';
@@ -1168,6 +1203,7 @@ function openCustModal(id){
   initUnitRows(normalizeUnits(c?.units));
   const _ef=document.getElementById('c-units-effective');
   if(_ef){const _n=new Date();_ef.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');}
+  renderCustEditHistory(c);
   openOverlay('cust-modal');
 }
 function saveCust(thenAction){
@@ -3031,15 +3067,21 @@ function doExport(){
 
 // ── Customer Matrix Export ────────────────────────────────────────────
 function openUnitsExport(){
-  // Populate month pickers same as matrix
-  const mos=[];
   const now=new Date();
-  for(let i=0;i<24;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);mos.push(d.toISOString().slice(0,7));}
-  mos.reverse();
+  const curMo=now.toISOString().slice(0,7);
+  // Find earliest month across invoices, recurring schedules, and unitsHistory
+  let earliest=curMo;
+  (DB.invoices||[]).forEach(i=>{if(i.month&&i.month<earliest)earliest=i.month;});
+  (DB.recurring||[]).forEach(s=>{if(s.month&&s.month<earliest)earliest=s.month;});
+  (DB.customers||[]).forEach(c=>(c.unitsHistory||[]).forEach(h=>{const m=h.date.slice(0,7);if(m<earliest)earliest=m;}));
+  // Generate all months from earliest to current
+  const mos=[];
+  const [ey,em]= earliest.split('-').map(Number);
+  let d=new Date(ey,em-1,1);
+  while(d.toISOString().slice(0,7)<=curMo){mos.push(d.toISOString().slice(0,7));d=new Date(d.getFullYear(),d.getMonth()+1,1);}
   const fromEl=document.getElementById('units-from');
   const toEl=document.getElementById('units-to');
-  [fromEl,toEl].forEach(sel=>{sel.innerHTML=mos.map(m=>{const d=new Date(m+'-01');return`<option value="${m}">${d.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</option>`;}).join('');});
-  const curMo=now.toISOString().slice(0,7);
+  [fromEl,toEl].forEach(sel=>{sel.innerHTML=mos.map(m=>{const dd=new Date(m+'-01');return`<option value="${m}">${dd.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</option>`;}).join('');});
   fromEl.value=mos[0];
   toEl.value=curMo;
   showOverlay('units-modal');
