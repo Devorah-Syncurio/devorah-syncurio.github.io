@@ -1200,7 +1200,19 @@ function openCustModal(id){
   document.getElementById('c-name').value=c?.name||'';
   document.getElementById('c-co').value=c?.company||'';
   document.getElementById('c-email').value=c?.email||'';
-  initUnitRows(normalizeUnits(c?.units));
+  // Pre-fill units from latest recurring invoice if no history recorded yet
+  const _validHist=(c?.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds));
+  let _initUnits=normalizeUnits(c?.units);
+  if(!_validHist.length&&c){
+    const _latestInv=DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&!i.deleted&&(i.lines||[]).length)
+      .sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(_latestInv){
+      const _beds=_latestInv.lines[0]?.qty||0;
+      const _unitName=c.company||c.name||'Unit 1';
+      _initUnits=[{name:_unitName,beds:_beds}];
+    }
+  }
+  initUnitRows(_initUnits);
   const _ef=document.getElementById('c-units-effective');
   if(_ef){const _n=new Date();_ef.value=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0');}
   renderCustEditHistory(c);
