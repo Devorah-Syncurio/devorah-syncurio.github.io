@@ -3130,6 +3130,15 @@ function exportUnitsXlsx(){
     // If month predates all history, use earliest snapshot as best approximation
     return snap||hist[0].snapshot;
   }
+  // Returns current units, or synthesises 1 unit from latest invoice beds if none saved
+  function effectiveCurU(c){
+    const cur=uLatest2(c).filter(u=>u.name||(u.beds>0));
+    if(cur.length)return cur;
+    const latestInv=invs2.filter(i=>i.customerId===c.id&&i.isRecurring&&(i.lines||[]).length)
+      .sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const beds=latestInv?latestInv.lines[0].qty:null;
+    return [{name:c.company||c.name||'Unit 1',beds:beds}];
+  }
   const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m);
   const hasDataInMo2=(c,m)=>{
     const u=uForMo2(c,m);
@@ -3176,9 +3185,8 @@ function exportUnitsXlsx(){
         rows.push(row);
       });
     } else {
-      // No unit history — use current units (curU)
-      const validCurU=curU.filter(u=>u.name||(u.beds>0));
-      const fallbackUnits=validCurU.length?validCurU:[{name:c.company||c.name||'Unit 1',beds:null}];
+      // No unit history — use effective current units (pre-filled from invoice if empty)
+      const fallbackUnits=effectiveCurU(c);
       fallbackUnits.forEach((u,ui)=>{
         const uName=u.name||'Unit 1';
         const row=[ui===0?c.name:'',uName];
@@ -3212,12 +3220,12 @@ function exportUnitsXlsx(){
   const snap2Rows=[snap2Hdr];
   let snapTot=0;
   custs2.forEach(c=>{
-    const curU=uLatest2(c);
-    curU.forEach((u,ui)=>{
+    const effU=effectiveCurU(c);
+    effU.forEach((u,ui)=>{
       snap2Rows.push([ui===0?c.name:'',u.name||'Unnamed',u.beds!=null?u.beds:'—']);
       if(u.beds!=null)snapTot+=u.beds;
     });
-    const cTot=curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
+    const cTot=effU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
     snap2Rows.push(['','↳ Total',cTot||'—']);
     snap2Rows.push(['','','']);
   });
