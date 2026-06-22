@@ -3057,6 +3057,34 @@ function doMatrixExport(){try{
   });
   sheets.push({name:'Price per Bed',rows:ppbRows});
 
+  // ── Sheet 4: Units per Home ──────────────────────────────────
+  // Reconstruct historical unit count by replaying unitsHistory up to last day of month
+  function unitsInMonth(c,monthKey){
+    const hist=(c.unitsHistory||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
+    const lastDay=monthKey+'-31';
+    let val=null;
+    for(const h of hist){if(h.date<=lastDay)val=h.to;else break;}
+    return val;
+  }
+  const allCusts=DB.customers.filter(x=>x.active!==false);
+  const unitsCusts=allCusts.filter(c=>c.units!=null||(c.unitsHistory||[]).length>0).sort((a,b)=>a.name.localeCompare(b.name));
+  const unitsHdr=['Customer',...monthLabels,'Current Units'];
+  const unitsRows=[unitsHdr];
+  const mGrandUnits=Object.fromEntries(months.map(m=>[m,0]));
+  const mHasData=Object.fromEntries(months.map(m=>[m,false]));
+  unitsCusts.forEach(c=>{
+    const row=[c.name];
+    months.forEach(m=>{
+      const u=unitsInMonth(c,m);
+      if(u!=null){mGrandUnits[m]+=u;mHasData[m]=true;}
+      row.push(u!=null?u:'—');
+    });
+    row.push(c.units!=null?c.units:'—');
+    unitsRows.push(row);
+  });
+  unitsRows.push(['Total',...months.map(m=>mHasData[m]?mGrandUnits[m]:'—'),'']);
+  sheets.push({name:'Units per Home',rows:unitsRows});
+
   // ── Per-month detail sheets ──────────────────────────────────────
   months.forEach((m,mi)=>{
     const mInvs=invs.filter(i=>mk(i.date)===m);
