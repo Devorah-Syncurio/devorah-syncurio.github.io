@@ -3133,6 +3133,23 @@ function setUnitsChip(nBefore){
   toEl.value=cur;
   const d=new Date(now.getFullYear(),now.getMonth()-nBefore,1);
   fromEl.value=d.toISOString().slice(0,7);
+  document.querySelectorAll('#units-chips .chip').forEach(b=>b.classList.remove('chip-active'));
+  event.currentTarget.classList.add('chip-active');
+}
+function setUnitsChipThisYear(){
+  const fromEl=document.getElementById('units-from');
+  const toEl=document.getElementById('units-to');
+  const now=new Date();
+  fromEl.value=`${now.getFullYear()}-01`;
+  toEl.value=now.toISOString().slice(0,7);
+  document.querySelectorAll('#units-chips .chip').forEach(b=>b.classList.remove('chip-active'));
+  event.currentTarget.classList.add('chip-active');
+}
+function setUnitsChipCustom(){
+  // Just clear active chip highlight — user sets pickers manually
+  document.querySelectorAll('#units-chips .chip').forEach(b=>b.classList.remove('chip-active'));
+  event.currentTarget.classList.add('chip-active');
+  document.getElementById('units-from').focus();
 }
 function openMatrixExport(){
   const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
@@ -4561,10 +4578,10 @@ document.addEventListener('DOMContentLoaded',function(){
     <div><label class="flbl">To</label><select class="finp" id="units-to"></select></div>
   </div>
   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap" id="units-chips">
-    <button class="chip" onclick="setUnitsChip(0)">Current month</button>
-    <button class="chip" onclick="setUnitsChip(11)">Last 12 months</button>
-    <button class="chip" onclick="setUnitsChip(5)">Last 6 months</button>
+    <button class="chip" onclick="setUnitsChipThisYear()">This year</button>
     <button class="chip" onclick="setUnitsChip(2)">Last 3 months</button>
+    <button class="chip" onclick="setUnitsChip(5)">Last 6 months</button>
+    <button class="chip" onclick="setUnitsChipCustom()">Custom</button>
   </div>
   <div style="margin-top:6px;font-size:12px;color:var(--ink3)">Only includes customers active (with recurring invoices) in each month. Exports two sheets: <em>Units by Month</em> &amp; <em>Current Units</em>.</div>
   <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
