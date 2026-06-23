@@ -2628,7 +2628,7 @@ function renderDash(){
           if(!cust)return;
           const snap=uForMoSnap(cust,b.k);
           const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-          total+=units.filter(u=>u.name||(u.beds>0)).reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+          total+=units.filter(u=>u.name||(u.beds>0)).length||1;
         });
         return total||null;
       });
@@ -3187,6 +3187,7 @@ function exportUnitsXlsx(){
   const hdr=['Customer','Unit Name',...monthLabels2];
   const rows=[hdr];
   let gBeds=Object.fromEntries(months2.map(m=>[m,0]));
+  let gUnits=Object.fromEntries(months2.map(m=>[m,0]));
   custs2.forEach(c=>{
     const curU=uForMoSnap(c,toVal);
     const hasUnitHist=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
@@ -3205,7 +3206,8 @@ function exportUnitsXlsx(){
           if(!snap||!snap.length){row.push('');return;}
           const unit=snap.find(u=>(u.name||'Unnamed')===uName);
           const beds=unit?.beds!=null?unit.beds:'—';
-          if(typeof beds==='number')gBeds[m]+=beds;
+          if(typeof beds==='number'){gBeds[m]+=beds;}
+          gUnits[m]+=1;
           row.push(beds);
         });
         rows.push(row);
@@ -3220,6 +3222,7 @@ function exportUnitsXlsx(){
           .sort((a,b)=>b.date.localeCompare(a.date))[0];
         const beds=inv&&inv.lines&&inv.lines[0]?parseFloat(inv.lines[0].qty)||null:null;
         if(beds!=null)gBeds[m]+=beds;
+        gUnits[m]+=1;
         row.push(beds!=null?beds:'—');
       });
       rows.push(row);
@@ -3242,12 +3245,14 @@ function exportUnitsXlsx(){
     rows.push(sub);
     rows.push(Array(hdr.length).fill(''));
   });
-  rows.push(['Grand Total','', ...months2.map(m=>gBeds[m]||'—')]);
+  rows.push(['Total Units (count)','', ...months2.map(m=>gUnits[m]||'—')]);
+  rows.push(['Total Beds','', ...months2.map(m=>gBeds[m]||'—')]);
 
   // Sheet 2: Clean unit breakdown for selected months — no blank rows, no subtotals, just a total
   const snap2Hdr=['Customer','Unit Name',...monthLabels2,'Total Beds'];
   const snap2Rows=[snap2Hdr];
   let snapGrandBeds=Object.fromEntries(months2.map(m=>[m,0]));
+  let snapGrandUnits=Object.fromEntries(months2.map(m=>[m,0]));
   custs2.forEach(c=>{
     const hasUnitHist2=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
     const unitsToShow=hasUnitHist2?[...new Set([
@@ -3272,15 +3277,17 @@ function exportUnitsXlsx(){
           beds=inv&&inv.lines&&inv.lines[0]?parseFloat(inv.lines[0].qty)||null:null;
         }
         if(beds!=null){snapGrandBeds[m]+=beds;rowTotal+=beds;}
+        snapGrandUnits[m]+=1;
         row.push(beds!=null?beds:'—');
       });
       row.push(rowTotal||'—');
       snap2Rows.push(row);
     });
   });
-  const snap2UnitCount=snap2Rows.length-1; // rows added so far minus header
   const snap2TotalBeds=months2.reduce((s,m)=>s+(snapGrandBeds[m]||0),0);
-  snap2Rows.push(['Grand Total ('+snap2UnitCount+' units)','', ...months2.map(m=>snapGrandBeds[m]||'—'), snap2TotalBeds||'—']);
+  const snap2TotalUnits=months2.reduce((s,m)=>s+(snapGrandUnits[m]||0),0);
+  snap2Rows.push(['Total Units (count)','', ...months2.map(m=>snapGrandUnits[m]||'—'), snap2TotalUnits||'—']);
+  snap2Rows.push(['Total Beds','', ...months2.map(m=>snapGrandBeds[m]||'—'), snap2TotalBeds||'—']);
 
   dlXlsx([
     {name:'Units by Month',rows},
