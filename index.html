@@ -2628,7 +2628,7 @@ function renderDash(){
           if(!cust)return;
           const snap=uForMoSnap(cust,b.k);
           const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-          total+=units.filter(u=>u.name||(u.beds>0)).length||1;
+          total+=units.filter(u=>u.name||(u.beds>0)).reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
         });
         return total||null;
       });
