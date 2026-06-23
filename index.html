@@ -2613,6 +2613,23 @@ function renderDash(){
           return new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId)).size;
         }
       });
+      const unitVals = bars.map(b=>{
+        let custIds;
+        if(!b.isFuture){
+          custIds=[...new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
+        } else {
+          custIds=[...new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId))];
+        }
+        let total=0;
+        custIds.forEach(cid=>{
+          const cust=DB.customers.find(x=>x.id===cid);
+          if(!cust)return;
+          const snap=uForMoSnap(cust,b.k);
+          const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+          total+=units.filter(u=>u.name||(u.beds>0)).length||1;
+        });
+        return total||null;
+      });
 
       const tdStyle = (b,val) => {
         if(!val&&val!==0) return 'color:var(--ink3)';
@@ -2643,6 +2660,7 @@ function renderDash(){
       const rows = [
         { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtGBP(v) },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
+        { label:'Units',    vals: unitVals,           fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
         { label:'Avg £/Bed',vals: avgPpbVals,         fmt: v=>(v!=null)?fmtGBP(v):'—' },
       ];
