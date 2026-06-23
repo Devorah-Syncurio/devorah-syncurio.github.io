@@ -3259,7 +3259,8 @@ function exportUnitsXlsx(){
     const hasUnitHist2=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
     const unitsToShow=hasUnitHist2?[...new Set([
       ...uForMoSnap(c,toVal).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
-      ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'))
+      ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed')),
+      ...months2.flatMap(m=>{const u=uForMoSnap(c,m);return u?u.filter(x=>x.name||(x.beds>0)).map(x=>x.name||'Unnamed'):[];})
     ])].filter(Boolean):[c.company||c.name||'Unit 1'];
     unitsToShow.forEach((uName,ui)=>{
       const row=[ui===0?c.name:'',uName];
