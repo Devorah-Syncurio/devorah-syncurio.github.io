@@ -3177,38 +3177,8 @@ function exportUnitsXlsx(){
   const monthLabels2=months2.map(m=>{const d=new Date(m+'-01');return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});});
   const mk2=d=>{if(!d)return'';return d.slice(0,7);};
   const invs2=DB.invoices.filter(i=>!i.deleted);
-  function uNorm2(raw){if(Array.isArray(raw)&&raw.some(u=>u.name||u.beds))return raw;if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));return [];}
-  function uLatest2(c){
-    const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>b.date.localeCompare(a.date));
-    return hist.length?hist[0].snapshot:uNorm2(c.units);
-  }
-  function uEarliest2(c){
-    const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>a.date.localeCompare(b.date));
-    return hist.length?hist[0].snapshot:uNorm2(c.units);
-  }
-  function uForMo2(c,mo){
-    const hist=(c.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>a.date.localeCompare(b.date));
-    if(!hist.length)return uNorm2(c.units);
-    const last=mo+'-31';let snap=null;
-    for(const h of hist){if(h.date<=last)snap=h.snapshot;else break;}
-    // If month predates all history, use earliest snapshot as best approximation
-    return snap||hist[0].snapshot;
-  }
-  // Returns current units, or synthesises 1 unit from latest invoice beds if none saved
-  function effectiveCurU(c){
-    const cur=uLatest2(c).filter(u=>u.name||(u.beds>0));
-    if(cur.length)return cur;
-    const latestInv=invs2.filter(i=>i.customerId===c.id&&i.isRecurring&&(i.lines||[]).length)
-      .sort((a,b)=>b.date.localeCompare(a.date))[0];
-    const beds=latestInv?latestInv.lines[0].qty:null;
-    return [{name:c.company||c.name||'Unit 1',beds:beds}];
-  }
+  // Use global uForMoSnap / effectiveCurUnits so export always matches dashboard
   const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring);
-  const hasDataInMo2=(c,m)=>{
-    const u=uForMo2(c,m);
-    return u&&u.length>0&&u.some(x=>x.name||x.beds!=null);
-  };
-  // Include customer if they have any invoice OR any unit history in range
   const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>hasInvInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
 
   // Sheet 1: Units by Month
@@ -3216,12 +3186,12 @@ function exportUnitsXlsx(){
   const rows=[hdr];
   let gBeds=Object.fromEntries(months2.map(m=>[m,0]));
   custs2.forEach(c=>{
-    const curU=uLatest2(c);
+    const curU=uForMoSnap(c,toVal);
     const hasUnitHist=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
     const allNames=hasUnitHist?[...new Set([
       ...curU.filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
       ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed')),
-      ...months2.flatMap(m=>{const u=uForMo2(c,m);return u?u.filter(x=>x.name||(x.beds>0)).map(x=>x.name||'Unnamed'):[];})
+      ...months2.flatMap(m=>{const u=uForMoSnap(c,m);return u?u.filter(x=>x.name||(x.beds>0)).map(x=>x.name||'Unnamed'):[];})
     ])].filter(Boolean):null;
     if(hasUnitHist&&!allNames.length)return;
     if(hasUnitHist){
@@ -3229,7 +3199,7 @@ function exportUnitsXlsx(){
         const row=[ui===0?c.name:'',uName];
         months2.forEach(m=>{
           if(!hasInvInMo2(c,m)){row.push('');return;}
-          const snap=uForMo2(c,m);
+          const snap=uForMoSnap(c,m);
           if(!snap||!snap.length){row.push('');return;}
           const unit=snap.find(u=>(u.name||'Unnamed')===uName);
           const beds=unit?.beds!=null?unit.beds:'—';
@@ -3239,7 +3209,7 @@ function exportUnitsXlsx(){
         rows.push(row);
       });
     } else {
-      const fallbackUnits=effectiveCurU(c);
+      const fallbackUnits=effectiveCurUnits(c);
       fallbackUnits.forEach((u,ui)=>{
         const uName=u.name||'Unit 1';
         const row=[ui===0?c.name:'',uName];
@@ -3255,7 +3225,7 @@ function exportUnitsXlsx(){
     const sub=['','↳ Total ('+c.name+')'];
     months2.forEach(m=>{
       if(!hasInvInMo2(c,m)){sub.push('');return;}
-      const snap=hasUnitHist?uForMo2(c,m):effectiveCurU(c);
+      const snap=hasUnitHist?uForMoSnap(c,m):effectiveCurUnits(c);
       const t=(snap||[]).reduce((s,u)=>s+(typeof u.beds==='number'?u.beds:0),0);
       sub.push(t>0?t:'—');
     });
@@ -3271,15 +3241,15 @@ function exportUnitsXlsx(){
   custs2.forEach(c=>{
     const hasUnitHist2=!!(c.unitsHistory||[]).filter(h=>(h.snapshot||[]).some(u=>u.name||u.beds)).length;
     const unitsToShow=hasUnitHist2?[...new Set([
-      ...uLatest2(c).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
+      ...uForMoSnap(c,toVal).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'),
       ...(c.unitsHistory||[]).flatMap(h=>(h.snapshot||[]).filter(u=>u.name||(u.beds>0)).map(u=>u.name||'Unnamed'))
-    ])].filter(Boolean):effectiveCurU(c).map(u=>u.name||'Unit 1');
+    ])].filter(Boolean):effectiveCurUnits(c).map(u=>u.name||'Unit 1');
     unitsToShow.forEach((uName,ui)=>{
       const row=[ui===0?c.name:'',uName];
       let rowTotal=0;
       months2.forEach(m=>{
         if(!hasInvInMo2(c,m)){row.push('');return;}
-        const snap=hasUnitHist2?uForMo2(c,m):effectiveCurU(c);
+        const snap=hasUnitHist2?uForMoSnap(c,m):effectiveCurUnits(c);
         const unit=Array.isArray(snap)?snap.find(u=>(u.name||'Unit 1')===uName):null;
         const beds=unit?.beds!=null?unit.beds:null;
         if(beds!=null){snapGrandBeds[m]+=beds;rowTotal+=beds;}
