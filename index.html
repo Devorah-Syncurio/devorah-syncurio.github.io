@@ -3245,8 +3245,25 @@ function exportUnitsXlsx(){
     rows.push(sub);
     rows.push(Array(hdr.length).fill(''));
   });
-  rows.push(['Total Units (count)','', ...months2.map(m=>gUnits[m]||'—')]);
-  rows.push(['Total Beds','', ...months2.map(m=>gBeds[m]||'—')]);
+  // Grand totals — computed using exact same formula as the dashboard trend table
+  const dashBeds2=Object.fromEntries(months2.map(m=>[m,
+    Math.round(invs2.filter(i=>mk2(i.date)===m&&i.isRecurring&&i.lines&&i.lines.length)
+      .reduce((s,i)=>s+(parseFloat(i.lines[0].qty)||0),0))
+  ]));
+  const dashUnits2=Object.fromEntries(months2.map(m=>[m,(()=>{
+    const cids=[...new Set(invs2.filter(i=>mk2(i.date)===m&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
+    let t=0;
+    cids.forEach(cid=>{
+      const cust=DB.customers.find(x=>x.id===cid);
+      if(!cust)return;
+      const snap=uForMoSnap(cust,m);
+      const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+      t+=units.filter(u=>u.name||(u.beds>0)).length||1;
+    });
+    return t;
+  })()]));
+  rows.push(['Total Units (count)','', ...months2.map(m=>dashUnits2[m]||'—')]);
+  rows.push(['Total Beds','', ...months2.map(m=>dashBeds2[m]||'—')]);
 
   // Sheet 2: Clean unit breakdown for selected months — no blank rows, no subtotals, just a total
   const snap2Hdr=['Customer','Unit Name',...monthLabels2,'Total Beds'];
@@ -3284,10 +3301,9 @@ function exportUnitsXlsx(){
       snap2Rows.push(row);
     });
   });
-  const snap2TotalBeds=months2.reduce((s,m)=>s+(snapGrandBeds[m]||0),0);
-  const snap2TotalUnits=months2.reduce((s,m)=>s+(snapGrandUnits[m]||0),0);
-  snap2Rows.push(['Total Units (count)','', ...months2.map(m=>snapGrandUnits[m]||'—'), snap2TotalUnits||'—']);
-  snap2Rows.push(['Total Beds','', ...months2.map(m=>snapGrandBeds[m]||'—'), snap2TotalBeds||'—']);
+  // Grand totals — same formula as dashboard
+  snap2Rows.push(['Total Units (count)','', ...months2.map(m=>dashUnits2[m]||'—'), months2.reduce((s,m)=>s+(dashUnits2[m]||0),0)||'—']);
+  snap2Rows.push(['Total Beds','', ...months2.map(m=>dashBeds2[m]||'—'), months2.reduce((s,m)=>s+(dashBeds2[m]||0),0)||'—']);
 
   dlXlsx([
     {name:'Units by Month',rows},
