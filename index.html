@@ -2137,13 +2137,10 @@ function renderDash(){
       avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
     }
     // Total named units across active customers for selected month
-    const bedSvcTypes2=new Set(['Residents','Residents and HR','HR and Governance']);
-    const skipSvcTypes2=new Set(['Tablets','Training','Onboarding','Other']);
-    const recurringCustIds3=new Set((DB.recurring||[]).map(r=>r.customerId));
     const activeCustomerIds=[...new Set(
       (isFutureDash
         ? (buildForecast(0,key,key)[0]?.items||[]).map(x=>x.customerId)
-        : DB.invoices.filter(i=>mk(i.date)===key&&!i.deleted&&(i.isRecurring||bedSvcTypes2.has(i.serviceType)||(!i.serviceType&&recurringCustIds3.has(i.customerId)))).map(i=>i.customerId)
+        : DB.invoices.filter(i=>mk(i.date)===key&&!i.deleted&&i.isRecurring).map(i=>i.customerId)
       )
     )];
     let totalUnits=0;
@@ -3188,16 +3185,13 @@ function exportUnitsXlsx(){
     const beds=latestInv?latestInv.lines[0].qty:null;
     return [{name:c.company||c.name||'Unit 1',beds:beds}];
   }
-  const bedSvcTypes=new Set(['Residents','Residents and HR','HR and Governance']);
-  const skipSvcTypes=new Set(['Tablets','Training','Onboarding','Other']);
-  const recurringCustIds2=new Set((DB.recurring||[]).map(r=>r.customerId));
-  const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m&&(i.isRecurring||bedSvcTypes.has(i.serviceType)||(!i.serviceType&&recurringCustIds2.has(c.id))));
+  const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring);
   const hasDataInMo2=(c,m)=>{
     const u=uForMo2(c,m);
     return u&&u.length>0&&u.some(x=>x.name||x.beds!=null);
   };
   // Include customer if they have any invoice OR any unit history in range
-  const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>hasInvInMo2(x,m)||hasDataInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
+  const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>hasInvInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
 
   // Sheet 1: Units by Month
   const hdr=['Customer','Unit Name',...monthLabels2];
