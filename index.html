@@ -1143,14 +1143,7 @@ function uForMoSnap(c,mo){
   const last=mo+'-31';let snap=null;
   for(const h of hist){if(h.date<=last)snap=h.snapshot;else break;}
   if(snap)return snap.filter(u=>u.name||(u.beds>0));
-  // Month is before earliest history — fall back to invoice first-line qty for that month
-  const inv=(DB.invoices||[]).filter(i=>i.customerId===c.id&&(i.date||'').slice(0,7)===mo&&i.isRecurring&&!i.deleted&&(i.lines||[]).length)
-    .sort((a,b)=>b.date.localeCompare(a.date))[0];
-  if(inv){
-    const beds=parseFloat(inv.lines[0].qty)||0;
-    return beds>0?[{name:c.company||c.name||'Unit 1',beds}]:[];
-  }
-  // Last resort: earliest snapshot
+  // Month is before earliest history — use earliest snapshot (preserves named unit structure)
   return hist[0].snapshot.filter(u=>u.name||(u.beds>0));
 }
 function effectiveCurUnits(c){
