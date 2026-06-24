@@ -3427,49 +3427,6 @@ function doMatrixExport(){try{
   });
   sheets.push({name:'Price per Bed',rows:ppbRows});
 
-  // ── Sheet 4: Units per Home (summary in matrix export) ──────────────
-  function _uNorm(raw){if(Array.isArray(raw))return raw;if(typeof raw==='number'&&raw>0)return Array.from({length:raw},(_,i)=>({name:'Unit '+(i+1),beds:null}));return [{name:'',beds:null}];}
-  function _uForMo(c,mk2){
-    const hist2=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>a.date.localeCompare(b.date));
-    const last=mk2+'-31';let snap=null;
-    for(const h of hist2){if(h.date<=last)snap=h.snapshot;else break;}
-    return snap||_uNorm(c.units);
-  }
-  const allCusts2=DB.customers.filter(x=>x.active!==false);
-  const activeInMo=(c,m)=>invs.some(i=>i.customerId===c.id&&i.isRecurring&&mk(i.date)===m);
-  const unitsCusts2=allCusts2.filter(c=>months.some(m=>activeInMo(c,m))).sort((a,b)=>a.name.localeCompare(b.name));
-  const unitsHdr=['Customer','Unit Name',...monthLabels,'Current Beds'];
-  const unitsRows=[unitsHdr];
-  let grandBeds2=Object.fromEntries(months.map(m=>[m,0]));
-  unitsCusts2.forEach(c=>{
-    const curU=_uNorm(c.units);
-    const allNames=[...new Set([...curU.map(u=>u.name||'Unnamed'),...months.flatMap(m=>activeInMo(c,m)?_uForMo(c,m).map(u=>u.name||'Unnamed'):[])])];
-    allNames.forEach((uName,ui)=>{
-      const row=[ui===0?c.name:'',uName];
-      months.forEach(m=>{
-        if(!activeInMo(c,m)){row.push('');return;}
-        const snap=_uForMo(c,m);
-        const unit=snap.find(u=>(u.name||'Unnamed')===uName);
-        const beds=unit?.beds!=null?unit.beds:'—';
-        if(typeof beds==='number')grandBeds2[m]+=beds;
-        row.push(beds);
-      });
-      const cu=curU.find(u=>(u.name||'Unnamed')===uName);
-      row.push(cu?.beds!=null?cu.beds:'—');
-      unitsRows.push(row);
-    });
-    const sub=['','↳ Total ('+c.name+')'];
-    months.forEach(m=>{
-      if(!activeInMo(c,m)){sub.push('');return;}
-      sub.push(_uForMo(c,m).reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
-    });
-    sub.push(curU.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0)||'—');
-    unitsRows.push(sub);
-    unitsRows.push(Array(unitsHdr.length).fill(''));
-  });
-  unitsRows.push(['Grand Total','',...months.map(m=>grandBeds2[m]||'—'),'']);
-  sheets.push({name:'Units per Home',rows:unitsRows});
-
   // ── Per-month detail sheets ──────────────────────────────────────
   months.forEach((m,mi)=>{
     const mInvs=invs.filter(i=>mk(i.date)===m);
