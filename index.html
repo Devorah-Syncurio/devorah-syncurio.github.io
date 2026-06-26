@@ -545,6 +545,7 @@ tbody tr:hover{background:var(--bg)}
             <th class="r" onclick="setCustSort('units-desc','units-asc',this)">Units <span class="sort-icon">⇅</span></th>
             <th class="r" onclick="setCustSort('ppb-desc','ppb-asc',this)">£/bed <span class="sort-icon">⇅</span></th>
             <th>Latest month</th>
+            <th>Date added</th>
             <th class="r">Invoices</th>
             <th class="r" onclick="setCustSort('total-desc','total-asc',this)">Total billed <span class="sort-icon">⇅</span></th>
             <th></th>
@@ -1271,7 +1272,7 @@ function saveCust(thenAction){
     c.units=newUnits;
   }else{
     newId='c'+Date.now();
-    const newCust={id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8};
+    const newCust={id:newId,name,company:document.getElementById('c-co').value.trim(),email:document.getElementById('c-email').value.trim(),ci:DB.customers.length%8,createdAt:new Date().toISOString()};
     newCust.units=newUnits;
     newCust.unitsHistory=[{date:_efVal,snapshot:newUnits}];
     DB.customers.push(newCust);
@@ -1342,6 +1343,7 @@ function renderCustomers(){
       <td class="r">${Array.isArray(c.units)?c.units.length:(c.units!=null?c.units:'1')}</td>
       <td class="r">${ppb?fmtGBP(ppb):'—'}</td>
       <td class="muted" style="font-size:12px">${latestMoFmt}</td>
+      <td class="muted" style="font-size:12px">${c.createdAt?new Date(c.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'-'}</td>
       <td class="r">${invs.length}</td><td class="r">${tot?fmtGBP(tot):'—'}</td>
       <td><div style="display:flex;gap:6px">
         <button class="btn btn-ghost btn-xs" onclick="openInvModal(null,false,'${c.id}')">+ Invoice</button>
@@ -4476,6 +4478,8 @@ function openCustProfile(id){
   document.getElementById('cp-name').textContent=c.name;
   const subParts=[c.company,c.email].filter(Boolean);
   document.getElementById('cp-company').textContent=subParts.join(' · ')||'No additional details';
+  const cpAdded=document.getElementById('cp-added');
+  if(cpAdded)cpAdded.textContent=c.createdAt?'Added '+new Date(c.createdAt).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}):'';
 
   // Action buttons
   document.getElementById('cp-edit-btn').onclick=()=>{closeOverlay('cust-profile-overlay');openCustModal(id);};
@@ -4745,6 +4749,7 @@ document.addEventListener('DOMContentLoaded',function(){
         <div>
           <div class="modal-title" id="cp-name">Customer</div>
           <div class="modal-sub" id="cp-company"></div>
+          <div id="cp-added" style="font-size:11px;color:var(--ink3);margin-top:2px"></div>
         </div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
