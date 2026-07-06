@@ -2202,23 +2202,18 @@ function renderDash(){
   // When a future month is selected, use recurring forecast for "this month" figures
   const thisFc=isFutureDash?buildForecast(0,key,key):null;
   const thisFcMonth=thisFc&&thisFc.length?thisFc[0]:null;
-  const thisMonthEx  = isFutureDash?(thisFcMonth?thisFcMonth.recurSub:0):recurEx;
-  const thisMonthInc = isFutureDash?(thisFcMonth?thisFcMonth.recurTotal:0):recurTotal;
-  const thisMonthCnt = isFutureDash?(thisFcMonth?thisFcMonth.items.length:0):recurInvs.length;
-  const extrasEx  = isFutureDash ? 0 : (totalEx - recurEx);
-  const extrasInc = isFutureDash ? 0 : (total - recurTotal);
+  const thisMonthEx  = isFutureDash?(thisFcMonth?thisFcMonth.recurSub:0):totalEx;
+  const thisMonthInc = isFutureDash?(thisFcMonth?thisFcMonth.recurTotal:0):total;
+  const thisMonthCnt = isFutureDash?(thisFcMonth?thisFcMonth.items.length:0):invs.length;
   const thisMonthLbl = isFutureDash
     ?`Predicted ${new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'})}`
     :'This month invoiced';
-  if(document.getElementById('ds-total-lbl'))document.getElementById('ds-total-lbl').textContent=thisMonthLbl;
+  if(document.getElementById('ds-total-lbl'))document.getElementById('ds-total-lbl').textContent=isFutureDash?thisMonthLbl:'This month invoiced (incl. extras)';
 
   // ex VAT = big number, inc VAT = small sub
   document.getElementById('ds-total').textContent=fmtPound(thisMonthEx)+' ex. VAT';
   document.getElementById('ds-total-ex').textContent=fmtPound(thisMonthInc)+' inc. VAT';
-  const extrasBracket = extrasEx > 0.005
-    ? ` (${fmtPound(totalEx)} inc. extras)`
-    : '';
-  document.getElementById('ds-count').textContent=(isFutureDash?'~':'')+thisMonthCnt+(isFutureDash?' recurring schedule':' invoice')+(thisMonthCnt!==1?'s':'')+extrasBracket;
+  document.getElementById('ds-count').textContent=(isFutureDash?'~':'')+thisMonthCnt+(isFutureDash?' recurring schedule':' invoice')+(thisMonthCnt!==1?'s':'');
   document.getElementById('ds-next').textContent=fmtPound(nextTotalEx)+' ex. VAT';
   document.getElementById('ds-next-ex').textContent=fmtPound(nextTotal)+' inc. VAT';
   document.getElementById('ds-next-sub').textContent=nextCount+' recurring schedule'+(nextCount!==1?'s':'');
