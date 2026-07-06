@@ -968,6 +968,7 @@ const fmtGBP=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,m
 const fmtShort=n=>{if(n>=1000000)return'£'+(n/1e6).toFixed(1)+'m';if(n>=10000)return'£'+(n/1000).toFixed(0)+'k';return'£'+Math.round(n).toLocaleString('en-GB');};
 const fmtPound=n=>'£'+Math.round(n).toLocaleString('en-GB');
 const fmtD=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
+const fmtMo=d=>d?new Date((d.slice(0,7)+'-15')+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
 const fmtDfull=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
 const mk=d=>d?d.substring(0,7):'';
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -4174,7 +4175,7 @@ function renderCommission(){
     const typeBadge=r.commissionType==='recurring'?`<span class="badge b-recur">↻ recurring</span>`:`<span class="badge b-period">one-off</span>`;
     const linkedBadge=r.entryType==='linked'?`<span class="badge b-active" style="font-size:10px;margin-left:4px">linked</span>`:'';
     const periodLabel=r.commissionType==='recurring'&&r.endDate
-      ?`<div style="font-size:11px;color:var(--ink3)">${fmtD(r.startDate)} – ${fmtD(r.endDate)}</div>`
+      ?`<div style="font-size:11px;color:var(--ink3)">${fmtMo(r.startDate)} – ${fmtMo(r.endDate)}</div>`
       :``;
     const spCells=spCols.map(sp=>{
       const e=r.salespersonEntries.find(x=>x.spId===sp.id);
@@ -4187,8 +4188,8 @@ function renderCommission(){
       ${spCells}
       <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(r.totalCommission)}</td>
       <td>${typeBadge}</td>
-      <td class="muted" style="font-size:12px"><div>${fmtD(r.startDate)}</div>${periodLabel}</td>
-      <td class="muted" style="font-size:12px">${r.endDate&&r.commissionType!=='recurring'?fmtD(r.endDate):'—'}</td>
+      <td class="muted" style="font-size:12px"><div>${fmtMo(r.startDate)}</div>${periodLabel}</td>
+      <td class="muted" style="font-size:12px">${r.endDate&&r.commissionType!=='recurring'?fmtMo(r.endDate):'—'}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-ghost btn-xs" onclick="openCommModal('${r.id}')">Edit</button>
         <button class="btn btn-danger btn-xs" onclick="deleteComm('${r.id}')">Del</button>
