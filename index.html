@@ -586,8 +586,8 @@ tbody tr:hover{background:var(--bg)}
             <th class="r">Invoice Total (ex VAT)</th>
             <th class="r">Total Commission</th>
             <th>Type</th>
-            <th>Start Date</th>
-            <th>End Date</th>
+            <th>Start Month</th>
+            <th>End Month</th>
             <th></th>
           </tr></thead>
           <tbody id="comm-tbody"></tbody>
@@ -4164,8 +4164,8 @@ function renderCommission(){
       ${spCols.map(sp=>`<th class="r" style="font-size:12px">${sp.name}<br><span style="font-weight:400;color:var(--ink3)">commission</span></th>`).join('')}
       <th class="r">Total Commission</th>
       <th>Type</th>
-      <th>Start Date</th>
-      <th>End Date</th>
+      <th>Start Month</th>
+      <th>End Month</th>
       <th></th>
     </tr>`;
   }
