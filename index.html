@@ -865,8 +865,8 @@ tbody tr:hover{background:var(--bg)}
           <option value="one-off">One-off</option>
         </select>
       </div>
-      <div class="fg"><label class="flbl">Start Date *</label><input type="date" class="finp" id="comm-start"></div>
-      <div class="fg"><label class="flbl">End Date</label><input type="date" class="finp" id="comm-end"><span class="fhint">Leave blank if open-ended or one-off</span></div>
+      <div class="fg"><label class="flbl">Start Month *</label><input type="month" class="finp" id="comm-start"></div>
+      <div class="fg"><label class="flbl">End Month</label><input type="month" class="finp" id="comm-end"><span class="fhint">Leave blank if open-ended or one-off</span></div>
       <div class="fg full"><label class="flbl">Notes</label><input type="text" class="finp" id="comm-notes" placeholder="Optional"></div>
     </div>
   </div>
@@ -3855,7 +3855,7 @@ function onCommInvSelect(){
     document.getElementById('comm-desc').value=(c?.name||'')+(inv.serviceType?' — '+inv.serviceType:'');
   }
   if(!document.getElementById('comm-start').value){
-    document.getElementById('comm-start').value=inv.date;
+    document.getElementById('comm-start').value=inv.date.slice(0,7);
   }
   recalcComm();
 }
@@ -3957,7 +3957,7 @@ function openCommForInvoice(invId){
   document.getElementById('comm-customer').value=c?.name||'';
   document.getElementById('comm-inv-total').value=f2(inv.subtotal);
   document.getElementById('comm-desc').value=(c?.name||'')+(inv.serviceType?' — '+inv.serviceType:'');
-  document.getElementById('comm-start').value=inv.date;
+  document.getElementById('comm-start').value=inv.date.slice(0,7);
   document.getElementById('comm-type-sel').value='one-off';
   recalcComm();
   showTab('commission');
@@ -3977,8 +3977,8 @@ function openCommModal(id){
   document.getElementById('comm-customer').value=c?.customer||'';
   document.getElementById('comm-inv-total').value=c?f2(c.invoiceTotalExVat):'';
   document.getElementById('comm-type-sel').value=c?.commissionType||'recurring';
-  document.getElementById('comm-start').value=c?.startDate||today();
-  document.getElementById('comm-end').value=c?.endDate||'';
+  document.getElementById('comm-start').value=(c?.startDate||today()).slice(0,7);
+  document.getElementById('comm-end').value=(c?.endDate||'').slice(0,7);
   document.getElementById('comm-notes').value=c?.notes||'';
   // Salespeople rows
   buildCommSpRows(c?c.salespersonEntries.map(e=>({spId:e.spId,pct:e.pct})):null);
@@ -3991,7 +3991,7 @@ function saveComm(){
   const invTotal=parseFloat(document.getElementById('comm-inv-total').value)||0;
   const startDate=document.getElementById('comm-start').value;
   if(!desc){showToast('Please enter a description.');return;}
-  if(!startDate){showToast('Please set a start date.');return;}
+  if(!startDate){showToast('Please set a start month.');return;}
   if(!invTotal){showToast('Please enter the invoice total (ex VAT).');return;}
   const entryType=document.getElementById('comm-type-linked').checked?'linked':'standalone';
   const invoiceId=entryType==='linked'?document.getElementById('comm-inv-sel').value:'';
