@@ -1315,7 +1315,7 @@ function renderCustomers(){
   }
   else if(sort==='beds-desc'||sort==='beds-asc'){
     const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const ba=(ia?.lines?.[0]?.qty)||0,bb=(ib?.lines?.[0]?.qty)||0;return sort==='beds-desc'?bb-ba:ba-bb;});
+    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const _sa=ia?uForMoSnap(a,mk(ia.date||'')):null;const _sb=ib?uForMoSnap(b,mk(ib.date||'')):null;const ba=_sa&&_sa.length?_sa.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ia?.lines?.[0]?.qty||0),bb=_sb&&_sb.length?_sb.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ib?.lines?.[0]?.qty||0);return sort==='beds-desc'?bb-ba:ba-bb;});
   }
   else if(sort==='units-desc'||sort==='units-asc'){
     const uCnt=c=>Array.isArray(c.units)?c.units.length:(typeof c.units==='number'?c.units:1);
@@ -1323,7 +1323,7 @@ function renderCustomers(){
   }
   else if(sort==='ppb-desc'||sort==='ppb-asc'){
     const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const ba=(ia?.lines?.[0]?.qty)||0,bb=(ib?.lines?.[0]?.qty)||0;const pa=ba?(ia.subtotal||0)/ba:0,pb=bb?(ib.subtotal||0)/bb:0;return sort==='ppb-desc'?pb-pa:pa-pb;});
+    custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const _sa=ia?uForMoSnap(a,mk(ia.date||'')):null;const _sb=ib?uForMoSnap(b,mk(ib.date||'')):null;const ba=_sa&&_sa.length?_sa.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ia?.lines?.[0]?.qty||0),bb=_sb&&_sb.length?_sb.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ib?.lines?.[0]?.qty||0);const _isuba=ia?(ia.subtotal!=null?ia.subtotal:(ia.sub||(ia.total||0)/(1+(ia.vatRate||20)/100))):0;const _isubb=ib?(ib.subtotal!=null?ib.subtotal:(ib.sub||(ib.total||0)/(1+(ib.vatRate||20)/100))):0;const pa=ba?_isuba/ba:0,pb=bb?_isubb/bb:0;return sort==='ppb-desc'?pb-pa:pa-pb;});
   }
   tb.innerHTML=custs.map(c=>{
     const invs=DB.invoices.filter(i=>i.customerId===c.id);
@@ -1331,7 +1331,7 @@ function renderCustomers(){
     const sc=DB.schedules.filter(s=>s.customerId===c.id&&s.active).length;
     // Latest recurring invoice for beds / £/bed
     const latestRecur=DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    const beds=latestRecur?.lines?.[0]?.qty||null;
+    {const _cs=latestRecur&&DB.customers.find(x=>x.id===c.id)?uForMoSnap(DB.customers.find(x=>x.id===c.id),mk(latestRecur.date||'')):null;var beds=_cs&&_cs.length?_cs.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):null;}
     const ppb=beds?(latestRecur.subtotal||0)/beds:null;
     const latestMo=latestRecur?latestRecur.date.slice(0,7):'';
     const latestMoFmt=latestMo?new Date(latestMo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
@@ -1696,6 +1696,13 @@ function saveInv(){
       const _pmN=document.getElementById('f-pm').value;
       const sched={id:sid,name,customerId:custId,currency:cur,vatRate:vr,lines:lines.map(l=>({...l})),notes,schedStart,schedEnd,dayOfMonth,active:true,serviceType,paymentMethod:_pmN,...(_pmN==='Direct Debit'?{ddSigned:document.getElementById('dd-signed-yes').checked}:{})};
       DB.schedules.push(sched);
+      // Auto-create 1 unit for this customer if they have no unit history yet
+      {const _ac=DB.customers.find(x=>x.id===custId);
+      if(_ac){const _vh=(_ac.unitsHistory||[]).filter(h=>h.snapshot&&h.snapshot.some(u=>u.name||u.beds));
+      if(!_vh.length){const _ab=parseFloat(sched.lines&&sched.lines[0]?sched.lines[0].qty:0)||0;
+      const _ad=(sched.schedStart||nowKey)+'-01';
+      _ac.unitsHistory=_ac.unitsHistory||[];
+      _ac.unitsHistory.push({date:_ad,snapshot:[{name:_ac.company||_ac.name||'Unit 1',beds:_ab}]});}}}
       regenSchedule(sched);
     }
     persist();
@@ -1912,8 +1919,8 @@ function renderInvoices(){
     if(invSort.col==='date')return invSort.dir*a.date.localeCompare(b.date);
     if(invSort.col==='subtotal')return invSort.dir*(a.subtotal-b.subtotal);
     if(invSort.col==='total')return invSort.dir*(a.total-b.total);
-    const bedsA=(a.lines&&a.lines[0])?a.lines[0].qty:0;
-    const bedsB=(b.lines&&b.lines[0])?b.lines[0].qty:0;
+    const _caA=DB.customers.find(x=>x.id===a.customerId);const _saA=_caA?uForMoSnap(_caA,mk(a.date||'')):null;const bedsA=_saA&&_saA.length?_saA.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):((a.lines&&a.lines[0])?a.lines[0].qty:0);
+    const _caB=DB.customers.find(x=>x.id===b.customerId);const _saB=_caB?uForMoSnap(_caB,mk(b.date||'')):null;const bedsB=_saB&&_saB.length?_saB.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):((b.lines&&b.lines[0])?b.lines[0].qty:0);
     if(invSort.col==='beds')return invSort.dir*(bedsA-bedsB);
     if(invSort.col==='ppb'){const ppA=bedsA?a.subtotal/bedsA:0;const ppB=bedsB?b.subtotal/bedsB:0;return invSort.dir*(ppA-ppB);}
     return 0;
@@ -1950,7 +1957,7 @@ function renderInvoices(){
       <td>${dot}<strong>${c?.name||'?'}</strong>${c?.company?` <span class="muted" style="font-size:11px">· ${c.company}</span>`:''}${rb}</td>
       <td class="muted" style="font-size:12px">${fmtD(inv.date)}</td>
       <td class="muted" style="font-size:12px;white-space:nowrap">${per}</td>
-      ${(()=>{const beds=(inv.lines&&inv.lines[0])?inv.lines[0].qty:null;const ppb=beds?inv.subtotal/beds:null;return`<td class="r muted" style="font-size:12px">${beds!=null?beds:'—'}</td><td class="r muted" style="font-size:12px">${ppb!=null?fmtGBP(ppb):'—'}</td>`;})()}
+      ${(()=>{const _ic=DB.customers.find(x=>x.id===inv.customerId);const _im=mk(inv.date||'');const _is=_ic?uForMoSnap(_ic,_im):null;const _iu=_is&&_is.length?_is:(_ic?effectiveCurUnits(_ic):null);const beds=_iu?_iu.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):null;const _sub=inv.subtotal!=null?inv.subtotal:(inv.sub!=null?inv.sub:(inv.total||0)/(1+(inv.vatRate||20)/100));const ppb=beds?_sub/beds:null;return`<td class="r muted" style="font-size:12px">${beds!=null?beds:'—'}</td><td class="r muted" style="font-size:12px">${ppb!=null?fmtGBP(ppb):'—'}</td>`;})()}
       <td class="r">${fmtGBP(inv.subtotal)}</td>
       <td class="r muted">${inv.vatRate>0?fmtGBP(inv.vat):'—'}</td>
       <td class="r" style="font-weight:600;color:var(--accent)">${fmtGBP(inv.total)}</td>
@@ -2110,10 +2117,14 @@ function renderDash(){
       // Past/current months: recurring invoices only for beds/price stats
       const mInvs=DB.invoices.filter(i=>mk(i.date)===key && i.isRecurring);
       totalHomes=new Set(mInvs.map(i=>i.customerId)).size;
-      totalBeds=mInvs.reduce((sum,i)=>{
-        if(!i.lines||!i.lines[0])return sum;
-        return sum+(parseFloat(i.lines[0].qty)||0);
-      },0);
+      {const _cids=[...new Set(mInvs.map(i=>i.customerId))];
+      totalBeds=_cids.reduce((sum,cid)=>{
+        const cust=DB.customers.find(x=>x.id===cid);
+        if(!cust||cust.active===false)return sum;
+        const snap=uForMoSnap(cust,key);
+        const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+        return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+      },0);}
       // Avg price: total ex VAT / first-line qty (bed count).
       // Multi-line invoices repeat the same bed count per service component — summing all lines
       // would double-count beds. First-line qty is the true bed count; i.sub covers all charges.
@@ -2128,9 +2139,14 @@ function renderDash(){
         return true;
       });
       totalHomes=new Set(activeBedScheds.map(s=>s.customerId)).size;
-      totalBeds=activeBedScheds.reduce((sum,s)=>{
-        return sum+(parseFloat(s.lines&&s.lines[0]?s.lines[0].qty:0)||0);
-      },0);
+      {const _fcids=[...new Set(activeBedScheds.map(s=>s.customerId))];
+      totalBeds=_fcids.reduce((sum,cid)=>{
+        const cust=DB.customers.find(x=>x.id===cid);
+        if(!cust||cust.active===false)return sum;
+        const snap=uForMoSnap(cust,key);
+        const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+        return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+      },0);}
       // Avg price: total revenue (all lines) / first-line qty (bed count).
       // Same logic as actuals: multiple lines share the same bed count, so only first-line qty
       // is used as denominator to avoid double-counting.
@@ -2605,9 +2621,23 @@ function renderDash(){
       // Build bed & homes data per bar
       const bedVals = bars.map(b=>{
         if(!b.isFuture){
-          return Math.round(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&i.lines&&i.lines.length).reduce((s,i)=>s+(parseFloat(i.lines[0].qty)||0),0));
+          {const _bcids=[...new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
+          return Math.round(_bcids.reduce((sum,cid)=>{
+            const cust=DB.customers.find(x=>x.id===cid);
+            if(!cust||cust.active===false)return sum;
+            const snap=uForMoSnap(cust,b.k);
+            const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+            return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+          },0));}
         } else {
-          return Math.round(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).reduce((s,sc)=>s+(parseFloat(sc.lines?.[0]?.qty)||0),0));
+          {const _fscids=[...new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId))];
+          return Math.round(_fscids.reduce((sum,cid)=>{
+            const cust=DB.customers.find(x=>x.id===cid);
+            if(!cust||cust.active===false)return sum;
+            const snap=uForMoSnap(cust,b.k);
+            const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+            return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+          },0));}
         }
       });
       const homeVals = bars.map(b=>{
