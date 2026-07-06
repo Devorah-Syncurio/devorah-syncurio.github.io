@@ -1331,7 +1331,7 @@ function renderCustomers(){
     const sc=DB.schedules.filter(s=>s.customerId===c.id&&s.active).length;
     // Latest recurring invoice for beds / £/bed
     const latestRecur=DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
-    {const _cs=latestRecur&&DB.customers.find(x=>x.id===c.id)?uForMoSnap(DB.customers.find(x=>x.id===c.id),mk(latestRecur.date||'')):null;var beds=_cs&&_cs.length?_cs.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):null;}
+    {const _cObj=DB.customers.find(x=>x.id===c.id);const _cs=latestRecur&&_cObj?uForMoSnap(_cObj,mk(latestRecur.date||'')):null;const _snapBeds=_cs&&_cs.length?_cs.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):0;var beds=_snapBeds||((latestRecur?.lines?.[0]?.qty)||null);}
     const ppb=beds?(latestRecur.subtotal||0)/beds:null;
     const latestMo=latestRecur?latestRecur.date.slice(0,7):'';
     const latestMoFmt=latestMo?new Date(latestMo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
