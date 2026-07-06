@@ -2208,10 +2208,10 @@ function renderDash(){
   const thisMonthLbl = isFutureDash
     ?`Predicted ${new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'})}`
     :'This month invoiced';
-  if(document.getElementById('ds-total-lbl'))document.getElementById('ds-total-lbl').textContent=thisMonthLbl;
+  if(document.getElementById('ds-total-lbl'))document.getElementById('ds-total-lbl').textContent=isFutureDash?thisMonthLbl:'This month invoiced (incl. extras)';
 
   // ex VAT = big number, inc VAT = small sub
-  document.getElementById('ds-total').textContent=fmtPound(thisMonthEx)+' ex. VAT'+(isFutureDash?'':' (incl. extras)');
+  document.getElementById('ds-total').textContent=fmtPound(thisMonthEx)+' ex. VAT';
   document.getElementById('ds-total-ex').textContent=fmtPound(thisMonthInc)+' inc. VAT';
   document.getElementById('ds-count').textContent=(isFutureDash?'~':'')+thisMonthCnt+(isFutureDash?' recurring schedule':' invoice')+(thisMonthCnt!==1?'s':'');
   document.getElementById('ds-next').textContent=fmtPound(nextTotalEx)+' ex. VAT';
