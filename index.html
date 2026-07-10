@@ -2254,14 +2254,25 @@ function renderDash(){
       const cid=nmToId[nm];
       const cInv=srcInvs.find(i=>i.customerId===cid);
       if(cInv&&cInv.lines){
-        const firstLine=cInv.lines[0];
-        if(firstLine){beds=parseFloat(firstLine.qty)||0;ppb=parseFloat(firstLine.price)||0;}
+        const cObj=DB.customers.find(x=>x.id===cid);
+        const snap=cObj?uForMoSnap(cObj,mk(cInv.date||'')):null;
+        const snapBeds=snap&&snap.length?snap.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):0;
+        beds=snapBeds||cInv.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+        const sub=cInv.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
+        ppb=beds?sub/beds:0;
       }
       // For "changed" also record the before values
       let bedsB=0,ppbB=0;
       if(type==='changed'){
         const aInv=aInvs.find(i=>i.customerId===cid);
-        if(aInv&&aInv.lines&&aInv.lines[0]){bedsB=parseFloat(aInv.lines[0].qty)||0;ppbB=parseFloat(aInv.lines[0].price)||0;}
+        if(aInv&&aInv.lines){
+          const cObj=DB.customers.find(x=>x.id===cid);
+          const snapB=cObj?uForMoSnap(cObj,mk(aInv.date||'')):null;
+          const snapBedsB=snapB&&snapB.length?snapB.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):0;
+          bedsB=snapBedsB||aInv.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+          const subB=aInv.lines.reduce((s,l)=>s+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
+          ppbB=bedsB?subB/bedsB:0;
+        }
       }
       ch.push({nm,d,type,customerId:nmToId[nm],beds,ppb,bedsB,ppbB});
     });
@@ -2637,7 +2648,10 @@ function renderDash(){
             if(!cust||cust.active===false)return sum;
             const snap=uForMoSnap(cust,b.k);
             const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-            return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+            let beds=units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
+            // Fallback: if no beds from history, use schedule line qty (covers new customers & forward-edited schedules)
+            if(!beds){const sc=DB.schedules.find(s=>s.customerId===cid&&s.active!==false&&(s.schedStart||'0000-01')<=b.k&&b.k<=(s.schedEnd||'9999-12'));if(sc)beds=(sc.lines||[]).reduce((s,l)=>s+(parseFloat(l.qty)||0),0);}
+            return sum+beds;
           },0));}
         }
       });
