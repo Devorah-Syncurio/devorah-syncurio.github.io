@@ -539,15 +539,15 @@ tbody tr:hover{background:var(--bg)}
         <table>
           <thead><tr>
             <th></th>
-            <th onclick="setCustSort('name-az','name-za',this)">Name <span class="sort-icon">⇅</span></th>
-            <th onclick="setCustSort('company-az','company-az',this)">Company <span class="sort-icon">⇅</span></th>
-            <th class="r" onclick="setCustSort('beds-desc','beds-asc',this)">Beds <span class="sort-icon">⇅</span></th>
-            <th class="r" onclick="setCustSort('units-desc','units-asc',this)">Units <span class="sort-icon">⇅</span></th>
-            <th class="r" onclick="setCustSort('ppb-desc','ppb-asc',this)">£/bed <span class="sort-icon">⇅</span></th>
-            <th>Latest month</th>
-            <th>Date added</th>
-            <th class="r">Invoices</th>
-            <th class="r" onclick="setCustSort('total-desc','total-asc',this)">Total billed <span class="sort-icon">⇅</span></th>
+            <th onclick="setCustSort('name-az','name-za',this)" id="csth-name">Name <span class="sort-icon">⇅</span></th>
+            <th onclick="setCustSort('company-az','company-za',this)" id="csth-company">Company <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('beds-desc','beds-asc',this)" id="csth-beds">Beds <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('units-desc','units-asc',this)" id="csth-units">Units <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('ppb-desc','ppb-asc',this)" id="csth-ppb">£/bed <span class="sort-icon">⇅</span></th>
+            <th onclick="setCustSort('month-desc','month-asc',this)" id="csth-month">Latest month <span class="sort-icon">⇅</span></th>
+            <th onclick="setCustSort('date-asc','date-desc',this)" id="csth-date">Date added <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('inv-desc','inv-asc',this)" id="csth-inv">Invoices <span class="sort-icon">⇅</span></th>
+            <th class="r" onclick="setCustSort('total-desc','total-asc',this)" id="csth-total">Total billed <span class="sort-icon">⇅</span></th>
             <th></th>
           </tr></thead>
           <tbody id="cust-tbody"></tbody>
@@ -1300,6 +1300,26 @@ function setCustSort(asc,desc,th){
   sel.value=(cur===asc)?desc:asc;
   renderCustomers();
 }
+function _updateCustSortIcons(sortVal){
+  const map={
+    'name-az':'csth-name','name-za':'csth-name',
+    'company-az':'csth-company','company-za':'csth-company',
+    'beds-desc':'csth-beds','beds-asc':'csth-beds',
+    'units-desc':'csth-units','units-asc':'csth-units',
+    'ppb-desc':'csth-ppb','ppb-asc':'csth-ppb',
+    'month-desc':'csth-month','month-asc':'csth-month',
+    'date-asc':'csth-date','date-desc':'csth-date',
+    'inv-desc':'csth-inv','inv-asc':'csth-inv',
+    'total-desc':'csth-total','total-asc':'csth-total'
+  };
+  const asc_vals=new Set(['name-az','company-az','beds-asc','units-asc','ppb-asc','month-asc','date-asc','inv-asc','total-asc']);
+  document.querySelectorAll('[id^=csth-]').forEach(th=>{
+    const si=th.querySelector('.sort-icon');
+    if(!si)return;
+    if(th.id===map[sortVal]){si.textContent=asc_vals.has(sortVal)?'↑':'↓';si.style.color='var(--accent)';}
+    else{si.textContent='⇅';si.style.color='';}
+  });
+}
 function renderCustomers(){
   const tb=document.getElementById('cust-tbody'),em=document.getElementById('cust-empty');
   if(!DB.customers.length){tb.innerHTML='';em.style.display='block';return;}
@@ -1326,6 +1346,18 @@ function renderCustomers(){
     const latestRecurInv=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring&&i.lines&&i.lines.length).sort((a,b)=>b.date.localeCompare(a.date))[0];
     custs.sort((a,b)=>{const ia=latestRecurInv(a),ib=latestRecurInv(b);const _sa=ia?uForMoSnap(a,mk(ia.date||'')):null;const _sb=ib?uForMoSnap(b,mk(ib.date||'')):null;const ba=_sa&&_sa.length?_sa.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ia?.lines?.[0]?.qty||0),bb=_sb&&_sb.length?_sb.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):(ib?.lines?.[0]?.qty||0);const _isuba=ia?(ia.subtotal!=null?ia.subtotal:(ia.sub||(ia.total||0)/(1+(ia.vatRate||20)/100))):0;const _isubb=ib?(ib.subtotal!=null?ib.subtotal:(ib.sub||(ib.total||0)/(1+(ib.vatRate||20)/100))):0;const pa=ba?_isuba/ba:0,pb=bb?_isubb/bb:0;return sort==='ppb-desc'?pb-pa:pa-pb;});
   }
+  else if(sort==='company-za'){custs.sort((a,b)=>(b.company||'').localeCompare(a.company||''));}
+  else if(sort==='month-desc'||sort==='month-asc'){
+    const latestMo=c=>DB.invoices.filter(i=>i.customerId===c.id&&i.isRecurring).sort((a,b)=>b.date.localeCompare(a.date))[0]?.date.slice(0,7)||'';
+    custs.sort((a,b)=>sort==='month-desc'?latestMo(b).localeCompare(latestMo(a)):latestMo(a).localeCompare(latestMo(b)));
+  }
+  else if(sort==='date-asc'||sort==='date-desc'){
+    custs.sort((a,b)=>{const da=a.createdAt||'',db=b.createdAt||'';return sort==='date-asc'?da.localeCompare(db):db.localeCompare(da);});
+  }
+  else if(sort==='inv-desc'||sort==='inv-asc'){
+    custs.sort((a,b)=>{const ia=DB.invoices.filter(i=>i.customerId===a.id).length,ib=DB.invoices.filter(i=>i.customerId===b.id).length;return sort==='inv-desc'?ib-ia:ia-ib;});
+  }
+  _updateCustSortIcons(sort);
   tb.innerHTML=custs.map(c=>{
     const invs=DB.invoices.filter(i=>i.customerId===c.id);
     const tot=invs.reduce((s,i)=>s+i.total,0);
