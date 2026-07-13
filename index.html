@@ -526,13 +526,7 @@ tbody tr:hover{background:var(--bg)}
           <span class="card-title">Customers</span>
           <div style="display:flex;gap:8px;align-items:center">
             <input class="sinp" id="cust-search" placeholder="Search customers…" oninput="_dRenderCustomers()" style="width:180px">
-            <select class="fltsel" id="cust-sort" onchange="renderCustomers()">
-              <option value="name-az">Name A–Z</option>
-              <option value="name-za">Name Z–A</option>
-              <option value="company-az">Company A–Z</option>
-              <option value="total-desc">Total billed ↓</option>
-              <option value="total-asc">Total billed ↑</option>
-            </select>
+            <input type="hidden" id="cust-sort" value="name-az">
             <button class="btn btn-primary btn-sm" onclick="openCustModal()">+ Add customer</button>
           </div>
         </div>
