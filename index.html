@@ -2753,8 +2753,8 @@ function renderDash(){
         }
       });
       const rows = [
-        { label:'Revenue excl VAT', vals: bars.map(b=>b.recurEx), fmt: v=>fmtGBP(v) },
-        { label:'One-off excl VAT', vals: bars.map(b=>b.oneoffEx||null), fmt: v=>v?fmtGBP(v):'—' },
+        { label:'Revenue', sub:'excl VAT', vals: bars.map(b=>b.recurEx), fmt: v=>fmtGBP(v) },
+        { label:'One-off', sub:'excl VAT', vals: bars.map(b=>b.oneoffEx||null), fmt: v=>v?fmtGBP(v):'—' },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
         { label:'Units',    vals: unitVals,           fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
@@ -2772,7 +2772,7 @@ function renderDash(){
       rows.forEach((row,ri)=>{
         const borderTop = ri>0?'border-top:1px solid var(--border)':'';
         html+=`<tr>
-          <td style="padding:4px 12px;color:var(--ink3);font-size:12px;text-transform:uppercase;letter-spacing:0.6px;font-weight:600;${borderTop};white-space:nowrap">${row.label}</td>`;
+          <td style="padding:4px 12px;color:var(--ink3);font-size:12px;text-transform:uppercase;letter-spacing:0.6px;font-weight:600;${borderTop};white-space:nowrap">${row.label}${row.sub?`<span style="font-size:9px;font-weight:400;text-transform:none;letter-spacing:0;margin-left:5px;color:var(--ink3);opacity:0.8">${row.sub}</span>`:''}</td>`;
         cols.forEach((b,ci)=>{
           html+=`<td style="text-align:right;padding:4px 8px;${borderTop};${tdStyle(b,row.vals[ci])}">${row.fmt(row.vals[ci])}</td>`;
         });
