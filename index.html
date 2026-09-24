@@ -2628,8 +2628,13 @@ function renderDash(){
         recurAmt=DB.invoices.filter(x=>mk(x.date)===k&&x.isRecurring).reduce((s,x)=>s+x.total,0);
       }
       const t=recurAmt;
+      const _exv=i=>(i.subtotal!=null?i.subtotal:(i.sub!=null?i.sub:(i.total||0)/(1+(i.vatRate||20)/100)));
+      let recurEx=0;
+      if(isFuture){const fc2=buildForecast(0,k,k);recurEx=fc2.length?fc2[0].recurSub:0;}
+      else{recurEx=DB.invoices.filter(x=>mk(x.date)===k&&x.isRecurring).reduce((s,x)=>s+_exv(x),0);}
+      const oneoffEx=DB.invoices.filter(x=>mk(x.date)===k&&!x.isRecurring).reduce((s,x)=>s+_exv(x),0);
       const fullLbl=td.toLocaleString('en-GB',{month:'long',year:'numeric'});
-      bars.push({k,t,recurAmt,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),fullLbl,isFuture});
+      bars.push({k,t,recurAmt,recurEx,oneoffEx,type:k===key?'current':isFuture?'forecast':'past',lbl:td.toLocaleString('en-GB',{month:'short'}),fullLbl,isFuture});
       td=new Date(td.getFullYear(),td.getMonth()+1,1);
     }
   window._trendBars=bars;
@@ -2748,7 +2753,8 @@ function renderDash(){
         }
       });
       const rows = [
-        { label:'Revenue',  vals: bars.map(b=>b.t),  fmt: v=>fmtGBP(v) },
+        { label:'Revenue excl VAT', vals: bars.map(b=>b.recurEx), fmt: v=>fmtGBP(v) },
+        { label:'One-off excl VAT', vals: bars.map(b=>b.oneoffEx||null), fmt: v=>v?fmtGBP(v):'—' },
         { label:'Beds',     vals: bedVals,            fmt: v=>v||'—' },
         { label:'Units',    vals: unitVals,           fmt: v=>v||'—' },
         { label:'Homes',    vals: homeVals,           fmt: v=>v||'—' },
