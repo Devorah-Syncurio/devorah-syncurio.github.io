@@ -4417,6 +4417,7 @@ async function startApp(){
   try{
     const{data,error}=await _supa.from('app_state').select('data').eq('id',1).maybeSingle();
     if(error)throw error;
+    if(!data||!data.data)throw new Error('No data returned (no access to the data row)');
     if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];if(!DB.salespeople)DB.salespeople=[];if(!DB.commissions)DB.commissions=[];}
     _loadOk=true; // loaded (or genuinely empty database)
   }catch(e){
