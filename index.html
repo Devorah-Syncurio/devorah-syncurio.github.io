@@ -1153,6 +1153,45 @@ function effectiveCurUnits(c){
   const beds=latestInv?latestInv.lines[0].qty:null;
   return [{name:c.company||c.name||'Unit 1',beds:beds}];
 }
+// Single source of truth for Homes / Units / Beds / Avg £ per bed (dashboard cards, Monthly Trends, Units export).
+// Actual months (up to the current month): that month's recurring invoices. Future months: active recurring templates.
+function bedsFromLines(lines){
+  // Ignore Governance and blank lines; a Residents/HR pair counts once; per-unit lines (e.g. "Apple Tree HR") are summed.
+  const ls=(lines||[]).filter(l=>{const d=String(l.desc||'').trim().toLowerCase();return d&&d!=='governance'&&(parseFloat(l.qty)||0)>0;});
+  if(!ls.length)return 0;
+  const generic=['residents','hr','residents and hr','residents & hr'];
+  const allGeneric=ls.every(l=>generic.includes(String(l.desc).trim().toLowerCase()));
+  if(allGeneric&&ls.length<=2)return Math.max(...ls.map(l=>parseFloat(l.qty)||0));
+  return ls.reduce((t,l)=>t+(parseFloat(l.qty)||0),0);
+}
+function schedsActiveIn(k){
+  return DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=k&&k<=en;});
+}
+function unitCountFor(cust,k){
+  const snap=uForMoSnap(cust,k);
+  const units=snap&&snap.length?snap:effectiveCurUnits(cust);
+  return units.filter(u=>u.name||(u.beds>0)).length||1;
+}
+function monthStats(k){
+  const nowKey=today().slice(0,7);
+  const isFuture=k>nowKey;
+  let custIds,beds,rev;
+  if(!isFuture){
+    const invs=DB.invoices.filter(i=>mk(i.date)===k&&i.isRecurring&&!i.deleted);
+    custIds=[...new Set(invs.map(i=>i.customerId))];
+    beds=invs.reduce((t,i)=>t+bedsFromLines(i.lines),0);
+    rev=invs.reduce((t,i)=>t+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
+  }else{
+    const sc=schedsActiveIn(k);
+    custIds=[...new Set(sc.map(s=>s.customerId))];
+    beds=sc.reduce((t,s)=>t+bedsFromLines(s.lines),0);
+    rev=sc.reduce((t,s)=>t+(s.lines||[]).reduce((a,l)=>a+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0),0);
+  }
+  let units=0;
+  custIds.forEach(cid=>{const c=DB.customers.find(x=>x.id===cid);if(c)units+=unitCountFor(c,k);});
+  beds=Math.round(beds);
+  return{isFuture,homes:custIds.length,units,beds,avgPpb:beds>0?rev/beds:0};
+}
 function addUnitRow(name,beds){
   name=name||'';beds=(beds!=null&&beds!=='')?beds:'';
   const list=document.getElementById('c-units-list');
@@ -2152,67 +2191,10 @@ function renderDash(){
   const nowKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const isFutureDash=key>nowKey;
   document.getElementById('dash-month').textContent=new Date(dashY,dashM,1).toLocaleString('en-GB',{month:'long',year:'numeric'});
-  // Quick stats bar
+  // Quick stats bar (same numbers as the Monthly Trends table and the Units export)
   {
-    let totalHomes,totalBeds,avgPpb;
-    if(!isFutureDash){
-      // Past/current months: recurring invoices only for beds/price stats
-      const mInvs=DB.invoices.filter(i=>mk(i.date)===key && i.isRecurring);
-      totalHomes=new Set(mInvs.map(i=>i.customerId)).size;
-      {const _cids=[...new Set(mInvs.map(i=>i.customerId))];
-      totalBeds=_cids.reduce((sum,cid)=>{
-        const cust=DB.customers.find(x=>x.id===cid);
-        if(!cust||cust.active===false)return sum;
-        const snap=uForMoSnap(cust,key);
-        const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-        return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
-      },0);}
-      // Avg price: total ex VAT / first-line qty (bed count).
-      // Multi-line invoices repeat the same bed count per service component — summing all lines
-      // would double-count beds. First-line qty is the true bed count; i.sub covers all charges.
-      const _subTotal=mInvs.reduce((sum,i)=>sum+(i.sub||i.total/(1+(i.vatRate||20)/100)),0);
-      avgPpb=totalBeds>0?_subTotal/totalBeds:0;
-    } else {
-      // Future months: use active recurring schedules as forecast
-      const activeBedScheds=DB.schedules.filter(s=>{
-        if(s.active===false)return false;
-        if(s.schedStart&&s.schedStart>key)return false;
-        if(s.schedEnd&&s.schedEnd<key)return false;
-        return true;
-      });
-      totalHomes=new Set(activeBedScheds.map(s=>s.customerId)).size;
-      {const _fcids=[...new Set(activeBedScheds.map(s=>s.customerId))];
-      totalBeds=_fcids.reduce((sum,cid)=>{
-        const cust=DB.customers.find(x=>x.id===cid);
-        if(!cust||cust.active===false)return sum;
-        const snap=uForMoSnap(cust,key);
-        const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-        return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
-      },0);}
-      // Avg price: total revenue (all lines) / first-line qty (bed count).
-      // Same logic as actuals: multiple lines share the same bed count, so only first-line qty
-      // is used as denominator to avoid double-counting.
-      const _totalRevenue=activeBedScheds.reduce((sum,s)=>{
-        if(!s.lines)return sum;
-        return sum+s.lines.reduce((t,l)=>t+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0);
-      },0);
-      avgPpb=totalBeds>0?_totalRevenue/totalBeds:0;
-    }
-    // Total named units across active customers for selected month
-    const activeCustomerIds=[...new Set(
-      (isFutureDash
-        ? (buildForecast(0,key,key)[0]?.items||[]).map(x=>x.customerId)
-        : DB.invoices.filter(i=>mk(i.date)===key&&!i.deleted&&i.isRecurring).map(i=>i.customerId)
-      )
-    )];
-    let totalUnits=0;
-    activeCustomerIds.forEach(cid=>{
-      const cust=DB.customers.find(x=>x.id===cid);
-      if(!cust)return;
-        const snap=uForMoSnap(cust,key);
-      const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-      totalUnits+=units.filter(u=>u.name||(u.beds>0)).length||1;
-    });
+    const _ms=monthStats(key);
+    const totalHomes=_ms.homes,totalBeds=_ms.beds,avgPpb=_ms.avgPpb,totalUnits=_ms.units;
     const qh=document.getElementById('qs-homes');
     const qu=document.getElementById('qs-units');
     const qb=document.getElementById('qs-beds');
@@ -2676,48 +2658,11 @@ function renderDash(){
         return `color:${c};font-weight:${fw};`;
       };
 
-      // Build bed & homes data per bar
-      // Beds: actual months from that month's recurring invoices; forecast months from active recurring templates.
-      // Per invoice/template: ignore Governance and blank lines; a Residents/HR pair counts once; per-unit lines (e.g. "Apple Tree HR") are summed.
-      const _linesBeds = (lines) => {
-        const ls=(lines||[]).filter(l=>{const d=String(l.desc||'').trim().toLowerCase();return d&&d!=='governance'&&(parseFloat(l.qty)||0)>0;});
-        if(!ls.length) return 0;
-        const generic=['residents','hr','residents and hr','residents & hr'];
-        const allGeneric=ls.every(l=>generic.includes(String(l.desc).trim().toLowerCase()));
-        if(allGeneric&&ls.length<=2) return Math.max(...ls.map(l=>parseFloat(l.qty)||0));
-        return ls.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
-      };
-      const bedVals = bars.map(b=>{
-        if(!b.isFuture){
-          return Math.round(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).reduce((s,i)=>s+_linesBeds(i.lines),0));
-        } else {
-          return Math.round(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).reduce((s,sc)=>s+_linesBeds(sc.lines),0));
-        }
-      });
-      const homeVals = bars.map(b=>{
-        if(!b.isFuture){
-          return new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring).map(i=>i.customerId)).size;
-        } else {
-          return new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId)).size;
-        }
-      });
-      const unitVals = bars.map(b=>{
-        let custIds;
-        if(!b.isFuture){
-          custIds=[...new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
-        } else {
-          custIds=[...new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId))];
-        }
-        let total=0;
-        custIds.forEach(cid=>{
-          const cust=DB.customers.find(x=>x.id===cid);
-          if(!cust)return;
-          const snap=uForMoSnap(cust,b.k);
-          const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-          total+=units.filter(u=>u.name||(u.beds>0)).length||1;
-        });
-        return total||null;
-      });
+      // Homes / Units / Beds / Avg £ per bed come from monthStats() - the same numbers as the dashboard cards and the Units export
+      const _msBars = bars.map(b=>monthStats(b.k));
+      const bedVals = _msBars.map(m=>m.beds);
+      const homeVals = _msBars.map(m=>m.homes);
+      const unitVals = _msBars.map(m=>m.units||null);
 
       const tdStyle = (b,val) => {
         if(!val&&val!==0) return 'color:var(--ink3)';
@@ -2726,25 +2671,7 @@ function renderDash(){
         return `color:${c};font-weight:${fw};`;
       };
 
-      const avgPpbVals = bars.map((b,bi)=>{
-        const beds = bedVals[bi];
-        if(!beds) return null;
-        if(!b.isFuture){
-          // actuals: sum of i.sub (ex VAT) for recurring invoices this month
-          const exVat = DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring)
-            .reduce((s,i)=>s+(i.sub!=null?i.sub:i.total/(1+(i.vatRate||20)/100)),0);
-          return exVat/beds;
-        } else {
-          // forecast: sum of all schedule lines (qty×price) / first-line qty
-          const scheds = DB.schedules.filter(s=>{
-            if(s.active===false)return false;
-            const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';
-            return st<=b.k&&b.k<=en;
-          });
-          const totalRev = scheds.reduce((s,sc)=>s+(sc.lines||[]).reduce((t,l)=>t+(parseFloat(l.qty)||0)*(parseFloat(l.price)||0),0),0);
-          return totalRev/beds;
-        }
-      });
+      const avgPpbVals = _msBars.map(m=>m.avgPpb||null);
       const rows = [
         { label:'Revenue', sub:'excl VAT', vals: bars.map(b=>b.recurEx), fmt: v=>fmtGBP(v) },
         { label:'One-off', sub:'excl VAT', vals: bars.map(b=>b.oneoffEx||null), fmt: v=>v?fmtGBP(v):'—' },
@@ -3268,7 +3195,8 @@ function exportUnitsXlsx(){
   const invs2=DB.invoices.filter(i=>!i.deleted);
   // Use global uForMoSnap / effectiveCurUnits so export always matches dashboard
   const hasInvInMo2=(c,m)=>invs2.some(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring);
-  const custs2=DB.customers.filter(x=>x.active!==false&&months2.some(m=>hasInvInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
+  const custs2=DB.customers.filter(x=>months2.some(m=>hasInvInMo2(x,m))).sort((a,b)=>a.name.localeCompare(b.name));
+  const invBeds2=(c,m)=>{const ii=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring);return ii.length?ii.reduce((t,i)=>t+bedsFromLines(i.lines),0):null;};
 
   // Sheet 1: Units by Month
   const hdr=['Customer','Unit Name',...monthLabels2];
@@ -3292,7 +3220,8 @@ function exportUnitsXlsx(){
           const snap=uForMoSnap(c,m);
           if(!snap||!snap.length){row.push('');return;}
           const unit=snap.find(u=>(u.name||'Unnamed')===uName);
-          const beds=unit?.beds!=null?unit.beds:'—';
+          if(!unit){row.push('');return;}
+          const beds=unit.beds!=null?unit.beds:'—';
           if(typeof beds==='number'){gBeds[m]+=beds;}
           gUnits[m]+=1;
           row.push(beds);
@@ -3305,9 +3234,7 @@ function exportUnitsXlsx(){
       const row=[c.name, uName];
       months2.forEach(m=>{
         if(!hasInvInMo2(c,m)){row.push('');return;}
-        const inv=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring)
-          .sort((a,b)=>b.date.localeCompare(a.date))[0];
-        const beds=inv&&inv.lines&&inv.lines[0]?parseFloat(inv.lines[0].qty)||null:null;
+        const beds=invBeds2(c,m)||null;
         if(beds!=null)gBeds[m]+=beds;
         gUnits[m]+=1;
         row.push(beds!=null?beds:'—');
@@ -3323,9 +3250,7 @@ function exportUnitsXlsx(){
         const t=(snap||[]).reduce((s,u)=>s+(typeof u.beds==='number'?u.beds:0),0);
         sub.push(t>0?t:'—');
       } else {
-        const inv=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring)
-          .sort((a,b)=>b.date.localeCompare(a.date))[0];
-        const beds=inv&&inv.lines&&inv.lines[0]?parseFloat(inv.lines[0].qty)||null:null;
+        const beds=invBeds2(c,m)||null;
         sub.push(beds!=null?beds:'—');
       }
     });
@@ -3333,22 +3258,10 @@ function exportUnitsXlsx(){
     rows.push(Array(hdr.length).fill(''));
   });
   // Grand totals — computed using exact same formula as the dashboard trend table
-  const dashBeds2=Object.fromEntries(months2.map(m=>[m,
-    Math.round(invs2.filter(i=>mk2(i.date)===m&&i.isRecurring&&i.lines&&i.lines.length)
-      .reduce((s,i)=>s+(parseFloat(i.lines[0].qty)||0),0))
-  ]));
-  const dashUnits2=Object.fromEntries(months2.map(m=>[m,(()=>{
-    const cids=[...new Set(invs2.filter(i=>mk2(i.date)===m&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
-    let t=0;
-    cids.forEach(cid=>{
-      const cust=DB.customers.find(x=>x.id===cid);
-      if(!cust)return;
-      const snap=uForMoSnap(cust,m);
-      const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-      t+=units.filter(u=>u.name||(u.beds>0)).length||1;
-    });
-    return t;
-  })()]));
+  // Grand totals: exactly the same numbers as the dashboard cards and the Monthly Trends table
+  const _ms2=Object.fromEntries(months2.map(m=>[m,monthStats(m)]));
+  const dashBeds2=Object.fromEntries(months2.map(m=>[m,_ms2[m].beds]));
+  const dashUnits2=Object.fromEntries(months2.map(m=>[m,_ms2[m].units]));
   rows.push(['Total Units (count)','', ...months2.map(m=>dashUnits2[m]||'—')]);
   rows.push(['Total Beds','', ...months2.map(m=>dashBeds2[m]||'—')]);
 
@@ -3373,12 +3286,11 @@ function exportUnitsXlsx(){
         if(hasUnitHist2){
           const snap=uForMoSnap(c,m);
           const unit=Array.isArray(snap)?snap.find(u=>(u.name||'Unnamed')===uName):null;
-          beds=unit?.beds!=null?unit.beds:null;
+          if(!unit){row.push('');return;}
+          beds=unit.beds!=null?unit.beds:null;
         } else {
           // No unit history — use actual invoice first-line qty for this month
-          const inv=invs2.filter(i=>i.customerId===c.id&&mk2(i.date)===m&&i.isRecurring)
-            .sort((a,b)=>b.date.localeCompare(a.date))[0];
-          beds=inv&&inv.lines&&inv.lines[0]?parseFloat(inv.lines[0].qty)||null:null;
+          beds=invBeds2(c,m)||null;
         }
         if(beds!=null){snapGrandBeds[m]+=beds;rowTotal+=beds;}
         snapGrandUnits[m]+=1;
