@@ -488,6 +488,7 @@ tbody tr:hover{background:var(--bg)}
             <button class="seg-btn active" data-val="all" onclick="setRecurFilter('all')">All</button>
             <button class="seg-btn" data-val="active" onclick="setRecurFilter('active')">Active</button>
             <button class="seg-btn" data-val="paused" onclick="setRecurFilter('paused')">Paused</button>
+            <button class="seg-btn" data-val="ended" onclick="setRecurFilter('ended')">Ended</button>
           </div>
           <button class="btn btn-primary" onclick="openInvModal(null,true)">+ New Schedule</button>
         </div>
@@ -921,7 +922,7 @@ tbody tr:hover{background:var(--bg)}
         <button class="btn btn-ghost btn-sm" onclick="document.getElementById('regen-fromdate-row').style.display='none'">Back</button>
       </div>
     </div>
-    <button class="btn btn-ghost" onclick="closeRegenConf()" style="width:100%;margin-top:4px">Cancel</button>
+    <button class="btn btn-ghost" onclick="cancelRegen()" style="width:100%;margin-top:4px">Cancel</button>
   </div>
 </div>
 
@@ -947,10 +948,15 @@ function dedupIds(){
 }
 if(!DB.schedules)DB.schedules=[];
 
+let _loadOk=false;
 function persist(){
+  if(!_loadOk){showToast('Not saved - data did not load. Please refresh the page.');return;}
   if(_saveTimer)clearTimeout(_saveTimer);
   _saveTimer=setTimeout(async()=>{
-    await _supa.from('app_state').upsert({id:1,data:DB,updated_at:new Date().toISOString(),last_session:SESSION_ID});
+    try{
+      const{error}=await _supa.from('app_state').upsert({id:1,data:DB,updated_at:new Date().toISOString(),last_session:SESSION_ID});
+      if(error)throw error;
+    }catch(e){console.error('Save failed',e);showToast('⚠️ Save failed - check your connection. Your last change may not be saved.');}
   },500);
 }
 
@@ -965,8 +971,13 @@ const fmtD=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric
 const fmtMo=d=>d?new Date((d.slice(0,7)+'-15')+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
 const fmtDfull=d=>d?new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}):'';
 const mk=d=>d?d.substring(0,7):'';
-const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const today=()=>new Date().toISOString().split('T')[0];
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// Local-date helpers: never use toISOString()/'YYYY-MM-01' parsing for calendar dates (UTC shifts the day/month outside GMT)
+Date.prototype.localYMD=function(){return this.getFullYear()+'-'+String(this.getMonth()+1).padStart(2,'0')+'-'+String(this.getDate()).padStart(2,'0');};
+const ymDate=k=>{const[y,m]=String(k).split('-').map(Number);return new Date(y,(m||1)-1,1);};
+const ymAdd=(k,n)=>{const d=ymDate(k);d.setMonth(d.getMonth()+n);return d.localYMD().slice(0,7);};
+const round2=n=>Math.round((Number(n)+Number.EPSILON)*100)/100;
+const today=()=>new Date().localYMD();
 
 // ── Toast ─────────────────────────────────────────────────────────────
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -978,7 +989,7 @@ function nav(v){
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
   document.getElementById('pageTitle').textContent=TITLES[v];
-  document.querySelectorAll('.nav-item').forEach(e=>{if(e.textContent.trim().toLowerCase().startsWith(v.slice(0,4)))e.classList.add('active');});
+  document.querySelectorAll('.nav-item').forEach(e=>{if((e.getAttribute('onclick')||'')==="nav('"+v+"')")e.classList.add('active');});
   if(v==='dashboard')renderDash();
   if(v==='invoices'){renderInvoices();refreshFilters();}
   if(v==='recurring')renderRecurring();
@@ -1193,7 +1204,7 @@ function renderCustEditHistory(c){
   if(!hist.length){el.innerHTML='';return;}
   let rows=hist.map(h=>{
     const mo=h.date.slice(0,7);
-    const d=new Date(mo+'-01');
+    const d=ymDate(mo);
     const label=d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});
     const units=(h.snapshot||[]).filter(u=>u.name||u.beds);
     const summary=units.length?units.map(u=>`${u.name||'Unnamed'} (${u.beds||0} beds)`).join(', '):'—';
@@ -1218,7 +1229,7 @@ window.loadUnitSnapshot=function(mo){
   if(!entry)return;
   initUnitRows(normalizeUnits(entry.snapshot));
   document.getElementById('c-units-effective').value=mo;
-  showToast('Units loaded from '+new Date(mo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}));
+  showToast('Units loaded from '+ymDate(mo).toLocaleDateString('en-GB',{month:'short',year:'numeric'}));
 };
 function openCustModal(id){
   editCustId=id||null;
@@ -1251,7 +1262,7 @@ function saveCust(thenAction){
   let newId=null;
   const newUnits=readUnits();
   if(!newUnits.length)newUnits.push({name:'',beds:null});
-  const today=new Date().toISOString().slice(0,10);
+  const today=new Date().localYMD();
   const _efEl=document.getElementById('c-units-effective');
   const _efVal=_efEl&&_efEl.value?_efEl.value+'-01':today;
   if(editCustId){
@@ -1284,7 +1295,9 @@ function saveCustThen(action){
   else if(action==='recurring'){openInvModal(null,true,id);}
 }
 function deleteCust(id){
-  confirm2('Delete customer?','Their invoices and schedules will remain.','Delete',()=>{
+  const nInv=DB.invoices.filter(i=>i.customerId===id).length;
+  if(nInv>0){showToast(`Can't delete: this customer has ${nInv} invoice${nInv!==1?'s':''}. Delete or move their invoices first.`);return;}
+  confirm2('Delete customer?','This customer has no invoices. Any schedules for them will remain.','Delete',()=>{
     DB.customers=DB.customers.filter(c=>c.id!==id);persist();renderCustomers();showToast('Deleted.');
   });
 }
@@ -1361,7 +1374,7 @@ function renderCustomers(){
     {const _cObj=DB.customers.find(x=>x.id===c.id);const _cs=latestRecur&&_cObj?uForMoSnap(_cObj,mk(latestRecur.date||'')):null;const _snapBeds=_cs&&_cs.length?_cs.reduce((s,u)=>s+(parseFloat(u.beds)||0),0):0;var beds=_snapBeds||((latestRecur?.lines?.[0]?.qty)||null);}
     const ppb=beds?(latestRecur.subtotal||0)/beds:null;
     const latestMo=latestRecur?latestRecur.date.slice(0,7):'';
-    const latestMoFmt=latestMo?new Date(latestMo+'-01').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
+    const latestMoFmt=latestMo?ymDate(latestMo).toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'—';
     return`<tr>
       <td><span style="width:10px;height:10px;border-radius:50%;background:${COLS[c.ci||0]};display:inline-block"></span></td>
       <td class="cp-name-cell" style="font-weight:600" onclick="openCustProfile('${c.id}')">⊡ ${c.name}${sc?` <span class="badge b-recur">↻ ${sc}</span>`:''}</td>
@@ -1384,118 +1397,97 @@ function renderCustomers(){
 
 // ── Recurring helpers ─────────────────────────────────────────────────
 function schedMonths(s){
-  // Generate all months the schedule covers up to current month
+  // All months the schedule covers, from schedStart up to the current month (and never past schedEnd).
+  // Pure string/integer month maths so the result is the same in every timezone.
   const months=[];
-  const now=new Date();
-  const nowKey=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  let cur=new Date(s.schedStart+'-01');
-  while(true){
-    const key=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;
-    if(key>nowKey)break;
-    if(s.schedEnd&&key>s.schedEnd)break;
-    months.push(key);cur.setMonth(cur.getMonth()+1);
-  }
+  if(!s||!/^\d{4}-\d{2}$/.test(s.schedStart||''))return months;
+  const nowKey=today().slice(0,7);
+  let key=s.schedStart;
+  while(key<=nowKey&&(!s.schedEnd||key<=s.schedEnd)){months.push(key);key=ymAdd(key,1);}
   return months;
 }
 function existingForSched(id){return DB.invoices.filter(i=>i.scheduleId===id).map(i=>mk(i.date));}
+// Months the user deliberately deleted/skipped from a schedule - never auto-recreate them
+function skippedForSched(s){return new Set(s.skipMonths||[]);}
+// Build one invoice for schedule s in month mKey (single source of truth for template -> invoice)
+function buildSchedInvoice(s,mKey,reuseId){
+  const[yr,mo]=mKey.split('-').map(Number);
+  const day=Math.min(s.dayOfMonth||1,28);
+  const sub=round2(s.lines.reduce((t,l)=>t+l.qty*l.price,0));
+  const vat=round2(sub*(s.vatRate/100));
+  return{
+    id:reuseId||uid('ri'),
+    scheduleId:s.id,customerId:s.customerId,
+    date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
+    currency:s.currency,
+    periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
+    periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
+    notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
+    serviceType:s.serviceType||'',
+    subtotal:sub,vat:vat,total:round2(sub+vat),isRecurring:true,
+  };
+}
+// Months the schedule covers that have no invoice yet (excluding deliberately skipped months)
+function missingForSched(s){
+  const existing=new Set(existingForSched(s.id));
+  const skip=skippedForSched(s);
+  return schedMonths(s).filter(m=>!existing.has(m)&&!skip.has(m));
+}
+// Create invoices for covered months that have none yet (never outside start/end, never a skipped month)
+function fillSchedule(s){
+  const miss=missingForSched(s);
+  miss.forEach(mKey=>{DB.invoices.unshift(buildSchedInvoice(s,mKey));DB.seq++;});
+  return miss.length;
+}
 
 // (#5 & #6) Regenerate invoices for a schedule from scratch (respects past dates)
 function regenSchedule(s){
-  // Remove all generated invoices for this schedule then regenerate from schedStart
-  DB.invoices=DB.invoices.filter(i=>i.scheduleId!==s.id);
-  let seq=0;
+  // Replace this schedule's invoices with fresh ones built from the template.
+  // Keep each month's invoice ID so linked commissions stay attached.
+  const oldIds={};
+  DB.invoices.filter(i=>i.scheduleId===s.id).forEach(i=>{oldIds[mk(i.date)]=oldIds[mk(i.date)]||i.id;});
+  // Invoices dated before the template's start month are left alone (they were kept on purpose)
+  DB.invoices=DB.invoices.filter(i=>i.scheduleId!==s.id||mk(i.date)<s.schedStart);
+  const skip=skippedForSched(s);
   schedMonths(s).forEach(mKey=>{
-    const[yr,mo]=mKey.split('-').map(Number);
-    const day=Math.min(s.dayOfMonth||1,28);
-    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
-    const inv={
-      id:uid('ri'),
-      scheduleId:s.id,customerId:s.customerId,
-      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
-      currency:s.currency,
-      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
-      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
-      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
-      serviceType:s.serviceType||'',
-      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
-    };
-    inv.total=inv.subtotal+inv.vat;
-    DB.invoices.unshift(inv);DB.seq++;
+    if(skip.has(mKey))return;
+    DB.invoices.unshift(buildSchedInvoice(s,mKey,oldIds[mKey]));
+    if(!oldIds[mKey])DB.seq++;
   });
 }
 
 // Keep existing invoices; only create invoices for months not yet covered
-function keepRegenSchedule(s){
-  const existing=new Set(existingForSched(s.id));
-  const months=schedMonths(s);
-  let seq=0;
-  months.forEach(mKey=>{
-    if(existing.has(mKey))return;
-    const[yr,mo]=mKey.split('-').map(Number);
-    const day=Math.min(s.dayOfMonth||1,28);
-    const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
-    const inv={
-      id:uid('ri'),scheduleId:s.id,customerId:s.customerId,
-      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
-      currency:s.currency,
-      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
-      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
-      notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
-      serviceType:s.serviceType||'',
-      subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
-    };
-    inv.total=inv.subtotal+inv.vat;
-    DB.invoices.unshift(inv);DB.seq++;
-  });
-}
+function keepRegenSchedule(s){fillSchedule(s);}
 
 // Regenerate invoices for a schedule from a given YYYY-MM onward, leaving earlier ones intact
 function regenFromDate(s, fromYYYYMM){
   // s already has the NEW settings applied. Restore old schedule, cap it, create new one.
   const old=window._regenOldSched||{...s};
-  // Compute prev month (end of old schedule)
-  const[fy,fm]=fromYYYYMM.split('-').map(Number);
-  const prevDate=new Date(fy,fm-2,1);
-  const prevMon=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
-  // Save new settings before restoring old ones onto s
+  const prevMon=ymAdd(fromYYYYMM,-1);
   const newSettings={...s,lines:s.lines.map(l=>({...l}))};
-  // Restore original settings to old schedule and set its end date
+  Object.keys(s).forEach(k=>delete s[k]);
   Object.assign(s,old);
-  s.schedEnd=prevMon;
-  // Remove invoices >= fromYYYYMM from old schedule (keep history before split)
+  s.schedEnd=(old.schedEnd&&old.schedEnd<prevMon)?old.schedEnd:prevMon;
+  const removedIds={};
   DB.invoices=DB.invoices.filter(i=>{
     if(i.scheduleId!==s.id)return true;
-    const m=(i.periodStart||i.date||'').slice(0,7);
-    return m<fromYYYYMM;
+    const m=mk(i.date);
+    if(m<fromYYYYMM)return true;
+    removedIds[m]=removedIds[m]||i.id;return false;
   });
-  // Create new schedule with new settings starting at fromYYYYMM
-  const newSched={
-    ...newSettings,
-    id:uid('ss'),
-    schedStart:fromYYYYMM,
-    // schedEnd carries through from what user set (newSettings.schedEnd)
-  };
+  const start=fromYYYYMM<old.schedStart?old.schedStart:fromYYYYMM;
+  const newSched={...newSettings,id:uid('ss'),schedStart:start,skipMonths:(old.skipMonths||[]).filter(m=>m>=start),replacesSchedule:s.id};
+  delete newSched.pausedAt;
   DB.schedules.push(newSched);
-  // Generate invoices for the new schedule
-  let seq=0;
+  const skip=skippedForSched(newSched);
   schedMonths(newSched).forEach(mKey=>{
-    const[yr,mo]=mKey.split('-').map(Number);
-    const day=Math.min(newSched.dayOfMonth||1,28);
-    const sub=newSched.lines.reduce((t,l)=>t+l.qty*l.price,0);
-    const inv={
-      id:uid('ri'),
-      scheduleId:newSched.id,customerId:newSched.customerId,
-      date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
-      currency:newSched.currency,
-      periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
-      periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
-      notes:newSched.notes||'',vatRate:newSched.vatRate,lines:newSched.lines.map(l=>({...l})),
-      serviceType:newSched.serviceType||'',
-      subtotal:sub,vat:sub*(newSched.vatRate/100),total:0,isRecurring:true,
-    };
-    inv.total=inv.subtotal+inv.vat;
-    DB.invoices.unshift(inv);DB.seq++;
+    if(skip.has(mKey))return;
+    // Safety net: never create a second recurring invoice for a month the old template still covers
+    if(DB.invoices.some(i=>i.scheduleId===s.id&&mk(i.date)===mKey))return;
+    DB.invoices.unshift(buildSchedInvoice(newSched,mKey,removedIds[mKey]));
+    if(!removedIds[mKey])DB.seq++;
   });
+  window._regenOldSched=null;
 }
 
 // Show the regen choice dialog; after() is called once user picks
@@ -1525,35 +1517,22 @@ function showRegenChoice(s,after){
   };
   document.getElementById('regen-conf').classList.add('open');
 }
+function cancelRegen(){
+  // User backed out: put the template back exactly as it was, so it keeps matching its invoices
+  const s=_regenSched,old=window._regenOldSched;
+  if(s&&old){Object.keys(s).forEach(k=>delete s[k]);Object.assign(s,old);}
+  window._regenOldSched=null;_regenSched=null;_regenAfter=null;
+  closeRegenConf();showToast('No changes made to the template.');
+}
 function closeRegenConf(){
   document.getElementById('regen-conf').classList.remove('open');
   document.getElementById('regen-fromdate-row').style.display='none';
 }
 
 function genRecurring(){
+  if(!_loadOk)return;
   let changed=false;
-  DB.schedules.filter(s=>s.active).forEach(s=>{
-    const existing=existingForSched(s.id);
-    let seq=0;
-    schedMonths(s).filter(m=>!existing.includes(m)).forEach(mKey=>{
-      const[yr,mo]=mKey.split('-').map(Number);
-      const day=Math.min(s.dayOfMonth||1,28);
-      const sub=s.lines.reduce((t,l)=>t+l.qty*l.price,0);
-      const inv={
-        id:uid('ri'),
-        scheduleId:s.id,customerId:s.customerId,
-        date:`${yr}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`,
-        currency:s.currency,
-        periodStart:`${yr}-${String(mo).padStart(2,'0')}-01`,
-        periodEnd:`${yr}-${String(mo).padStart(2,'0')}-${String(new Date(yr,mo,0).getDate()).padStart(2,'0')}`,
-        notes:s.notes||'',vatRate:s.vatRate,lines:s.lines.map(l=>({...l})),
-        serviceType:s.serviceType||'',
-        subtotal:sub,vat:sub*(s.vatRate/100),total:0,isRecurring:true,
-      };
-      inv.total=inv.subtotal+inv.vat;
-      DB.invoices.unshift(inv);DB.seq++;changed=true;
-    });
-  });
+  DB.schedules.filter(s=>s.active).forEach(s=>{if(fillSchedule(s)>0)changed=true;});
   if(changed)persist();
 }
 
@@ -1637,9 +1616,9 @@ function renderLines(){
 function recalc(){
   const sym=document.getElementById('f-cur').value;
   lines.forEach((_,i)=>{const e=document.getElementById('lt'+i);if(e)e.textContent=sym+f2(lines[i].qty*lines[i].price);});
-  const sub=lines.reduce((s,l)=>s+l.qty*l.price,0);
+  const sub=round2(lines.reduce((s,l)=>s+l.qty*l.price,0));
   const vr=parseFloat(document.getElementById('vat-sel').value)||0;
-  const vat=sub*(vr/100);
+  const vat=round2(sub*(vr/100));
   document.getElementById('t-sub').textContent=sym+f2(sub);
   document.getElementById('t-vat').textContent=sym+f2(vat);
   document.getElementById('t-total').textContent=sym+f2(sub+vat);
@@ -1652,10 +1631,10 @@ function saveInv(){
   const serviceType=document.getElementById('f-service').value;
   if(!custId){showToast('Please select a customer.');return;}
   if(!lines.some(l=>String(l.desc||'').trim())){showToast('Add at least one line item.');return;}
-  const sub=lines.reduce((s,l)=>s+l.qty*l.price,0);
+  const sub=round2(lines.reduce((s,l)=>s+l.qty*l.price,0));
   const vr=parseFloat(document.getElementById('vat-sel').value)||0;
-  const vat=sub*(vr/100);
-  const total=sub+vat;
+  const vat=round2(sub*(vr/100));
+  const total=round2(sub+vat);
   const cur=document.getElementById('f-cur').value;
   const notes=document.getElementById('f-notes').value.trim();
 
@@ -1764,6 +1743,8 @@ function deleteInv(id){
       ? 'This removes only this invoice. The recurring schedule continues for future months.'
       : 'This invoice will be permanently removed.',
     'Delete',()=>{
+      if(inv&&inv.scheduleId){const s=DB.schedules.find(x=>x.id===inv.scheduleId);
+        if(s){const m=mk(inv.date);s.skipMonths=s.skipMonths||[];if(!s.skipMonths.includes(m))s.skipMonths.push(m);}}
       DB.invoices=DB.invoices.filter(i=>i.id!==id);persist();renderInvoices();renderDash();showToast('Invoice deleted.');
     });
 }
@@ -2010,9 +1991,10 @@ function renderRecurring(){
   const nowKey=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
   let scheds=DB.schedules;
   if(recurStatusFilter==='active'){scheds=scheds.filter(s=>s.active&&!(s.schedEnd&&s.schedEnd<nowKey));}
-  else if(recurStatusFilter==='paused'){scheds=scheds.filter(s=>!s.active);}
+  else if(recurStatusFilter==='paused'){scheds=scheds.filter(s=>!s.active&&!(s.schedEnd&&s.schedEnd<nowKey));}
+  else if(recurStatusFilter==='ended'){scheds=scheds.filter(s=>s.schedEnd&&s.schedEnd<nowKey).slice().sort((a,b)=>b.schedEnd.localeCompare(a.schedEnd));}
   if(q){scheds=scheds.filter(s=>{const c=DB.customers.find(x=>x.id===s.customerId);return(s.name||'').toLowerCase().includes(q)||(c?.name||'').toLowerCase().includes(q)||(c?.company||'').toLowerCase().includes(q)||(s.serviceType||'').toLowerCase().includes(q);});}
-  if(!scheds.length){el.innerHTML=q||recurStatusFilter!=='all'?`<div class="empty"><div class="empty-text">No ${recurStatusFilter==='paused'?'paused':recurStatusFilter==='active'?'active':''} schedules${q?` matching "${q}"`:''} found.</div></div>`:`<div class="empty"><div class="empty-icon">↻</div><div class="empty-text">No recurring schedules yet.</div><button class="btn btn-primary btn-sm" onclick="openInvModal(null,true)">Create first schedule</button></div>`;return;}
+  if(!scheds.length){el.innerHTML=q||recurStatusFilter!=='all'?`<div class="empty"><div class="empty-text">No ${recurStatusFilter==='paused'?'paused':recurStatusFilter==='active'?'active':recurStatusFilter==='ended'?'ended':''} schedules${q?` matching "${q}"`:''} found.</div></div>`:`<div class="empty"><div class="empty-icon">↻</div><div class="empty-text">No recurring schedules yet.</div><button class="btn btn-primary btn-sm" onclick="openInvModal(null,true)">Create first schedule</button></div>`;return;}
   el.innerHTML=scheds.map(s=>{
     const c=DB.customers.find(x=>x.id===s.customerId);
     const col=c?COLS[c.ci||0]:'#888';
@@ -2020,8 +2002,8 @@ function renderRecurring(){
     const isEnded=s.schedEnd&&s.schedEnd<nowKey;
     const gen=DB.invoices.filter(i=>i.scheduleId===s.id).length;
     const startLbl=new Date(s.schedStart+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
-    const endLbl=s.schedEnd?'Ends '+new Date(s.schedEnd+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'No end date';
-    const badge=isEnded?`<span class="badge b-ended">Ended</span>`:`<span class="badge b-active">Active</span>`;
+    const endLbl=s.schedEnd?(isEnded?'Ended ':'Ends ')+new Date(s.schedEnd+'-15').toLocaleDateString('en-GB',{month:'short',year:'numeric'}):'No end date';
+    const badge=isEnded?`<span class="badge b-ended">Ended</span>`:(!s.active?`<span class="badge b-ended">Paused</span>`:`<span class="badge b-active">Active</span>`);
     return`<div class="rc">
       <div class="rc-left"><div class="rc-dot" style="background:${col}"></div>
         <div class="rc-info">
@@ -2041,16 +2023,57 @@ function renderRecurring(){
     </div>`;
   }).join('');
 }
-function pauseSched(id){const s=DB.schedules.find(x=>x.id===id);if(!s)return;s.active=false;persist();renderRecurring();showToast('Schedule paused.');}
-function resumeSched(id){const s=DB.schedules.find(x=>x.id===id);if(!s)return;s.active=true;persist();genRecurring();renderRecurring();renderDash();showToast('Schedule resumed.');}
+function pauseSched(id){const s=DB.schedules.find(x=>x.id===id);if(!s)return;s.active=false;s.pausedAt=today().slice(0,7);persist();renderRecurring();showToast('Schedule paused.');}
+function resumeSched(id){
+  const s=DB.schedules.find(x=>x.id===id);if(!s)return;
+  const miss=missingForSched(s);
+  if(!miss.length){finishResume(s,null);return;}
+  const fmt=m=>ymDate(m).toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+  const nowKey=today().slice(0,7);
+  const def=s.pausedAt&&s.pausedAt>=s.schedStart?s.pausedAt:miss[0];
+  const ov=document.createElement('div');
+  ov.id='resume-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(28,43,58,0.45);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:Inter,sans-serif;';
+  ov.innerHTML=`<div style="background:#fff;border-radius:14px;padding:28px 28px 22px;width:400px;max-width:92vw;box-shadow:0 8px 40px rgba(28,43,58,0.2)">
+    <div style="font-size:17px;font-weight:700;color:#1C2B3A;margin-bottom:6px">Resume schedule</div>
+    <div style="font-size:13px;color:#5a6b7c;margin-bottom:16px">${miss.length} month${miss.length!==1?'s have':' has'} no invoice while this was paused (${fmt(miss[0])}${miss.length>1?' – '+fmt(miss[miss.length-1]):''}). How do you want to resume?</div>
+    <button class="btn btn-ghost" style="width:100%;margin-bottom:8px;text-align:left" id="resume-backfill">Back-fill all missed months (creates ${miss.length} invoice${miss.length!==1?'s':''})</button>
+    <div style="border:1px solid #dde2ea;border-radius:8px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:13px;color:#1C2B3A;margin-bottom:8px">Resume from a chosen month (earlier missed months are skipped):</div>
+      <div style="display:flex;gap:8px;align-items:center"><input type="month" id="resume-month" class="finp" style="flex:1" min="${miss[0]}" max="${nowKey>miss[miss.length-1]?nowKey:miss[miss.length-1]}" value="${def}">
+      <button class="btn btn-primary btn-sm" id="resume-from">Resume</button></div>
+    </div>
+    <button class="btn btn-ghost" style="width:100%" id="resume-cancel">Cancel</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.querySelector('#resume-cancel').onclick=close;
+  ov.querySelector('#resume-backfill').onclick=()=>{close();finishResume(s,null);};
+  ov.querySelector('#resume-from').onclick=()=>{
+    const m=ov.querySelector('#resume-month').value;
+    if(!/^\d{4}-\d{2}$/.test(m)){showToast('Please choose a month.');return;}
+    close();finishResume(s,m);
+  };
+}
+function finishResume(s,fromMonth){
+  if(fromMonth){
+    // Mark the missed months before the chosen month as skipped so they are never auto-created
+    s.skipMonths=s.skipMonths||[];
+    missingForSched(s).filter(m=>m<fromMonth).forEach(m=>{if(!s.skipMonths.includes(m))s.skipMonths.push(m);});
+  }
+  s.active=true;delete s.pausedAt;
+  const n=fillSchedule(s);
+  persist();renderRecurring();renderDash();renderInvoices();refreshFilters();
+  showToast('Schedule resumed'+(n?` - ${n} invoice${n!==1?'s':''} created.`:'.'));
+}
 
 // ── Forecast ──────────────────────────────────────────────────────────
 function buildForecast(n,startKey,endKey){
   const months=[];
   let cur;
   if(startKey&&endKey){
-    cur=new Date(startKey+'-01');
-    const end=new Date(endKey+'-01');
+    cur=ymDate(startKey);
+    const end=ymDate(endKey);
     while(cur<=end){const key=`${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}`;months.push({year:cur.getFullYear(),month:cur.getMonth(),key,label:cur.toLocaleString('en-GB',{month:'long',year:'numeric'}),short:cur.toLocaleString('en-GB',{month:'short',year:'2-digit'})});cur.setMonth(cur.getMonth()+1);}
   }else{
     const now=new Date();
@@ -2600,7 +2623,7 @@ function renderDash(){
     // Build exactly trendN bars; past/current = actuals, future = recurring forecast
     window._trendBars=[];
     const bars=[];
-    let td=new Date(trendStart+'-01');
+    let td=ymDate(trendStart);
     for(let i=0;i<trendN;i++){
       const k=`${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}`;
       const isFuture=k>nowKey;
@@ -3092,7 +3115,7 @@ function getExpInvs(){
 function openExport(){
   const now=new Date();
   document.getElementById('exp-from').value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
-  document.getElementById('exp-to').value=new Date(now.getFullYear(),now.getMonth()+1,0).toISOString().split('T')[0];
+  document.getElementById('exp-to').value=new Date(now.getFullYear(),now.getMonth()+1,0).localYMD();
   document.getElementById('exp-rf').value='';
   const cf=document.getElementById('exp-cf');
   const companies=[...new Set(DB.customers.map(c=>c.company).filter(Boolean))].sort();
@@ -3106,8 +3129,8 @@ function openExport(){
 function setExpRange(p){
   const now=new Date();const y=now.getFullYear(),m=now.getMonth();
   let f,t;
-  if(p==='tm'){f=`${y}-${String(m+1).padStart(2,'0')}-01`;t=new Date(y,m+1,0).toISOString().split('T')[0];}
-  else if(p==='lm'){const lm=m===0?11:m-1,ly=m===0?y-1:y;f=`${ly}-${String(lm+1).padStart(2,'0')}-01`;t=new Date(ly,lm+1,0).toISOString().split('T')[0];}
+  if(p==='tm'){f=`${y}-${String(m+1).padStart(2,'0')}-01`;t=new Date(y,m+1,0).localYMD();}
+  else if(p==='lm'){const lm=m===0?11:m-1,ly=m===0?y-1:y;f=`${ly}-${String(lm+1).padStart(2,'0')}-01`;t=new Date(ly,lm+1,0).localYMD();}
   else if(p==='ty'){f=`${y}-01-01`;t=`${y}-12-31`;}
   else if(p==='ly'){f=`${y-1}-01-01`;t=`${y-1}-12-31`;}
   else{const ds=DB.invoices.map(i=>i.date).filter(Boolean).sort();f=ds[0]||'';t=ds[ds.length-1]||'';}
@@ -3219,7 +3242,7 @@ function doExport(){
 // ── Customer Matrix Export ────────────────────────────────────────────
 function openUnitsExport(){
   const now=new Date();
-  const curMo=now.toISOString().slice(0,7);
+  const curMo=now.localYMD().slice(0,7);
   // Find earliest month across invoices, recurring schedules, and unitsHistory
   let earliest=curMo;
   (DB.invoices||[]).forEach(i=>{if(i.month&&i.month<earliest)earliest=i.month;});
@@ -3229,10 +3252,10 @@ function openUnitsExport(){
   const mos=[];
   const [ey,em]= earliest.split('-').map(Number);
   let d=new Date(ey,em-1,1);
-  while(d.toISOString().slice(0,7)<=curMo){mos.push(d.toISOString().slice(0,7));d=new Date(d.getFullYear(),d.getMonth()+1,1);}
+  while(d.localYMD().slice(0,7)<=curMo){mos.push(d.localYMD().slice(0,7));d=new Date(d.getFullYear(),d.getMonth()+1,1);}
   const fromEl=document.getElementById('units-from');
   const toEl=document.getElementById('units-to');
-  [fromEl,toEl].forEach(sel=>{sel.innerHTML=mos.map(m=>{const dd=new Date(m+'-01');return`<option value="${m}">${dd.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</option>`;}).join('');});
+  [fromEl,toEl].forEach(sel=>{sel.innerHTML=mos.map(m=>{const dd=ymDate(m);return`<option value="${m}">${dd.toLocaleDateString('en-GB',{month:'short',year:'numeric'})}</option>`;}).join('');});
   fromEl.value=mos[0];
   toEl.value=curMo;
   showOverlay('units-modal');
@@ -3249,7 +3272,7 @@ function exportUnitsXlsx(){
     months2.push(`${fy}-${String(fm).padStart(2,'0')}`);
     fm++;if(fm>12){fm=1;fy++;}
   }
-  const monthLabels2=months2.map(m=>{const d=new Date(m+'-01');return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});});
+  const monthLabels2=months2.map(m=>{const d=ymDate(m);return d.toLocaleDateString('en-GB',{month:'short',year:'numeric'});});
   const mk2=d=>{if(!d)return'';return d.slice(0,7);};
   const invs2=DB.invoices.filter(i=>!i.deleted);
   // Use global uForMoSnap / effectiveCurUnits so export always matches dashboard
@@ -3389,10 +3412,10 @@ function setUnitsChip(nBefore){
   const fromEl=document.getElementById('units-from');
   const toEl=document.getElementById('units-to');
   const now=new Date();
-  const cur=now.toISOString().slice(0,7);
+  const cur=now.localYMD().slice(0,7);
   toEl.value=cur;
   const d=new Date(now.getFullYear(),now.getMonth()-nBefore,1);
-  fromEl.value=d.toISOString().slice(0,7);
+  fromEl.value=d.localYMD().slice(0,7);
   document.querySelectorAll('#units-chips .chip').forEach(b=>b.classList.remove('chip-active'));
   event.currentTarget.classList.add('chip-active');
 }
@@ -3401,7 +3424,7 @@ function setUnitsChipThisYear(){
   const toEl=document.getElementById('units-to');
   const now=new Date();
   fromEl.value=`${now.getFullYear()}-01`;
-  toEl.value=now.toISOString().slice(0,7);
+  toEl.value=now.localYMD().slice(0,7);
   document.querySelectorAll('#units-chips .chip').forEach(b=>b.classList.remove('chip-active'));
   event.currentTarget.classList.add('chip-active');
 }
@@ -3439,7 +3462,7 @@ function doMatrixExport(){try{
   if(fromVal>toVal){showToast('From must be before To.');return;}
   const from=fromVal+'-01';
   const toYM=toVal.split('-');
-  const to=new Date(parseInt(toYM[0]),parseInt(toYM[1]),0).toISOString().split('T')[0];
+  const to=new Date(parseInt(toYM[0]),parseInt(toYM[1]),0).localYMD();
   const invs=DB.invoices.filter(i=>i.date>=from&&i.date<=to);
   if(!invs.length){showToast('No invoices in that range.');return;}
   const months=[...new Set(invs.map(i=>mk(i.date)))].sort();
@@ -3521,8 +3544,8 @@ function doMatrixExport(){try{
 
 // Forecast export
 function toggleFcExpRange(){const isCustom=document.getElementById('fcexp-range-type').value==='custom';document.getElementById('fcexp-months-wrap').style.display=isCustom?'none':'';document.getElementById('fcexp-from-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-to-wrap').style.display=isCustom?'':'none';document.getElementById('fcexp-presets').style.display=isCustom?'flex':'none';}
-function setFcExpPreset(p){const now=new Date();let from,to;if(p==='q1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+3,1);}else if(p==='h1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+6,1);}else if(p==='y1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+12,1);}else if(p==='y2'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+24,1);}document.getElementById('fcexp-from').value=from.toISOString().split('T')[0];document.getElementById('fcexp-to').value=to.toISOString().split('T')[0];}
-function openFcExport(){document.getElementById('fcexp-months').value=document.getElementById('fc-months').value;document.getElementById('fcexp-range-type').value='months';const now=new Date();const from=new Date(now.getFullYear(),now.getMonth()+1,1);const to=new Date(now.getFullYear(),now.getMonth()+6,1);document.getElementById('fcexp-from').value=from.toISOString().split('T')[0];document.getElementById('fcexp-to').value=to.toISOString().split('T')[0];toggleFcExpRange();openOverlay('fcexp-modal');}
+function setFcExpPreset(p){const now=new Date();let from,to;if(p==='q1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+3,1);}else if(p==='h1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+6,1);}else if(p==='y1'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+12,1);}else if(p==='y2'){from=new Date(now.getFullYear(),now.getMonth()+1,1);to=new Date(now.getFullYear(),now.getMonth()+24,1);}document.getElementById('fcexp-from').value=from.localYMD();document.getElementById('fcexp-to').value=to.localYMD();}
+function openFcExport(){document.getElementById('fcexp-months').value=document.getElementById('fc-months').value;document.getElementById('fcexp-range-type').value='months';const now=new Date();const from=new Date(now.getFullYear(),now.getMonth()+1,1);const to=new Date(now.getFullYear(),now.getMonth()+6,1);document.getElementById('fcexp-from').value=from.localYMD();document.getElementById('fcexp-to').value=to.localYMD();toggleFcExpRange();openOverlay('fcexp-modal');}
 function doFcExport(){
   const isCustom=document.getElementById('fcexp-range-type').value==='custom';
   const detail=document.getElementById('fcexp-detail').value;
@@ -3581,9 +3604,9 @@ function exportInvoiceChanges(){try{
   const bMonthVal=document.getElementById('icb-month').value;
   if(!aMonthVal||!bMonthVal){showToast('Please select both months');return;}
   const aFrom=aMonthVal+'-01';
-  const aTo=new Date(parseInt(aMonthVal.slice(0,4)),parseInt(aMonthVal.slice(5,7)),0).toISOString().split('T')[0];
+  const aTo=new Date(parseInt(aMonthVal.slice(0,4)),parseInt(aMonthVal.slice(5,7)),0).localYMD();
   const bFrom=bMonthVal+'-01';
-  const bTo=new Date(parseInt(bMonthVal.slice(0,4)),parseInt(bMonthVal.slice(5,7)),0).toISOString().split('T')[0];
+  const bTo=new Date(parseInt(bMonthVal.slice(0,4)),parseInt(bMonthVal.slice(5,7)),0).localYMD();
 
   const inRange=(date,from,to)=>date>=from&&date<=to;
   const r2=v=>{const n=Number(v);return isNaN(n)?0:Math.round(n*100)/100;};
@@ -4107,7 +4130,7 @@ function renderCommission(){
   const allCommMonths=new Set();
   DB.commissions.forEach(comm=>{
     if(comm.startDate){
-      const d=new Date(comm.startDate+'-01');
+      const d=ymDate(comm.startDate);
       // Add start month
       allCommMonths.add(comm.startDate.slice(0,7));
     }
@@ -4129,7 +4152,7 @@ function renderCommission(){
   if(fromSel){
     const curFrom=fromSel.value||nowMk;
     fromSel.innerHTML='<option value="">From month…</option>'+sortedMonths.map(m=>{
-      const d=new Date(m+'-01');
+      const d=ymDate(m);
       const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
       return`<option value="${m}"${m===curFrom?' selected':''}>${lbl}</option>`;
     }).join('');
@@ -4138,7 +4161,7 @@ function renderCommission(){
   if(toSel){
     const curTo=toSel.value||nowMk;
     toSel.innerHTML='<option value="">To month…</option>'+sortedMonths.map(m=>{
-      const d=new Date(m+'-01');
+      const d=ymDate(m);
       const lbl=d.toLocaleString('en-GB',{month:'short',year:'numeric'});
       return`<option value="${m}"${m===curTo?' selected':''}>${lbl}</option>`;
     }).join('');
@@ -4330,9 +4353,16 @@ function exportCommission(){
 // ── Init ──────────────────────────────────────────────────────────────
 (async()=>{
   try{
-    const{data,error}=await _supa.from('app_state').select('data').eq('id',1).single();
+    const{data,error}=await _supa.from('app_state').select('data').eq('id',1).maybeSingle();
+    if(error)throw error;
     if(data&&data.data){DB=data.data;if(!DB.schedules)DB.schedules=[];if(!DB.salespeople)DB.salespeople=[];if(!DB.commissions)DB.commissions=[];}
-  }catch(e){console.warn('Supabase load failed, starting empty.',e);}
+    _loadOk=true; // loaded (or genuinely empty database)
+  }catch(e){
+    console.error('Supabase load failed',e);
+    const lo=document.getElementById('loading-overlay');
+    if(lo)lo.innerHTML='<div style="text-align:center;font-family:Inter,sans-serif;color:#1C2B3A;padding:40px"><div style="font-size:18px;font-weight:700;margin-bottom:8px">Could not load your data</div><div style="font-size:14px;color:#8a99a8;margin-bottom:16px">Nothing has been changed. Check your connection and try again.</div><button class="btn btn-primary" onclick="location.reload()">Retry</button></div>';
+    return;
+  }
   dedupIds();
   document.getElementById('loading-overlay').style.display='none';
   genRecurring();
@@ -4593,7 +4623,7 @@ function openCustProfile(id){
   // Units section
   const unitsWrap2=document.getElementById('cp-units-wrap');
   if(unitsWrap2){
-    const selMo2=(typeof selMo!=='undefined'?selMo:null)||new Date().toISOString().slice(0,7);
+    const selMo2=(typeof selMo!=='undefined'?selMo:null)||new Date().localYMD().slice(0,7);
     const uArr=unitsForMonth(c,selMo2);
     const hist=(c.unitsHistory||[]).filter(h=>h.snapshot).slice().sort((a,b)=>b.date.localeCompare(a.date));
     const totalBeds=uArr.reduce((s,u)=>s+(u.beds!=null?u.beds:0),0);
