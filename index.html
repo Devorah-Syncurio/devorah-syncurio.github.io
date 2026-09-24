@@ -2677,28 +2677,21 @@ function renderDash(){
       };
 
       // Build bed & homes data per bar
+      // Beds: actual months from that month's recurring invoices; forecast months from active recurring templates.
+      // Per invoice/template: ignore Governance and blank lines; a Residents/HR pair counts once; per-unit lines (e.g. "Apple Tree HR") are summed.
+      const _linesBeds = (lines) => {
+        const ls=(lines||[]).filter(l=>{const d=String(l.desc||'').trim().toLowerCase();return d&&d!=='governance'&&(parseFloat(l.qty)||0)>0;});
+        if(!ls.length) return 0;
+        const generic=['residents','hr','residents and hr','residents & hr'];
+        const allGeneric=ls.every(l=>generic.includes(String(l.desc).trim().toLowerCase()));
+        if(allGeneric&&ls.length<=2) return Math.max(...ls.map(l=>parseFloat(l.qty)||0));
+        return ls.reduce((s,l)=>s+(parseFloat(l.qty)||0),0);
+      };
       const bedVals = bars.map(b=>{
         if(!b.isFuture){
-          {const _bcids=[...new Set(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).map(i=>i.customerId))];
-          return Math.round(_bcids.reduce((sum,cid)=>{
-            const cust=DB.customers.find(x=>x.id===cid);
-            if(!cust||cust.active===false)return sum;
-            const snap=uForMoSnap(cust,b.k);
-            const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-            return sum+units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
-          },0));}
+          return Math.round(DB.invoices.filter(i=>mk(i.date)===b.k&&i.isRecurring&&!i.deleted).reduce((s,i)=>s+_linesBeds(i.lines),0));
         } else {
-          {const _fscids=[...new Set(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).map(s=>s.customerId))];
-          return Math.round(_fscids.reduce((sum,cid)=>{
-            const cust=DB.customers.find(x=>x.id===cid);
-            if(!cust||cust.active===false)return sum;
-            const snap=uForMoSnap(cust,b.k);
-            const units=snap&&snap.length?snap:effectiveCurUnits(cust);
-            let beds=units.reduce((s,u)=>s+(parseFloat(u.beds)||0),0);
-            // Fallback: if no beds from history, use schedule line qty (covers new customers & forward-edited schedules)
-            if(!beds){const sc=DB.schedules.find(s=>s.customerId===cid&&s.active!==false&&(s.schedStart||'0000-01')<=b.k&&b.k<=(s.schedEnd||'9999-12'));if(sc)beds=(sc.lines||[]).reduce((s,l)=>s+(parseFloat(l.qty)||0),0);}
-            return sum+beds;
-          },0));}
+          return Math.round(DB.schedules.filter(s=>{if(s.active===false)return false;const st=s.schedStart||'0000-01',en=s.schedEnd||'9999-12';return st<=b.k&&b.k<=en;}).reduce((s,sc)=>s+_linesBeds(sc.lines),0));
         }
       });
       const homeVals = bars.map(b=>{
