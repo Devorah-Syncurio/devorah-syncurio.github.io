@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+<script>
+  
+document.addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('trend-table'),p=document.getElementById('trend-tooltip');if(!t||!p)return;const key=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),money=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});function val(k,r){if(r<2){if(k>today().slice(0,7))return r?0:(buildForecast(0,k,k)[0]?.recurSub||0);return DB.invoices.filter(i=>mk(i.date)===k&&!i.deleted&&!!i.isRecurring===(r===0)).reduce((s,i)=>s+(i.subtotal??i.sub??i.total/(1+(i.vatRate||20)/100)),0)}const m=monthStats(k);return [m.beds,m.units,m.homes,m.avgPpb][r-2]}t.addEventListener('pointermove',e=>{const c=e.target.closest('tbody td');if(!c||!c.cellIndex){p.style.display='none';return}const r=c.parentNode.rowIndex-1,b=window._trendBars?.[c.cellIndex-1];if(!b)return;const d=ymDate(b.k),prev=new Date(d.getFullYear(),d.getMonth()-1,1),old=val(key(prev),r),cur=val(b.k,r),delta=cur-old,fmt=n=>r<2||r===5?money(n):n.toLocaleString('en-GB'),diff=(delta>0?'+':delta<0?'−':'')+fmt(Math.abs(delta));p.style.pointerEvents='none';p.style.maxWidth='300px';p.textContent=['Revenue','One-off','Beds','Units','Homes','Avg £/Bed'][r]+' · '+prev.toLocaleString('en-GB',{month:'short',year:'numeric'})+' → '+b.fullLbl+(b.isFuture?' forecast':'')+'\n'+fmt(old)+' → '+fmt(cur)+'\nChange: '+diff;p.style.whiteSpace='pre-line';p.style.display='block';p.style.left=Math.max(4,Math.min(e.clientX+12,innerWidth-p.offsetWidth-4))+'px';p.style.top=Math.max(4,Math.min(e.clientY+12,innerHeight-p.offsetHeight-4))+'px'});t.addEventListener('pointerleave',()=>p.style.display='none');new MutationObserver(()=>t.querySelectorAll('tbody td:not(:first-child)').forEach(c=>c.style.cursor='help')).observe(t,{childList:true})});
+  
+</script><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ledger — Invoice Tracker</title>
