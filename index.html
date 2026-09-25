@@ -1,5 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<script>
+  
+// Unit snapshots begin on their effective date, never before it.
+  
+window.addEventListener('load',()=>{const old=uForMoSnap;uForMoSnap=function(c,mo){const h=(c.unitsHistory||[]).filter(x=>x.snapshot&&x.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>a.date.localeCompare(b.date));if(h.length&&mo+'-31'<h[0].date)return [];return old(c,mo)};const orig=unitCountFor;unitCountFor=function(c,k){const h=(c.unitsHistory||[]).filter(x=>x.snapshot&&x.snapshot.some(u=>u.name||u.beds)).sort((a,b)=>a.date.localeCompare(b.date));if(h.length&&k+'-31'<h[0].date)return 0;return orig(c,k)};if(typeof renderDash==='function')renderDash()});
+  
+</script><html lang="en">
 <script>
   
 // Explain the causes behind each month-to-month figure, using customer IDs rather than names.
