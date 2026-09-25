@@ -2,6 +2,124 @@
 <html lang="en">
 <script>
   
+// Explain the causes behind each month-to-month figure, using customer IDs rather than names.
+  
+document.addEventListener('DOMContentLoaded',()=>{
+  
+ const table=document.getElementById('trend-table'),oldTip=document.getElementById('trend-tooltip');if(!table)return;
+  
+ table.addEventListener('pointermove',e=>{e.stopImmediatePropagation();if(oldTip)oldTip.style.display='none'},true);
+  
+ // The former pointer tooltip only showed two totals. Replace that interaction with a click panel.
+  
+ table.onpointermove=null;table.onpointerover=null;table.onmousemove=null;table.onmouseleave=null;table.onpointerleave=null;
+  
+ const css=document.createElement('style');css.textContent='.trend-cause-cell{cursor:pointer!important;text-decoration:underline dotted;text-underline-offset:3px}.trend-cause-cell:hover,.trend-cause-cell:focus{background:#e5edf6!important;outline:2px solid #3981a0;outline-offset:-2px}.trend-cause-dialog{position:fixed;inset:0;background:rgba(20,30,45,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:14px}.trend-cause-panel{background:#fff;border-radius:12px;box-shadow:0 12px 40px #16213355;color:#1c2b3a;width:min(560px,100%);max-height:85vh;display:flex;flex-direction:column;font:13px Figtree,sans-serif}.trend-cause-body{overflow:auto;padding:0 18px 20px}.trend-cause-row{display:flex;justify-content:space-between;gap:12px;padding:7px 2px;border-bottom:1px solid #edf0f3}.trend-cause-row span:last-child{font-family:"JetBrains Mono",monospace;white-space:nowrap}';document.head.appendChild(css);
+  
+ const esc=x=>String(x).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  
+ const money=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});
+  
+ const idKey=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  
+ const label=(cid)=>{const c=DB.customers.find(x=>String(x.id)===cid);return c?((c.company&&c.name&&c.company!==c.name)?c.name+' ('+c.company+')':c.company||c.name||'Unknown customer'):'Unknown customer'};
+  
+ const type=(a,b)=>a===0&&b!==0?'Started':b===0&&a!==0?'Stopped':'Changed';
+  
+ const signed=(n,cash)=>{const v=cash?Number(Math.abs(n).toFixed(2)):Math.abs(n);return (v===0?'':n>0?'+':'−')+(cash?money(v):v.toLocaleString('en-GB'))};
+  
+ // This source mirrors each Monthly Trends row's own basis: recurring invoices or forecast,
+  
+ // one-offs from invoices, and the shared monthStats logic for counts/beds/average.
+  
+ function ledger(k,r){
+   
+  const map=new Map(),add=(id,val)=>{id=String(id);map.set(id,(map.get(id)||0)+val)};
+   
+  const isFuture=k>today().slice(0,7);
+   
+  if(r<2){
+    
+   if(r===0&&isFuture){(buildForecast(0,k,k)[0]?.items||[]).forEach(x=>add(x.custId,x.sub));}
+     
+   else DB.invoices.filter(i=>mk(i.date)===k&&!!i.isRecurring===(r===0)).forEach(i=>add(i.customerId,i.subtotal!=null?i.subtotal:(i.sub!=null?i.sub:(i.total||0)/(1+(i.vatRate||20)/100))));
+    
+  }else{
+    
+   const ids=new Set(),parts=isFuture?schedsActiveIn(k):DB.invoices.filter(i=>mk(i.date)===k&&i.isRecurring&&!i.deleted);
+    
+   parts.forEach(x=>{const id=String(x.customerId);ids.add(id);if(r===2)add(id,bedsFromLines(x.lines));});
+    
+   if(r===3)ids.forEach(id=>{const c=DB.customers.find(x=>String(x.id)===id);if(c)add(id,unitCountFor(c,k));});
+     
+   if(r===4)ids.forEach(id=>add(id,1));
+     
+  }
+   
+  return map;
+   
+ }
+  
+ function sum(m){return [...m.values()].reduce((a,b)=>a+b,0)}
+  
+ function list(a,b,cash){return [...new Set([...a.keys(),...b.keys()])].map(id=>({id,name:label(id),before:a.get(id)||0,after:b.get(id)||0,delta:(b.get(id)||0)-(a.get(id)||0)})).filter(x=>Math.abs(x.delta)>=(cash?.005:.5)).sort((x,y)=>Math.abs(y.delta)-Math.abs(x.delta)||x.name.localeCompare(y.name));}
+  
+ function rowsHTML(items,cash){return items.length?items.map(x=>'<div class="trend-cause-row"><span><b>'+esc(x.name)+'</b> <span style="color:#64748b">'+type(x.before,x.after)+'</span><br><small style="color:#64748b">'+(cash?money(x.before):x.before.toLocaleString('en-GB'))+' → '+(cash?money(x.after):x.after.toLocaleString('en-GB'))+'</small></span><span style="color:'+(x.delta>=0?'#0e6e72':'#c4401a')+'">'+signed(x.delta,cash)+'</span></div>').join(''):'<p style="color:#64748b;padding:12px 2px">No individual customer changes.</p>'}
+  
+ function open(cell){
+   
+  const ri=cell.parentNode.rowIndex-1,ci=cell.cellIndex-1,b=window._trendBars?.[ci];if(ri<0||ci<0||!b)return;
+    
+  const d=ymDate(b.k),p=new Date(d.getFullYear(),d.getMonth()-1,1),pk=idKey(p),cur=b.k;
+   
+  const names=['Recurring revenue','One-off revenue','Beds','Units','Homes','Avg £/bed'],cash=ri<2||ri===5;
+   
+  let before,after,items=[],extra='';
+   
+  if(ri===5){
+    
+   // A ratio cannot be attributed additively to customers: show the two inputs and their customer drivers instead.
+    
+   const m0=monthStats(pk),m1=monthStats(cur);before=m0.avgPpb;after=m1.avgPpb;
+    
+   const r0=ledger(pk,0),r1=ledger(cur,0),b0=ledger(pk,2),b1=ledger(cur,2);
+    
+   // Average uses monthStats revenue, whose forecast schedule basis may differ from the revenue row.
+    
+   const rBefore=m0.avgPpb*m0.beds,rAfter=m1.avgPpb*m1.beds;
+    
+   extra='<p style="margin:12px 0 6px;color:#475569">Average = recurring revenue ÷ beds. It moved because:</p><p><b>Revenue:</b> '+money(rBefore)+' → '+money(rAfter)+' ('+signed(rAfter-rBefore,true)+')</p><p><b>Beds:</b> '+m0.beds.toLocaleString('en-GB')+' → '+m1.beds.toLocaleString('en-GB')+' ('+signed(m1.beds-m0.beds,false)+')</p><h4 style="margin:14px 0 4px">Revenue drivers</h4>'+rowsHTML(list(r0,r1,true),true)+'<h4 style="margin:14px 0 4px">Bed drivers</h4>'+rowsHTML(list(b0,b1,false),false);
+    
+  }else{
+    
+   const a=ledger(pk,ri),z=ledger(cur,ri);before=sum(a);after=sum(z);items=list(a,z,ri<2);
+    
+   extra='<p style="margin:12px 0 4px;color:#475569">'+(ri===3?'Units follow each billed customer’s monthly unit snapshot. ':ri===2?'Beds follow recurring invoice lines. ':'')+'Customer changes:</p>'+rowsHTML(items,ri<2);
+    
+  }
+   
+  const fmt=n=>cash?money(n):n.toLocaleString('en-GB'),delta=after-before;
+   
+  const overlay=document.createElement('div');overlay.className='trend-cause-dialog';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');overlay.setAttribute('aria-label',names[ri]+' changes');
+   
+  overlay.innerHTML='<div class="trend-cause-panel"><div style="padding:16px 18px;border-bottom:1px solid #dde3e9;display:flex;justify-content:space-between;gap:8px"><div><strong style="font-size:16px">'+names[ri]+' changes</strong><div style="color:#64748b;margin-top:3px">'+esc(p.toLocaleString('en-GB',{month:'long',year:'numeric'}))+' → '+esc(b.fullLbl)+(b.isFuture?' (forecast)':'')+'</div></div><button type="button" aria-label="Close" style="background:none;border:0;font-size:24px;cursor:pointer;align-self:start">×</button></div><div class="trend-cause-body"><p style="font-size:15px;padding-top:13px">'+fmt(before)+' → '+fmt(after)+' <b style="color:'+(delta>=0?'#0e6e72':'#c4401a')+'">('+signed(delta,cash)+')</b></p>'+extra+'</div></div>';
+   
+  document.querySelector('.trend-cause-dialog')?.remove();document.body.appendChild(overlay);
+   
+  const close=()=>{overlay.remove();cell.focus()};overlay.querySelector('button').onclick=close;overlay.onclick=e=>{if(e.target===overlay)close()};overlay.onkeydown=e=>{if(e.key==='Escape')close()};overlay.querySelector('button').focus();
+   
+ }
+  
+ table.addEventListener('click',e=>{const c=e.target.closest('tbody td');if(c&&c.cellIndex>0)open(c)});
+  
+ table.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches('.trend-cause-cell')){e.preventDefault();open(e.target)}});
+  
+ const decorate=()=>table.querySelectorAll('tbody td:not(:first-child)').forEach(c=>{c.classList.add('trend-cause-cell');c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Show what changed: '+c.textContent)});decorate();new MutationObserver(decorate).observe(table,{childList:true});
+  
+});
+  
+</script><script>
+  
 document.addEventListener('DOMContentLoaded',()=>{const t=document.getElementById('trend-table'),p=document.getElementById('trend-tooltip');if(!t||!p)return;const key=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'),money=n=>'£'+Number(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});function val(k,r){if(r<2){if(k>today().slice(0,7))return r?0:(buildForecast(0,k,k)[0]?.recurSub||0);return DB.invoices.filter(i=>mk(i.date)===k&&!i.deleted&&!!i.isRecurring===(r===0)).reduce((s,i)=>s+(i.subtotal??i.sub??i.total/(1+(i.vatRate||20)/100)),0)}const m=monthStats(k);return [m.beds,m.units,m.homes,m.avgPpb][r-2]}t.addEventListener('pointermove',e=>{const c=e.target.closest('tbody td');if(!c||!c.cellIndex){p.style.display='none';return}const r=c.parentNode.rowIndex-1,b=window._trendBars?.[c.cellIndex-1];if(!b)return;const d=ymDate(b.k),prev=new Date(d.getFullYear(),d.getMonth()-1,1),old=val(key(prev),r),cur=val(b.k,r),delta=cur-old,fmt=n=>r<2||r===5?money(n):n.toLocaleString('en-GB'),diff=(delta>0?'+':delta<0?'−':'')+fmt(Math.abs(delta));p.style.pointerEvents='none';p.style.maxWidth='300px';p.textContent=['Revenue','One-off','Beds','Units','Homes','Avg £/Bed'][r]+' · '+prev.toLocaleString('en-GB',{month:'short',year:'numeric'})+' → '+b.fullLbl+(b.isFuture?' forecast':'')+'\n'+fmt(old)+' → '+fmt(cur)+'\nChange: '+diff;p.style.whiteSpace='pre-line';p.style.display='block';p.style.left=Math.max(4,Math.min(e.clientX+12,innerWidth-p.offsetWidth-4))+'px';p.style.top=Math.max(4,Math.min(e.clientY+12,innerHeight-p.offsetHeight-4))+'px'});t.addEventListener('pointerleave',()=>p.style.display='none');new MutationObserver(()=>t.querySelectorAll('tbody td:not(:first-child)').forEach(c=>c.style.cursor='help')).observe(t,{childList:true})});
   
 </script><head>
